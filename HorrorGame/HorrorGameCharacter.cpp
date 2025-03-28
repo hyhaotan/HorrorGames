@@ -79,8 +79,6 @@ AHorrorGameCharacter::AHorrorGameCharacter()
 	// Khởi tạo trạng thái flashlight và việc đang giữ vật
 	bIsFlashlightEnabled = false;
 	isGrabbingObject = false;
-<<<<<<< HEAD
-=======
 
     // Configure character movement
     GetCharacterMovement()->MaxWalkSpeed = 200.f;
@@ -96,7 +94,6 @@ AHorrorGameCharacter::AHorrorGameCharacter()
 
 	//Set Crouch
 	bIsCrouching = false;
->>>>>>> 00e24d2923f0a41b5554200249ef1956c042b661
 }
 
 void AHorrorGameCharacter::BeginPlay()
@@ -111,10 +108,8 @@ void AHorrorGameCharacter::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
 	Ticks(DeltaTime);
-<<<<<<< HEAD
-=======
+
 	HandleStaminaSprint(DeltaTime);
->>>>>>> 00e24d2923f0a41b5554200249ef1956c042b661
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -160,15 +155,12 @@ void AHorrorGameCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInpu
 		EnhancedInputComponent->BindAction(DropObjectAction, ETriggerEvent::Completed, this, &AHorrorGameCharacter::DropObject);
         EnhancedInputComponent->BindAction(ZoomObjectAction, ETriggerEvent::Triggered, this, &AHorrorGameCharacter::HandleZoom);
 
-<<<<<<< HEAD
-=======
         //Sprint
         EnhancedInputComponent->BindAction(SprintAction, ETriggerEvent::Triggered, this, &AHorrorGameCharacter::Sprint);
         EnhancedInputComponent->BindAction(SprintAction, ETriggerEvent::Completed, this, &AHorrorGameCharacter::UnSprint);
 
         //Crouch
         EnhancedInputComponent->BindAction(CrouchAction, ETriggerEvent::Completed, this, &AHorrorGameCharacter::ToggleCrouch);
->>>>>>> 00e24d2923f0a41b5554200249ef1956c042b661
 	}
 	else
 	{
@@ -620,9 +612,7 @@ void AHorrorGameCharacter::Ticks(float DeltaTime)
         // Cập nhật vị trí mục tiêu của Physics Handle
         PhysicsHandle->SetTargetLocation(TargetLocation);
     }
-<<<<<<< HEAD
-}
-=======
+
 }
 
 void AHorrorGameCharacter::HandleStaminaSprint(float DeltaTime)
@@ -665,31 +655,29 @@ void AHorrorGameCharacter::Sprint()
     // Chỉ cho phép sprint khi nhân vật đang di chuyển
     if (GetVelocity().SizeSquared() <= 0.0f)
     {
-        UE_LOG(LogTemp, Warning, TEXT("Cannot sprint while stationary."));
+        UE_LOG(LogTemp, Warning, TEXT("Không thể chạy khi đứng yên."));
         return;
     }
 
     bIsSprint = true;
-    float SprintSpeed;
+    float SprintSpeed = 0.f;
 
-    if (CurrentStamina >= 40.0f)
+    if (CurrentStamina >= 0.4f)
     {
-        // Nếu stamina đủ, đặt tốc độ sprint trực tiếp là 600
         SprintSpeed = 600.f;
-        GetCharacterMovement()->MaxWalkSpeed = SprintSpeed;
     }
     else
     {
-        // Nếu stamina dưới 40, tốc độ giảm dần từ 0 đến 400
-        SprintSpeed = FMath::Lerp(0.f, 400.f, CurrentStamina / 40.0f);
-        GetCharacterMovement()->MaxWalkSpeed = SprintSpeed;
+        SprintSpeed = FMath::Lerp(200.f, 600.f, CurrentStamina / 0.4f);
     }
-    UE_LOG(LogTemp, Warning, TEXT("Sprinting at speed: %f"), SprintSpeed);
+    GetCharacterMovement()->MaxWalkSpeed = SprintSpeed;
+    UE_LOG(LogTemp, Warning, TEXT("Chạy với tốc độ: %f"), SprintSpeed);
 
-    // Ngăn việc hồi phục stamina trong khoảng thời gian nhất định
+    // Ngăn việc hồi phục stamina trong lúc sprint
     CanStaminaRecharge = false;
     GetWorld()->GetTimerManager().ClearTimer(StaminaRechargeTimerHandle);
 }
+
 
 void AHorrorGameCharacter::UnSprint()
 {
@@ -717,4 +705,3 @@ void AHorrorGameCharacter::ToggleCrouch()
         bIsCrouching = true;
 	}
 }
->>>>>>> 00e24d2923f0a41b5554200249ef1956c042b661
