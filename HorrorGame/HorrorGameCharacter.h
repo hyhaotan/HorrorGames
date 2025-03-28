@@ -83,6 +83,15 @@ class AHorrorGameCharacter : public ACharacter
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
 	UInputAction* ZoomObjectAction;
 
+<<<<<<< HEAD
+=======
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
+	UInputAction* SprintAction;
+	
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
+	UInputAction* CrouchAction;
+
+>>>>>>> 00e24d2923f0a41b5554200249ef1956c042b661
 public:
 	AHorrorGameCharacter();
 	
@@ -147,6 +156,15 @@ public:
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Toggle Object 3")
 	bool bIsToggleObject3;
+<<<<<<< HEAD
+=======
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Stamina")
+	bool CanStaminaRecharge;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Sprint")
+	bool bIsSprint;
+>>>>>>> 00e24d2923f0a41b5554200249ef1956c042b661
 	//------------------------------------------------FLOAT--------------------------------------------------------//
 	
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Grab")
@@ -157,6 +175,28 @@ public:
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Grab")
 	float MaxGrabDistance = 500.0f;
+<<<<<<< HEAD
+=======
+
+	UPROPERTY(EditInstanceOnly, BlueprintReadWrite, Category = "Heath", meta = (EditCondition = "Health >= 100"))
+	float Health = 100;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Stamina")
+	float DelayForStaminaRecharge;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Stamina")
+	float CurrentStamina;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Stamina")
+	float MaxStamina;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Stamina")
+	float StaminaSpringUsageRate;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Stamina")
+	float StaminaRechargeRate;
+
+>>>>>>> 00e24d2923f0a41b5554200249ef1956c042b661
 	//------------------------------------------------INT--------------------------------------------------------//
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Grab")
 	int32 InteractLineTraceLength = 500;
@@ -175,6 +215,10 @@ private:
 
 	void Interact();
 
+<<<<<<< HEAD
+=======
+	//Handle Everything Object
+>>>>>>> 00e24d2923f0a41b5554200249ef1956c042b661
 	void GrabObject();
 	void StopGrabObject();
 	void InteractWithGrabbedObject();
@@ -194,13 +238,36 @@ private:
 	void HandleInventoryWidget();
 
 	void Ticks(float DeltaTime);
+<<<<<<< HEAD
 	//------------------------------------------------BOOLEAN--------------------------------------------------------//
 
+=======
+
+	//Handle Stamina and Sprint
+	void HandleStaminaSprint(float DeltaTime);
+	void EnableStaminaGain();
+	void DepletedAllStamina();
+	void Sprint();
+	void UnSprint();
+
+	// Handle Crouch
+	void ToggleCrouch();
+
+	//------------------------------------------------BOOLEAN--------------------------------------------------------//
+	UPROPERTY(EditInstanceOnly, Category = "Crouch")
+	bool bIsCrouching;
+>>>>>>> 00e24d2923f0a41b5554200249ef1956c042b661
 	//------------------------------------------------INTEGER--------------------------------------------------------//
 
 
 	//------------------------------------------------FLOAT--------------------------------------------------------//
+<<<<<<< HEAD
 
+=======
+	
+	//------------------------------------------------TIMER HANDLE--------------------------------------------------------//
+	FTimerHandle StaminaRechargeTimerHandle;
+>>>>>>> 00e24d2923f0a41b5554200249ef1956c042b661
 
 	//------------------------------------------------OTHER--------------------------------------------------------//
 	UMenuSettingWidget* MenuSettingWidget;

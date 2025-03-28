@@ -79,6 +79,24 @@ AHorrorGameCharacter::AHorrorGameCharacter()
 	// Khởi tạo trạng thái flashlight và việc đang giữ vật
 	bIsFlashlightEnabled = false;
 	isGrabbingObject = false;
+<<<<<<< HEAD
+=======
+
+    // Configure character movement
+    GetCharacterMovement()->MaxWalkSpeed = 200.f;
+
+    //Set Stamina
+    CurrentStamina = 1.f;
+    MaxStamina = 1.f;
+    StaminaSpringUsageRate = 0.1f;
+    StaminaRechargeRate = 0.1f;
+
+    CanStaminaRecharge = true;
+    DelayForStaminaRecharge = 2.0f;
+
+	//Set Crouch
+	bIsCrouching = false;
+>>>>>>> 00e24d2923f0a41b5554200249ef1956c042b661
 }
 
 void AHorrorGameCharacter::BeginPlay()
@@ -93,6 +111,10 @@ void AHorrorGameCharacter::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
 	Ticks(DeltaTime);
+<<<<<<< HEAD
+=======
+	HandleStaminaSprint(DeltaTime);
+>>>>>>> 00e24d2923f0a41b5554200249ef1956c042b661
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -138,6 +160,15 @@ void AHorrorGameCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInpu
 		EnhancedInputComponent->BindAction(DropObjectAction, ETriggerEvent::Completed, this, &AHorrorGameCharacter::DropObject);
         EnhancedInputComponent->BindAction(ZoomObjectAction, ETriggerEvent::Triggered, this, &AHorrorGameCharacter::HandleZoom);
 
+<<<<<<< HEAD
+=======
+        //Sprint
+        EnhancedInputComponent->BindAction(SprintAction, ETriggerEvent::Triggered, this, &AHorrorGameCharacter::Sprint);
+        EnhancedInputComponent->BindAction(SprintAction, ETriggerEvent::Completed, this, &AHorrorGameCharacter::UnSprint);
+
+        //Crouch
+        EnhancedInputComponent->BindAction(CrouchAction, ETriggerEvent::Completed, this, &AHorrorGameCharacter::ToggleCrouch);
+>>>>>>> 00e24d2923f0a41b5554200249ef1956c042b661
 	}
 	else
 	{
@@ -589,4 +620,101 @@ void AHorrorGameCharacter::Ticks(float DeltaTime)
         // Cập nhật vị trí mục tiêu của Physics Handle
         PhysicsHandle->SetTargetLocation(TargetLocation);
     }
+<<<<<<< HEAD
 }
+=======
+}
+
+void AHorrorGameCharacter::HandleStaminaSprint(float DeltaTime)
+{
+    if (bIsSprint)
+    {
+        // Tiêu hao stamina theo thời gian chạy
+        CurrentStamina = FMath::Clamp(CurrentStamina - (StaminaSpringUsageRate * DeltaTime), 0, MaxStamina);
+
+        if (CurrentStamina <= 0)
+        {
+            DepletedAllStamina();
+        }
+    }
+    else
+    {
+        // Hồi phục stamina khi không chạy
+        if (CurrentStamina < MaxStamina)
+        {
+            if (CanStaminaRecharge)
+            {
+                CurrentStamina = FMath::Clamp(CurrentStamina + (StaminaRechargeRate * DeltaTime), 0, MaxStamina);
+            }
+        }
+    }
+}
+
+void AHorrorGameCharacter::EnableStaminaGain()
+{
+    CanStaminaRecharge = true;
+}
+
+void AHorrorGameCharacter::DepletedAllStamina()
+{
+    UnSprint();
+}
+
+void AHorrorGameCharacter::Sprint()
+{
+    // Chỉ cho phép sprint khi nhân vật đang di chuyển
+    if (GetVelocity().SizeSquared() <= 0.0f)
+    {
+        UE_LOG(LogTemp, Warning, TEXT("Cannot sprint while stationary."));
+        return;
+    }
+
+    bIsSprint = true;
+    float SprintSpeed;
+
+    if (CurrentStamina >= 40.0f)
+    {
+        // Nếu stamina đủ, đặt tốc độ sprint trực tiếp là 600
+        SprintSpeed = 600.f;
+        GetCharacterMovement()->MaxWalkSpeed = SprintSpeed;
+    }
+    else
+    {
+        // Nếu stamina dưới 40, tốc độ giảm dần từ 0 đến 400
+        SprintSpeed = FMath::Lerp(0.f, 400.f, CurrentStamina / 40.0f);
+        GetCharacterMovement()->MaxWalkSpeed = SprintSpeed;
+    }
+    UE_LOG(LogTemp, Warning, TEXT("Sprinting at speed: %f"), SprintSpeed);
+
+    // Ngăn việc hồi phục stamina trong khoảng thời gian nhất định
+    CanStaminaRecharge = false;
+    GetWorld()->GetTimerManager().ClearTimer(StaminaRechargeTimerHandle);
+}
+
+void AHorrorGameCharacter::UnSprint()
+{
+    if (bIsSprint)
+    {
+        UE_LOG(LogTemp, Warning, TEXT("We have stopped running."));
+        bIsSprint = false;
+        GetCharacterMovement()->MaxWalkSpeed = 200.f;
+
+        //Start the timer to rechage stamina when the character has stopped running
+        GetWorld()->GetTimerManager().SetTimer(StaminaRechargeTimerHandle, this, &AHorrorGameCharacter::EnableStaminaGain, DelayForStaminaRecharge, false);
+    }
+}
+
+void AHorrorGameCharacter::ToggleCrouch()
+{
+	if (bIsCrouching)
+	{
+		UnCrouch();
+        bIsCrouching = false;
+	}
+	else
+	{
+		Crouch();
+        bIsCrouching = true;
+	}
+}
+>>>>>>> 00e24d2923f0a41b5554200249ef1956c042b661
