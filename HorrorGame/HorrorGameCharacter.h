@@ -226,6 +226,7 @@ private:
 	void HandleInventoryWidget();
 
 	void Ticks(float DeltaTime);
+	//------------------------------------------------BOOLEAN--------------------------------------------------------//
 
 	//Handle Stamina and Sprint
 	void HandleStaminaSprint(float DeltaTime);

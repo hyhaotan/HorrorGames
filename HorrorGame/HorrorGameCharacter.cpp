@@ -108,6 +108,7 @@ void AHorrorGameCharacter::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
 	Ticks(DeltaTime);
+
 	HandleStaminaSprint(DeltaTime);
 }
 
@@ -611,6 +612,7 @@ void AHorrorGameCharacter::Ticks(float DeltaTime)
         // Cập nhật vị trí mục tiêu của Physics Handle
         PhysicsHandle->SetTargetLocation(TargetLocation);
     }
+
 }
 
 void AHorrorGameCharacter::HandleStaminaSprint(float DeltaTime)
@@ -653,31 +655,29 @@ void AHorrorGameCharacter::Sprint()
     // Chỉ cho phép sprint khi nhân vật đang di chuyển
     if (GetVelocity().SizeSquared() <= 0.0f)
     {
-        UE_LOG(LogTemp, Warning, TEXT("Cannot sprint while stationary."));
+        UE_LOG(LogTemp, Warning, TEXT("Không thể chạy khi đứng yên."));
         return;
     }
 
     bIsSprint = true;
-    float SprintSpeed;
+    float SprintSpeed = 0.f;
 
-    if (CurrentStamina >= 40.0f)
+    if (CurrentStamina >= 0.4f)
     {
-        // Nếu stamina đủ, đặt tốc độ sprint trực tiếp là 600
         SprintSpeed = 600.f;
-        GetCharacterMovement()->MaxWalkSpeed = SprintSpeed;
     }
     else
     {
-        // Nếu stamina dưới 40, tốc độ giảm dần từ 0 đến 400
-        SprintSpeed = FMath::Lerp(0.f, 400.f, CurrentStamina / 40.0f);
-        GetCharacterMovement()->MaxWalkSpeed = SprintSpeed;
+        SprintSpeed = FMath::Lerp(200.f, 600.f, CurrentStamina / 0.4f);
     }
-    UE_LOG(LogTemp, Warning, TEXT("Sprinting at speed: %f"), SprintSpeed);
+    GetCharacterMovement()->MaxWalkSpeed = SprintSpeed;
+    UE_LOG(LogTemp, Warning, TEXT("Chạy với tốc độ: %f"), SprintSpeed);
 
-    // Ngăn việc hồi phục stamina trong khoảng thời gian nhất định
+    // Ngăn việc hồi phục stamina trong lúc sprint
     CanStaminaRecharge = false;
     GetWorld()->GetTimerManager().ClearTimer(StaminaRechargeTimerHandle);
 }
+
 
 void AHorrorGameCharacter::UnSprint()
 {
