@@ -15,6 +15,7 @@ class UStaticMeshComponent;
 class UMenuSettingWidget;
 class UInventory;
 class UInventorySlot;
+class AItem;
 struct FInputActionValue;
 
 DECLARE_LOG_CATEGORY_EXTERN(LogTemplateCharacter, Log, All);
@@ -89,6 +90,9 @@ class AHorrorGameCharacter : public ACharacter
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
 	UInputAction* CrouchAction;
 
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
+	UInputAction* UseItemAction;
+
 public:
 	AHorrorGameCharacter();
 	
@@ -119,6 +123,15 @@ public:
 	{
 		return Health;
 	};
+
+	UFUNCTION()
+	void IncreaseHealth(float Amount);
+
+	UFUNCTION()
+	void IncreaseStamina(float Amount);
+
+	UFUNCTION()
+	void IncreaseStat(float& CurrentValue, float MaxValue, float Amount, const FString& StatName);
 	//------------------------------------------------PROPERTY--------------------------------------------------------//
 	//------------------------------------------------OTHER--------------------------------------------------------//
 	/** Returns CameraBoom subobject **/
@@ -146,6 +159,18 @@ public:
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "UI")
 	TSubclassOf<class UDeathScreenWidget> DeathScreenWidgetClass;
+
+	UPROPERTY(EditDefaultsOnly, Category = "UI")
+	TSubclassOf<UUserWidget> PickupItemWidgetClass;
+
+	UPROPERTY()
+	UUserWidget* PickupItemWidget;
+
+	UPROPERTY()
+	AItem* EquippedItem;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "PostProcess")
+	class UPostProcessComponent* PostProcessComponent;
 
 	//------------------------------------------------BOOLEAN--------------------------------------------------------//
 
@@ -255,9 +280,18 @@ private:
 	UFUNCTION()
 	void HandleDeath();
 
+	void UseEquippedItem();
+
+	void UpdatePickupWidget();
+
+	bool PerformInteractionLineTrace(FHitResult& OutHitResult) const;
+
 	//------------------------------------------------BOOLEAN--------------------------------------------------------//
 	UPROPERTY(EditInstanceOnly, Category = "Crouch")
-	bool bIsCrouching;
+	bool bIsCrouching;	 
+	
+	UPROPERTY(EditDefaultsOnly, Category = "Hold Item")
+	bool bIsHoldItem;
 	//------------------------------------------------INTEGER--------------------------------------------------------//
 
 
@@ -269,6 +303,6 @@ private:
 	//------------------------------------------------OTHER--------------------------------------------------------//
 	UMenuSettingWidget* MenuSettingWidget;
 
-	class AItem* ItemRef;
+	AItem* ItemRef;
 };
 

@@ -23,7 +23,10 @@ public:
 	EItemTypeData ItemTypeData;
 
 	UPROPERTY(VisibleAnywhere, Category = "Item Data")
-	FItemQuantityData ItemQuantityData;
+	FItemQuantityData ItemQuantityData;	
+	
+	UPROPERTY(VisibleAnywhere, Category = "Item Data")
+	FItem3DMeshData Item3DMeshData;
 
 	UFUNCTION(Category = "Item")
 	UItemBase* CreateItemCopy() const;

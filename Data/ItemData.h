@@ -19,6 +19,18 @@ struct FItemTextData
 	UTexture2D* Icon;
 };
 
+USTRUCT(BlueprintType)
+struct FItem3DMeshData
+{
+	GENERATED_USTRUCT_BODY()
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	UStaticMesh* StaticMesh;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	USkeletalMesh* SkeletalMesh;
+};
+
 
 USTRUCT(BlueprintType)
 struct FItemQuantityData
@@ -51,4 +63,7 @@ struct FItemData : public FTableRowBase
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Item Data")
 	FItemQuantityData ItemQuantityData;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Item Data")
+	FItem3DMeshData Item3DMeshData;
 };

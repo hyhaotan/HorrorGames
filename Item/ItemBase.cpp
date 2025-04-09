@@ -10,6 +10,7 @@ UItemBase* UItemBase::CreateItemCopy() const
 	NewItem->ItemTextData = ItemTextData;
 	NewItem->ItemTypeData = ItemTypeData;
 	NewItem->ItemQuantityData = ItemQuantityData;
+	NewItem->Item3DMeshData = Item3DMeshData;
 	return NewItem;
 }
 
@@ -20,4 +21,5 @@ void UItemBase::InitializeFromItemData(const FItemData& Data)
 	ItemTextData = Data.ItemTextData;
 	ItemTypeData = Data.ItemTypeData;
 	ItemQuantityData = Data.ItemQuantityData;
+	Item3DMeshData = Data.Item3DMeshData;
 }

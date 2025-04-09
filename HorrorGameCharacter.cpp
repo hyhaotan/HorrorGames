@@ -26,6 +26,7 @@
 #include "Components/SceneComponent.h"
 #include "PhysicsEngine/PhysicsHandleComponent.h"
 #include "Kismet/GameplayStatics.h"
+#include "Components/PostProcessComponent.h"
 
 DEFINE_LOG_CATEGORY(LogTemplateCharacter);
 
@@ -96,6 +97,14 @@ AHorrorGameCharacter::AHorrorGameCharacter()
 
 	//Set Crouch
 	bIsCrouching = false;
+
+    bIsHoldItem = false;
+
+    PostProcessComponent = CreateDefaultSubobject<UPostProcessComponent>(TEXT("PostProcessComponent"));
+
+    // Initialize the PostProcessComponent
+    PostProcessComponent->SetupAttachment(GetRootComponent());
+    PostProcessComponent->bEnabled = true;
 }
 
 void AHorrorGameCharacter::BeginPlay()
@@ -112,6 +121,7 @@ void AHorrorGameCharacter::Tick(float DeltaTime)
 	Ticks(DeltaTime);
 
 	HandleStaminaSprint(DeltaTime);
+	UpdatePickupWidget();
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -148,8 +158,8 @@ void AHorrorGameCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInpu
 		EnhancedInputComponent->BindAction(SettingAction, ETriggerEvent::Completed, this, &AHorrorGameCharacter::ToggleSettings);
 
 		// Object interactions: Grab, Retrieve (attach) and Drop,....
-		EnhancedInputComponent->BindAction(HoldAction, ETriggerEvent::Triggered, this, &AHorrorGameCharacter::GrabObject);
-		EnhancedInputComponent->BindAction(HoldAction, ETriggerEvent::Completed, this, &AHorrorGameCharacter::StopGrabObject);
+		//EnhancedInputComponent->BindAction(HoldAction, ETriggerEvent::Triggered, this, &AHorrorGameCharacter::GrabObject);
+		//EnhancedInputComponent->BindAction(HoldAction, ETriggerEvent::Completed, this, &AHorrorGameCharacter::StopGrabObject);
 		EnhancedInputComponent->BindAction(InteractGrabAction, ETriggerEvent::Completed, this, &AHorrorGameCharacter::InteractWithGrabbedObject);
 		EnhancedInputComponent->BindAction(Slot1Action, ETriggerEvent::Completed, this, &AHorrorGameCharacter::ToggleObject1);
 		EnhancedInputComponent->BindAction(Slot2Action, ETriggerEvent::Completed, this, &AHorrorGameCharacter::ToggleObject2);
@@ -163,6 +173,9 @@ void AHorrorGameCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInpu
 
         //Crouch
         EnhancedInputComponent->BindAction(CrouchAction, ETriggerEvent::Completed, this, &AHorrorGameCharacter::ToggleCrouch);
+
+        //Uses Item
+        EnhancedInputComponent->BindAction(UseItemAction, ETriggerEvent::Completed, this, &AHorrorGameCharacter::UseEquippedItem);
 	}
 	else
 	{
@@ -306,7 +319,6 @@ void AHorrorGameCharacter::GrabObject()
     }
 }
 
-
 void AHorrorGameCharacter::StopGrabObject()
 {
     if (isGrabbingObject && PhysicsHandle)
@@ -319,57 +331,99 @@ void AHorrorGameCharacter::StopGrabObject()
 
 void AHorrorGameCharacter::InteractWithGrabbedObject()
 {
-    if (isGrabbingObject && PhysicsHandle && PhysicsHandle->GrabbedComponent)
+    FHitResult HitResult;
+    if (PerformInteractionLineTrace(HitResult))
     {
-        // Kiểm tra số lượng item hiện có trong inventory
-        int32 ValidItemCount = 0;
-        for (AActor* Actor : Inventory)
+        if (AItem* HitItem = Cast<AItem>(HitResult.GetActor()))
         {
-            if (Actor != nullptr)
+            // Kiểm tra số lượng item có trong Inventory
+            int32 ValidItemCount = 0;
+            for (AActor* Actor : Inventory)
             {
-                ValidItemCount++;
+                if (Actor != nullptr)
+                {
+                    ValidItemCount++;
+                }
             }
-        }
-        if (ValidItemCount >= 3)
-        {
-            UE_LOG(LogTemp, Warning, TEXT("Inventory đầy, không thể nhặt thêm item."));
-            // Giải phóng vật thể đang giữ nếu inventory đã đầy
-            PhysicsHandle->ReleaseComponent();
-            isGrabbingObject = false;
-            return;
-        }
-
-        AActor* GrabbedActor = PhysicsHandle->GrabbedComponent->GetOwner();
-        if (GrabbedActor)
-        {
-            // Thêm đối tượng vừa nhặt vào Inventory (tìm slot trống nếu có)
-            int32 EmptyIndex = Inventory.IndexOfByPredicate([](AActor* Actor) { return Actor == nullptr; });
-            if (EmptyIndex != INDEX_NONE)
+            if (ValidItemCount >= 3)
             {
-                Inventory[EmptyIndex] = GrabbedActor;
-            }
-            else
-            {
-                Inventory.Add(GrabbedActor);
+                UE_LOG(LogTemp, Warning, TEXT("Inventory đầy, không thể nhặt thêm item."));
+                return;
             }
 
-            // Nếu đối tượng là AItem, gọi hàm OnPickup để xử lý ẩn, tắt collision và physics
-            if (AItem* Item = Cast<AItem>(GrabbedActor))
+            if (HitItem->ItemMesh)
             {
-                Item->OnPickup();
-            }
-            PhysicsHandle->ReleaseComponent();
-            isGrabbingObject = false;
-            // Reset ItemRef sau khi nhặt xong
-            ItemRef = nullptr;
-        }
+                if (HitItem->ItemData)
+                {
+                    int32 WeightItem = HitItem->ItemData->ItemQuantityData.Weight;
+                    HitItem->SetItemWeight(WeightItem);
+                }
+                else
+                {
+                    UE_LOG(LogTemp, Warning, TEXT("ItemData is null!"));
+                }
 
-        if (InventoryWidget)
-        {
-            InventoryWidget->UpdateInventory(Inventory);
+                HitItem->OnPickup();
+
+                // Cập nhật Inventory: tìm slot trống hoặc thêm vào cuối mảng
+                int32 EmptyIndex = Inventory.IndexOfByPredicate([](AActor* Actor) { return Actor == nullptr; });
+                if (EmptyIndex != INDEX_NONE)
+                {
+                    Inventory[EmptyIndex] = HitItem;
+                }
+                else
+                {
+                    Inventory.Add(HitItem);
+                }
+
+                // Cập nhật giao diện Inventory nếu có widget
+                if (InventoryWidget)
+                {
+                    InventoryWidget->UpdateInventory(Inventory);
+                }
+            }
         }
     }
 }
+
+void AHorrorGameCharacter::UpdatePickupWidget()
+{
+    FHitResult HitResult;
+    bool bHit = PerformInteractionLineTrace(HitResult);
+    AItem* HitItem = bHit ? Cast<AItem>(HitResult.GetActor()) : nullptr;
+
+    if (HitItem)
+    {
+        if (!PickupItemWidget && PickupItemWidgetClass)
+        {
+            PickupItemWidget = CreateWidget<UUserWidget>(GetWorld(), PickupItemWidgetClass);
+            if (PickupItemWidget)
+            {
+                PickupItemWidget->AddToViewport();
+            }
+        }
+        // Nếu cần cập nhật thông tin hiển thị của widget dựa trên HitItem, thực hiện tại đây.
+    }
+    else
+    {
+        if (PickupItemWidget)
+        {
+            PickupItemWidget->RemoveFromParent();
+            PickupItemWidget = nullptr;
+        }
+    }
+}
+
+bool AHorrorGameCharacter::PerformInteractionLineTrace(FHitResult& OutHitResult) const
+{
+    // Tính toán điểm bắt đầu và kết thúc dựa trên vị trí và hướng của FollowCamera
+    const FVector Start = FollowCamera->GetComponentLocation();
+    const FVector End = Start + FollowCamera->GetForwardVector() * InteractLineTraceLength;
+
+    // Thực hiện line trace với channel Visibility
+    return GetWorld()->LineTraceSingleByChannel(OutHitResult, Start, End, ECC_Visibility);
+}
+
 
 void AHorrorGameCharacter::StoreCurrentHeldObject()
 {
@@ -412,39 +466,116 @@ AActor* AHorrorGameCharacter::GetHeldObject() const
 
 void AHorrorGameCharacter::HandleAttachInteract(int32 Index)
 {
-    if (!Inventory.IsValidIndex(Index))
+    if (!bIsHoldItem)
     {
-        UE_LOG(LogTemp, Warning, TEXT("Invalid Inventory index: %d (Size: %d)"), Index, Inventory.Num());
-        return;
+        bIsHoldItem = true;
+
+        // Kiểm tra xem Index có hợp lệ trong kho hay không
+        if (!Inventory.IsValidIndex(Index))
+        {
+            UE_LOG(LogTemp, Warning, TEXT("Invalid Inventory index: %d (Size: %d)"), Index, Inventory.Num());
+            return;
+        }
+
+        // Nếu đã cầm vật phẩm nào trên tay thì thông báo và không cho attach thêm
+        if (EquippedItem)
+        {
+            UE_LOG(LogTemp, Warning, TEXT("Already holding an item. Use or drop the current item before attaching a new one."));
+            return;
+        }
+
+        AActor* RetrievedActor = Inventory[Index];
+        if (!RetrievedActor)
+        {
+            UE_LOG(LogTemp, Warning, TEXT("No object at Inventory index: %d"), Index);
+            return;
+        }
+
+        // Nếu đối tượng là AItem, gọi AttachToCharacter để cầm vật phẩm
+        if (AItem* Item = Cast<AItem>(RetrievedActor))
+        {
+            // Attach vào mesh của nhân vật tại socket "Object"
+            Item->AttachToCharacter(GetMesh(), FName("Object"));
+            EquippedItem = Item;
+            UE_LOG(LogTemp, Log, TEXT("Attached item from Inventory slot %d to hand."), Index);
+        }
+        else
+        {
+            // Xử lý attach cho các đối tượng không phải AItem
+            RetrievedActor->SetActorHiddenInGame(false);
+            RetrievedActor->SetActorEnableCollision(false);
+            if (UPrimitiveComponent* PrimComp = Cast<UPrimitiveComponent>(RetrievedActor->GetComponentByClass(UPrimitiveComponent::StaticClass())))
+            {
+                PrimComp->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+                if (PrimComp->IsSimulatingPhysics())
+                {
+                    PrimComp->SetSimulatePhysics(false);
+                }
+            }
+            RetrievedActor->AttachToComponent(GetMesh(), FAttachmentTransformRules::SnapToTargetNotIncludingScale, FName("Object"));
+            // Nếu đối tượng attach thành công nhưng không phải AItem, không lưu vào EquippedItem
+            UE_LOG(LogTemp, Log, TEXT("Attached non-item actor from Inventory slot %d to hand."), Index);
+        }
     }
-    AActor* RetrievedActor = Inventory[Index];
-    if (!RetrievedActor)
+}
+
+void AHorrorGameCharacter::UseEquippedItem()
+{
+    // Kiểm tra đã có vật phẩm được cầm
+    if (!EquippedItem)
     {
-        UE_LOG(LogTemp, Warning, TEXT("No object at Inventory index: %d"), Index);
+        UE_LOG(LogTemp, Warning, TEXT("No equipped item to use."));
         return;
     }
 
-    // Nếu đối tượng là AItem, gọi hàm AttachToCharacter bên AItem
-    if (AItem* Item = Cast<AItem>(RetrievedActor))
+    // Nếu item thuộc loại không được sử dụng (vd: Normal), thông báo và thoát
+    if (EquippedItem->ItemCategory == EItemCategory::Normal)
     {
-        Item->AttachToCharacter(GetMesh(), FName("Object"));
+        UE_LOG(LogTemp, Warning, TEXT("This item is not usable."));
+        return;
     }
-    else
+
+    // Gọi hành động sử dụng của item
+    EquippedItem->HandleUseItem();
+
+    EquippedItem = nullptr;
+    bIsHoldItem = false;
+    if (InventoryWidget)
     {
-        // Với đối tượng không phải AItem, xử lý attach thủ công
-        RetrievedActor->SetActorHiddenInGame(false);
-        RetrievedActor->SetActorEnableCollision(false);
-        if (UPrimitiveComponent* PrimComp = Cast<UPrimitiveComponent>(RetrievedActor->GetComponentByClass(UPrimitiveComponent::StaticClass())))
-        {
-            PrimComp->SetCollisionEnabled(ECollisionEnabled::NoCollision);
-            if (PrimComp->IsSimulatingPhysics())
-            {
-                PrimComp->SetSimulatePhysics(false);
-            }
-        }
-        RetrievedActor->AttachToComponent(GetMesh(), FAttachmentTransformRules::SnapToTargetNotIncludingScale, FName("Object"));
+        InventoryWidget->UpdateInventory(Inventory);
     }
-    UE_LOG(LogTemp, Warning, TEXT("Attached object from Inventory slot %d to hand."), Index);
+}
+
+
+// Hàm trợ giúp dùng chung để tăng giá trị của một thuộc tính
+void AHorrorGameCharacter::IncreaseStat(float& CurrentValue, float MaxValue, float Amount, const FString& StatName)
+{
+    if (CurrentValue >= MaxValue)
+    {
+        UE_LOG(LogTemp, Warning, TEXT("%s is already full. Cannot use %s item."), *StatName, *StatName);
+        return;
+    }
+
+    float NewValue = FMath::Clamp(CurrentValue + Amount, 0.f, MaxValue);
+    float ActualIncrease = NewValue - CurrentValue;
+
+    if (ActualIncrease > 0.f)
+    {
+        CurrentValue = NewValue;
+        UE_LOG(LogTemp, Log, TEXT("%s increased by %f. Current %s: %f"), *StatName, ActualIncrease, *StatName, CurrentValue);
+    }
+}
+
+// Hàm tăng máu sử dụng IncreaseStat
+void AHorrorGameCharacter::IncreaseHealth(float Amount)
+{
+    IncreaseStat(Health, 100.f, Amount, FString("Health"));
+}
+
+// Hàm tăng stamina sử dụng IncreaseStat
+void AHorrorGameCharacter::IncreaseStamina(float Amount)
+{
+    IncreaseStat(CurrentStamina, MaxStamina, Amount, FString("Stamina"));
 }
 
 void AHorrorGameCharacter::RetrieveObject(int32 Index)
@@ -557,6 +688,8 @@ void AHorrorGameCharacter::DropObject()
                 InventoryWidget->UpdateInventory(Inventory);
             }
 
+            EquippedItem = nullptr;
+            bIsHoldItem = false;
             UE_LOG(LogTemp, Warning, TEXT("Dropped object from Inventory slot %d"), DroppedIndex);
         }
     }
