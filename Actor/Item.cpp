@@ -293,7 +293,6 @@ void AItem::TriggerFlashPostProcess()
 {
     // Lấy danh sách tất cả các nhân vật có thể bị ảnh hưởng
     TArray<AActor*> OverlappedActors;
-    constexpr float FlashRadius = 800.0f;
     UGameplayStatics::GetAllActorsOfClass(GetWorld(), ACharacter::StaticClass(), OverlappedActors);
 
     for (AActor* Actor : OverlappedActors)
@@ -521,22 +520,15 @@ void AItem::HandleUseItem()
 
 void AItem::HandleFlashExplosive()
 {
-    UE_LOG(LogTemp, Log, TEXT("Flash explosive armed; will detonate in 3 seconds"));
-
-    // Đặt Timer để gọi hàm ExplodeFlash sau 3 giây
     GetWorldTimerManager().SetTimer(BombActivationTime, this, &AItem::ExplodeFlash, ActivationTime(3.0f), false);
 }
 
 void AItem::HandleGeneralExplosive()
 {
-    UE_LOG(LogTemp, Log, TEXT("General explosive armed; will detonate in 3 seconds"));
-
-    // Đặt Timer để gọi hàm ExplodeGeneral sau 3 giây
     GetWorldTimerManager().SetTimer(BombActivationTime, this, &AItem::ExplodeGeneral, ActivationTime(3.0f), false);
 }
 
 float AItem::ActivationTime(float Seconds)
 {
-    // Hàm này hiện đang trả về số giây truyền vào, có thể mở rộng cho logic phức tạp hơn nếu cần.
     return Seconds;
 }
