@@ -4,6 +4,7 @@
 #include "HorrorGame/Widget/ItemWidget.h"
 #include "HorrorGame/Item/ItemBase.h"
 #include "HorrorGame/HorrorGameCharacter.h"
+#include "HorrorGame/Actor/FireZone.h"
 
 #include "Kismet/GameplayStatics.h"
 #include "Components/PrimitiveComponent.h"
@@ -15,6 +16,9 @@
 #include "Components/PostProcessComponent.h"
 #include "Components/TimelineComponent.h"
 #include "Particles/ParticleSystemComponent.h"
+#include "NiagaraComponent.h"
+#include "NiagaraFunctionLibrary.h"
+#include "GameFramework/ProjectileMovementComponent.h"
 
 // Sets default values
 AItem::AItem()
@@ -24,7 +28,7 @@ AItem::AItem()
     // Tạo ItemMesh, đặt làm RootComponent và bật simulate physics
     ItemMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("ItemMesh"));
     RootComponent = ItemMesh;
-    ItemMesh->SetSimulatePhysics(true);
+    ItemMesh->SetSimulatePhysics(false);
 
     // Tạo ItemCollision và attach vào ItemMesh
     ItemCollision = CreateDefaultSubobject<UBoxComponent>(TEXT("ItemCollision"));
@@ -242,6 +246,8 @@ void AItem::ExplodeFlash()
 
     // Phát âm thanh flash explosion
     PlaySoundEffect(GetActorLocation());
+
+    // Hủy actor bomb sau khi nổ
     Destroy();
 }
 
@@ -476,23 +482,79 @@ void AItem::PlayFlashReactionMontage(APawn* Pawn)
     }
 }
 
-void AItem::ExplodeGeneral()
+void AItem::MolotovCocktail()
 {
-    const float Damage = 50.f;
-    const float Radius = 300.f;
-
-    // Gây sát thương vùng cho các actor xung quanh
-    UGameplayStatics::ApplyRadialDamage(this, Damage, GetActorLocation(), Radius,
-        UDamageType::StaticClass(), TArray<AActor*>(), this, GetInstigatorController(), true);
-
-    // Khởi chạy hiệu ứng nổ (particle effect) nếu được gán
-    if (GeneralExplosive)
+    if (!GetWorld())
     {
-        UGameplayStatics::SpawnEmitterAtLocation(GetWorld(), GeneralExplosive, GetActorLocation());
+        UE_LOG(LogTemp, Warning, TEXT("MolotovCocktail: GetWorld() returned nullptr."));
+        return;
     }
 
-    UE_LOG(LogTemp, Log, TEXT("General explosive triggered: %f damage within radius: %f"), Damage, Radius);
-    Destroy();
+    // Thiết lập timer delay 3 giây để kích hoạt hiệu ứng "cháy"
+    FTimerHandle DelayTimerHandle;
+    GetWorld()->GetTimerManager().SetTimer(DelayTimerHandle, [this]()
+        {
+            if (!GetWorld())
+            {
+                return;
+            }
+
+            // Phát âm thanh kích hoạt "cháy" tại vị trí bomb
+            if (MolotovCocktailSound)
+            {
+                UGameplayStatics::PlaySoundAtLocation(this, MolotovCocktailSound, GetActorLocation());
+            }
+            else
+            {
+                UE_LOG(LogTemp, Warning, TEXT("MolotovCocktail: MolotovCocktailSound is nullptr."));
+            }
+
+            // Spawn hiệu ứng "cháy" sử dụng Niagara effect
+            if (FireEffect)
+            {
+                UNiagaraComponent* NiagaraComp = UNiagaraFunctionLibrary::SpawnSystemAtLocation(GetWorld(), FireEffect, GetActorLocation());
+                if (NiagaraComp)
+                {
+                    // Sử dụng TWeakObjectPtr để tránh trường hợp component bị xóa trước khi timer chạy hết
+                    TWeakObjectPtr<UNiagaraComponent> WeakNiagaraComp = NiagaraComp;
+                    FTimerHandle NiagaraTimerHandle;
+                    GetWorld()->GetTimerManager().SetTimer(NiagaraTimerHandle, [WeakNiagaraComp]()
+                        {
+                            if (WeakNiagaraComp.IsValid())
+                            {
+                                WeakNiagaraComp->DestroyComponent();
+                            }
+                        }, 5.0f, false);
+                }
+            }
+            else
+            {
+                UE_LOG(LogTemp, Warning, TEXT("MolotovCocktail: FireEffect is nullptr."));
+            }
+
+            // Spawn actor vùng "cháy" để gây sát thương khi nhân vật đi vào
+            if (FireZoneClass)
+            {
+                FActorSpawnParameters SpawnParams;
+                SpawnParams.Owner = this;
+                SpawnParams.Instigator = GetInstigator();
+                AFireZone* FireZone = GetWorld()->SpawnActor<AFireZone>(FireZoneClass, GetActorLocation(), FRotator::ZeroRotator, SpawnParams);
+                if (FireZone)
+                {
+                    // Thiết lập thời gian tồn tại của FireZone (ở đây 5 giây)
+                    FireZone->SetLifeSpan(5.0f);
+                }
+            }
+            else
+            {
+                UE_LOG(LogTemp, Warning, TEXT("MolotovCocktail: FireZoneClass is nullptr."));
+            }
+
+            UE_LOG(LogTemp, Log, TEXT("Molotov Cocktail: Fire activated after delay."));
+            // Hủy actor bomb sau khi kích hoạt hiệu ứng
+            Destroy();
+
+        }, 3.0f, false);
 }
 
 void AItem::HandleUseItem()
@@ -507,7 +569,7 @@ void AItem::HandleUseItem()
         HandleStaminaMedicine();
         break;
     case EItemCategory::General:
-        HandleGeneralExplosive();
+        HandleMolotovCocktail();
         break;
     case EItemCategory::Flash:
         HandleFlashExplosive();
@@ -523,12 +585,78 @@ void AItem::HandleFlashExplosive()
     GetWorldTimerManager().SetTimer(BombActivationTime, this, &AItem::ExplodeFlash, ActivationTime(3.0f), false);
 }
 
-void AItem::HandleGeneralExplosive()
+void AItem::HandleMolotovCocktail()
 {
-    GetWorldTimerManager().SetTimer(BombActivationTime, this, &AItem::ExplodeGeneral, ActivationTime(3.0f), false);
+    if (IgniteEffect)
+    {
+        UGameplayStatics::SpawnEmitterAtLocation(GetWorld(), IgniteEffect,GetActorLocation());
+    }
+
+    GetWorldTimerManager().SetTimer(BombActivationTime, this, &AItem::MolotovCocktail, ActivationTime(3.0f), false);
 }
 
 float AItem::ActivationTime(float Seconds)
 {
     return Seconds;
+}
+
+void AItem::ThrowBomb(const FVector& TargetLocation, float ProjectileSpeed)
+{
+    FVector StartLocation = GetActorLocation();
+    FVector TossVelocity;
+
+    // Tính toán vector vận tốc cần thiết để đưa bomb từ StartLocation tới TargetLocation
+    // bFavorHighArc = false: đường bay thấp; thay đổi thành true nếu muốn đường bay cao hơn.
+    bool bHaveAimSolution = UGameplayStatics::SuggestProjectileVelocity(
+        this,
+        TossVelocity,
+        StartLocation,
+        TargetLocation,
+        ProjectileSpeed,                     // Vận tốc ban đầu
+        false,                               // bFavorHighArc: đường bay thấp
+        0.0f,                                // Override gravity: dùng gravity mặc định nếu bằng 0
+        0.0f,                                // Collision radius nếu cần (ở đây bỏ qua)
+        ESuggestProjVelocityTraceOption::DoNotTrace
+    );
+
+    if (bHaveAimSolution)
+    {
+        // Bật mô phỏng vật lý nếu chưa bật
+        if (ItemMesh && !ItemMesh->IsSimulatingPhysics())
+        {
+            ItemMesh->SetSimulatePhysics(true);
+        }
+        // Áp dụng impulse dựa vào vận tốc tính được, nhân thêm khối lượng để đảm bảo lực đủ
+        if (ItemMesh)
+        {
+            ItemMesh->AddImpulse(TossVelocity * ItemMesh->GetMass());
+        }
+        UE_LOG(LogTemp, Log, TEXT("ThrowBomb: Bomb được ném với lực: %s"), *TossVelocity.ToString());
+    }
+    else
+    {
+        UE_LOG(LogTemp, Warning, TEXT("ThrowBomb: Không tính được vận tốc ném tới mục tiêu (%s)."), *TargetLocation.ToString());
+    }
+}
+
+void AItem::ActivateAndThrowBomb(const FVector& TargetLocation, float ProjectileSpeed, bool bIsFlashBomb)
+{
+    // Ném bomb về phía mục tiêu với đường bay vật lý
+    ThrowBomb(TargetLocation, ProjectileSpeed);
+
+    // Thiết lập timer delay kích hoạt hiệu ứng sau thời gian định sẵn
+    if (bIsFlashBomb)
+    {
+        // Kích hoạt flash
+        GetWorldTimerManager().SetTimer(BombActivationTime, this, &AItem::ExplodeFlash, ActivationTime(ActivationDelay), false);
+    }
+    else
+    {
+        // Với Molotov, hiển thị hiệu ứng Ignite ngay khi kích hoạt
+        if (IgniteEffect)
+        {
+            UGameplayStatics::SpawnEmitterAtLocation(GetWorld(), IgniteEffect, GetActorLocation());
+        }
+        GetWorldTimerManager().SetTimer(BombActivationTime, this, &AItem::MolotovCocktail, ActivationTime(ActivationDelay), false);
+    }
 }

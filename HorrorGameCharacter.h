@@ -290,8 +290,6 @@ private:
 	UPROPERTY(EditInstanceOnly, Category = "Crouch")
 	bool bIsCrouching;	 
 	
-	UPROPERTY(EditDefaultsOnly, Category = "Hold Item")
-	bool bIsHoldItem;
 	//------------------------------------------------INTEGER--------------------------------------------------------//
 
 

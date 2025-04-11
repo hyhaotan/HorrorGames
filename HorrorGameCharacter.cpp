@@ -98,8 +98,6 @@ AHorrorGameCharacter::AHorrorGameCharacter()
 	//Set Crouch
 	bIsCrouching = false;
 
-    bIsHoldItem = false;
-
     PostProcessComponent = CreateDefaultSubobject<UPostProcessComponent>(TEXT("PostProcessComponent"));
 
     // Initialize the PostProcessComponent
@@ -255,14 +253,14 @@ void AHorrorGameCharacter::Look(const FInputActionValue& Value)
 void AHorrorGameCharacter::Interact()
 {
 	FHitResult HitResult;
-	FVector Start = FollowCamera->GetComponentLocation();
-	FVector End = Start + FollowCamera->GetForwardVector() * InteractLineTraceLength;
-	GetWorld()->LineTraceSingleByChannel(HitResult, Start, End, ECollisionChannel::ECC_Visibility);
-	if (ADoor* Door = Cast<ADoor>(HitResult.GetActor()))
-	{
-		Door->Player = this;
-		Door->Interact();
-	}
+    if(PerformInteractionLineTrace(HitResult))
+    {
+        if (ADoor* Door = Cast<ADoor>(HitResult.GetActor()))
+        {
+            Door->Player = this;
+            Door->Interact();
+        }
+    }
 }
 
 void AHorrorGameCharacter::GrabObject()
@@ -424,17 +422,21 @@ bool AHorrorGameCharacter::PerformInteractionLineTrace(FHitResult& OutHitResult)
     return GetWorld()->LineTraceSingleByChannel(OutHitResult, Start, End, ECC_Visibility);
 }
 
-
 void AHorrorGameCharacter::StoreCurrentHeldObject()
 {
     if (AActor* HeldObject = GetHeldObject())
     {
+        // Tách vật khỏi nhân vật
         HeldObject->DetachFromActor(FDetachmentTransformRules::KeepWorldTransform);
+
+        // Nếu vật chưa có trong kho thì lưu vào Inventory
         if (!Inventory.Contains(HeldObject))
         {
             Inventory.Add(HeldObject);
             UE_LOG(LogTemp, Warning, TEXT("Stored currently held object into Inventory."));
         }
+
+        // Kiểm tra loại của vật và xử lý tương ứng
         if (AItem* Item = Cast<AItem>(HeldObject))
         {
             Item->OnPickup();
@@ -443,6 +445,8 @@ void AHorrorGameCharacter::StoreCurrentHeldObject()
         {
             HeldObject->SetActorHiddenInGame(true);
         }
+
+        EquippedItem = nullptr;
     }
 }
 
@@ -466,56 +470,51 @@ AActor* AHorrorGameCharacter::GetHeldObject() const
 
 void AHorrorGameCharacter::HandleAttachInteract(int32 Index)
 {
-    if (!bIsHoldItem)
+    // Kiểm tra xem Index có hợp lệ trong kho hay không
+    if (!Inventory.IsValidIndex(Index))
     {
-        bIsHoldItem = true;
+        UE_LOG(LogTemp, Warning, TEXT("Invalid Inventory index: %d (Size: %d)"), Index, Inventory.Num());
+        return;
+    }
 
-        // Kiểm tra xem Index có hợp lệ trong kho hay không
-        if (!Inventory.IsValidIndex(Index))
-        {
-            UE_LOG(LogTemp, Warning, TEXT("Invalid Inventory index: %d (Size: %d)"), Index, Inventory.Num());
-            return;
-        }
+    // Nếu đã cầm vật phẩm nào trên tay thì thông báo và không cho attach thêm
+    if (EquippedItem)
+    {
+        UE_LOG(LogTemp, Warning, TEXT("Already holding an item. Use or drop the current item before attaching a new one."));
+        return;
+    }
 
-        // Nếu đã cầm vật phẩm nào trên tay thì thông báo và không cho attach thêm
-        if (EquippedItem)
-        {
-            UE_LOG(LogTemp, Warning, TEXT("Already holding an item. Use or drop the current item before attaching a new one."));
-            return;
-        }
+    AActor* RetrievedActor = Inventory[Index];
+    if (!RetrievedActor)
+    {
+        UE_LOG(LogTemp, Warning, TEXT("No object at Inventory index: %d"), Index);
+        return;
+    }
 
-        AActor* RetrievedActor = Inventory[Index];
-        if (!RetrievedActor)
+    // Nếu đối tượng là AItem, gọi AttachToCharacter để cầm vật phẩm
+    if (AItem* Item = Cast<AItem>(RetrievedActor))
+    {
+        // Attach vào mesh của nhân vật tại socket "Object"
+        Item->AttachToCharacter(GetMesh(), FName("Object"));
+        EquippedItem = Item;
+        UE_LOG(LogTemp, Log, TEXT("Attached item from Inventory slot %d to hand."), Index);
+    }
+    else
+    {
+        // Xử lý attach cho các đối tượng không phải AItem
+        RetrievedActor->SetActorHiddenInGame(false);
+        RetrievedActor->SetActorEnableCollision(false);
+        if (UPrimitiveComponent* PrimComp = Cast<UPrimitiveComponent>(RetrievedActor->GetComponentByClass(UPrimitiveComponent::StaticClass())))
         {
-            UE_LOG(LogTemp, Warning, TEXT("No object at Inventory index: %d"), Index);
-            return;
-        }
-
-        // Nếu đối tượng là AItem, gọi AttachToCharacter để cầm vật phẩm
-        if (AItem* Item = Cast<AItem>(RetrievedActor))
-        {
-            // Attach vào mesh của nhân vật tại socket "Object"
-            Item->AttachToCharacter(GetMesh(), FName("Object"));
-            EquippedItem = Item;
-            UE_LOG(LogTemp, Log, TEXT("Attached item from Inventory slot %d to hand."), Index);
-        }
-        else
-        {
-            // Xử lý attach cho các đối tượng không phải AItem
-            RetrievedActor->SetActorHiddenInGame(false);
-            RetrievedActor->SetActorEnableCollision(false);
-            if (UPrimitiveComponent* PrimComp = Cast<UPrimitiveComponent>(RetrievedActor->GetComponentByClass(UPrimitiveComponent::StaticClass())))
+            PrimComp->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+            if (PrimComp->IsSimulatingPhysics())
             {
-                PrimComp->SetCollisionEnabled(ECollisionEnabled::NoCollision);
-                if (PrimComp->IsSimulatingPhysics())
-                {
-                    PrimComp->SetSimulatePhysics(false);
-                }
+                PrimComp->SetSimulatePhysics(false);
             }
-            RetrievedActor->AttachToComponent(GetMesh(), FAttachmentTransformRules::SnapToTargetNotIncludingScale, FName("Object"));
-            // Nếu đối tượng attach thành công nhưng không phải AItem, không lưu vào EquippedItem
-            UE_LOG(LogTemp, Log, TEXT("Attached non-item actor from Inventory slot %d to hand."), Index);
         }
+        RetrievedActor->AttachToComponent(GetMesh(), FAttachmentTransformRules::SnapToTargetNotIncludingScale, FName("Object"));
+        // Nếu đối tượng attach thành công nhưng không phải AItem, không lưu vào EquippedItem
+        UE_LOG(LogTemp, Log, TEXT("Attached non-item actor from Inventory slot %d to hand."), Index);
     }
 }
 
@@ -539,7 +538,6 @@ void AHorrorGameCharacter::UseEquippedItem()
     EquippedItem->HandleUseItem();
 
     EquippedItem = nullptr;
-    bIsHoldItem = false;
     if (InventoryWidget)
     {
         InventoryWidget->UpdateInventory(Inventory);
@@ -689,7 +687,6 @@ void AHorrorGameCharacter::DropObject()
             }
 
             EquippedItem = nullptr;
-            bIsHoldItem = false;
             UE_LOG(LogTemp, Warning, TEXT("Dropped object from Inventory slot %d"), DroppedIndex);
         }
     }

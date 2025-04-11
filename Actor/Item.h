@@ -65,14 +65,24 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Item Data")
 	EItemCategory ItemCategory;
 
+	//------------------------------------------------------PARTICLE-----------------------------------------------------//
 	UPROPERTY(EditInstanceOnly, BlueprintReadOnly, Category = "Effects")
-	UParticleSystem* GeneralExplosive;
+	UParticleSystem* GrenadeExplosive;
 
-	UPROPERTY(EditInstanceOnly, BlueprintReadOnly, Category = "Effects")
+	UPROPERTY(EditInstanceOnly, BlueprintReadOnly, Category = "Flash")
 	UParticleSystem* FlashExplosive;
+
+	UPROPERTY(EditAnywhere, Category = "Effects")
+	UParticleSystem* IgniteEffect;
+
+	UPROPERTY(EditAnywhere, Category = "Effects")
+	class UNiagaraSystem* FireEffect;
 
 	UPROPERTY(EditAnywhere, Category = "Flash | Widget")
 	TSubclassOf<UUserWidget> FlashWidgetClass;
+
+	UPROPERTY(EditDefaultsOnly, Category = "Effects")
+	TSubclassOf<class AFireZone> FireZoneClass;
 
 	UPROPERTY()
 	UPostProcessComponent* FlashPostProcess;
@@ -83,7 +93,7 @@ public:
 	UPROPERTY(EditDefaultsOnly, Category = "Flash")
 	TSubclassOf<UCameraShakeBase> FlashCameraShake;
 
-	UPROPERTY(EditDefaultsOnly, Category = "Flash")
+	UPROPERTY(EditInstanceOnly, BlueprintReadOnly, Category = "Grenade")
 	UParticleSystem* ExplosionEffect;
 
 	UPROPERTY()
@@ -98,7 +108,10 @@ public:
 
 	//------------------------------------------------------SOUND-----------------------------------------------------//
 	UPROPERTY(EditDefaultsOnly, Category = "Flash")
-	USoundBase* FlashSound;
+	USoundBase* FlashSound;	  
+	
+	UPROPERTY(EditDefaultsOnly, Category = "Grenade")
+	USoundBase* MolotovCocktailSound;
 
 	//------------------------------------------------------VARIABLES-----------------------------------------------------//
 	//------------------------------------------------------FLOAT-----------------------------------------------------//
@@ -113,6 +126,9 @@ public:
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Flash")
 	float FlashRadius = 800.0f;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Bomb")
+	float ActivationDelay = 3.0f;
 	//-----------------------------------------------------FUNCTIONS-----------------------------------------------------//
 	UFUNCTION(BlueprintCallable, Category = "Item")
 	void OnPickup();
@@ -142,13 +158,13 @@ public:
 	void HandleStaminaMedicine();
 
 	UFUNCTION()
-	void HandleGeneralExplosive();
+	void HandleMolotovCocktail();
 
 	UFUNCTION()
 	void ExplodeFlash();
 
 	UFUNCTION()
-	void ExplodeGeneral();
+	void MolotovCocktail();
 
 	void HandleUseItem();
 
@@ -169,6 +185,14 @@ public:
 	void TriggerCameraShake(APlayerController* PC);
 
 	void PlayFlashReactionMontage(APawn* Pawn);
+	
+	// Hàm tích hợp: ném bomb với vật lý và kích hoạt hiệu ứng nổ sau delay
+	UFUNCTION(BlueprintCallable, Category = "Bomb")
+	void ActivateAndThrowBomb(const FVector& TargetLocation, float ProjectileSpeed, bool bIsFlashBomb);
+
+	// Hàm ném bomb sử dụng vật lý (tính toán đường bay cong)
+	UFUNCTION(BlueprintCallable, Category = "Bomb")
+	void ThrowBomb(const FVector& TargetLocation, float ProjectileSpeed);
 
 private:
 	// Hàm khởi tạo dữ liệu cho item dựa vào DataTable
