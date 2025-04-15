@@ -66,69 +66,21 @@ public:
 	EItemCategory ItemCategory;
 
 	//------------------------------------------------------PARTICLE-----------------------------------------------------//
-	UPROPERTY(EditInstanceOnly, BlueprintReadOnly, Category = "Effects")
-	UParticleSystem* GrenadeExplosive;
-
-	UPROPERTY(EditInstanceOnly, BlueprintReadOnly, Category = "Flash")
-	UParticleSystem* FlashExplosive;
-
-	UPROPERTY(EditAnywhere, Category = "Effects")
-	UParticleSystem* IgniteEffect;
-
-	UPROPERTY(EditAnywhere, Category = "Effects")
-	class UNiagaraSystem* FireEffect;
-
-	UPROPERTY(EditAnywhere, Category = "Flash | Widget")
-	TSubclassOf<UUserWidget> FlashWidgetClass;
 
 	UPROPERTY(EditDefaultsOnly, Category = "Effects")
 	TSubclassOf<class AFireZone> FireZoneClass;
 
-	UPROPERTY()
-	UPostProcessComponent* FlashPostProcess;
-
-	UPROPERTY()
-	UMaterialInstanceDynamic* FlashMaterialInstance;
-
-	UPROPERTY(EditDefaultsOnly, Category = "Flash")
-	TSubclassOf<UCameraShakeBase> FlashCameraShake;
-
-	UPROPERTY(EditInstanceOnly, BlueprintReadOnly, Category = "Grenade")
-	UParticleSystem* ExplosionEffect;
-
-	UPROPERTY()
-	UTimelineComponent* FlashTimeline;
-
-	UPROPERTY(EditDefaultsOnly, Category = "Flash")
-	UCurveFloat* FlashCurve;
+	UPROPERTY(EditDefaultsOnly, Category = "GrenadeProjectile")
+	TSubclassOf<class AGrenadeProjectile> GrenadeClass;
 
 	//------------------------------------------------------ANIMATION-----------------------------------------------------//
-	UPROPERTY(EditDefaultsOnly, Category = "Flash")
-	UAnimMontage* FlashReactionMontage;
+
 
 	//------------------------------------------------------SOUND-----------------------------------------------------//
-	UPROPERTY(EditDefaultsOnly, Category = "Flash")
-	USoundBase* FlashSound;	  
-	
-	UPROPERTY(EditDefaultsOnly, Category = "Grenade")
-	USoundBase* MolotovCocktailSound;
 
 	//------------------------------------------------------VARIABLES-----------------------------------------------------//
 	//------------------------------------------------------FLOAT-----------------------------------------------------//
-	UPROPERTY(EditDefaultsOnly, Category = "Flash")
-	float FlashMaxDistance = 1500.0f;
-
-	UPROPERTY(EditDefaultsOnly, Category = "Flash")
-	float FlashViewAngleThreshold = 70.0f;
-
-	UPROPERTY(EditDefaultsOnly, Category = "Flash")
-	float FlashDuration = 2.0f;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Flash")
-	float FlashRadius = 800.0f;
-
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Bomb")
-	float ActivationDelay = 3.0f;
+	
 	//-----------------------------------------------------FUNCTIONS-----------------------------------------------------//
 	UFUNCTION(BlueprintCallable, Category = "Item")
 	void OnPickup();
@@ -160,61 +112,13 @@ public:
 	UFUNCTION()
 	void HandleMolotovCocktail();
 
-	UFUNCTION()
-	void ExplodeFlash();
-
-	UFUNCTION()
-	void MolotovCocktail();
-
 	void HandleUseItem();
 
 	UFUNCTION()
 	void HandleFlashExplosive();
 
-	UFUNCTION()
-	float ActivationTime(float Seconds);
-
-	void ApplyFlashEffectToScreen(APlayerController* PlayerController, float Duration);
-
-	void PlaySoundEffect(const FVector& Location);
-
-	void PlaySoundEffectForController(APlayerController* PC);
-
-	void SpawnParticleEffect();
-
-	void TriggerCameraShake(APlayerController* PC);
-
-	void PlayFlashReactionMontage(APawn* Pawn);
-	
-	// Hàm tích hợp: ném bomb với vật lý và kích hoạt hiệu ứng nổ sau delay
-	UFUNCTION(BlueprintCallable, Category = "Bomb")
-	void ActivateAndThrowBomb(const FVector& TargetLocation, float ProjectileSpeed, bool bIsFlashBomb);
-
-	// Hàm ném bomb sử dụng vật lý (tính toán đường bay cong)
-	UFUNCTION(BlueprintCallable, Category = "Bomb")
-	void ThrowBomb(const FVector& TargetLocation, float ProjectileSpeed);
-
 private:
 	// Hàm khởi tạo dữ liệu cho item dựa vào DataTable
 	void InitializeItemData();
-
-	UPROPERTY(EditDefaultsOnly, Category = "Effects")
-	UMaterialInterface* FlashPostProcessMaterial;
-
-	FTimerHandle BombActivationTime;
-
-	bool IsPlayerLookingAtMe() const;
-	void TriggerFlashWidget();
-	void TriggerFlashPostProcess();
-
-	// --- Hàm callback cho Timeline ---
-	UFUNCTION()
-	void UpdateFlashEffect(float Value);
-
-	UFUNCTION()
-	void OnFlashTimelineFinished();
-
-	UFUNCTION()
-	void FlashCurves();
 
 };
