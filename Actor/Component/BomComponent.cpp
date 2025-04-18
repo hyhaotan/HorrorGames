@@ -1,4 +1,5 @@
 ﻿#include "BomComponent.h"
+#include "HorrorGame/HorrorGameCharacter.h"
 #include "HorrorGame/Actor/Item.h"
 #include "GameFramework/Actor.h"
 #include "Kismet/GameplayStatics.h"
@@ -145,46 +146,49 @@ void UBomComponent::ThrowBomb(const FVector& TargetLocation, float InProjectileS
 
 void UBomComponent::SpawnAndThrowBomb(const FVector& Velocity)
 {
-	// Kiểm tra nếu ItemRef và ItemMesh hợp lệ
-	if (!ItemRef || !ItemRef->ItemMesh)
+	// Kiểm tra class bomb đã được thiết lập chưa
+	if (!BombClass)
 	{
-		UE_LOG(LogTemp, Warning, TEXT("SpawnAndThrowBomb: ItemRef hoặc ItemMesh là nullptr."));
+		UE_LOG(LogTemp, Warning, TEXT("BombClass is not set in the BombComponent!"));
 		return;
 	}
 
-	// Lấy vị trí và hướng từ ItemMesh (giả định rằng ItemMesh chính là phần tay của nhân vật cầm)
-	FVector SpawnLocation = ItemRef->ItemMesh->GetComponentLocation();
-	// Nếu cần hướng theo lực ném, sử dụng velocity.Rotation() hoặc có thể dùng GetComponentRotation()
-	FRotator SpawnRotation = Velocity.Rotation();
-
-	// Thiết lập thông số spawn cho actor
-	FActorSpawnParameters SpawnParams;
-	SpawnParams.Owner = GetOwner();
-	if (APawn* PawnOwner = Cast<APawn>(GetOwner()))
+	// Lấy owner để xác định vị trí spawn
+	AActor* Owner = GetOwner();
+	if (!Owner)
 	{
-		SpawnParams.Instigator = PawnOwner;
+		UE_LOG(LogTemp, Warning, TEXT("Owner of BombComponent is null!"));
+		return;
 	}
 
-	// Spawn đối tượng grenade projectile
-	AGrenadeProjectile* Bomb = GetWorld()->SpawnActor<AGrenadeProjectile>(
-		AGrenadeProjectile::StaticClass(), SpawnLocation, SpawnRotation, SpawnParams);
+	// Vị trí và hướng spawn bom
+	const FVector SpawnLocation = Owner->GetActorLocation() + Owner->GetActorForwardVector() * 100.0f;
+	const FRotator SpawnRotation = Owner->GetActorRotation();
 
-	if (Bomb && Bomb->MeshComp)
+	// Thiết lập thông tin spawn
+	FActorSpawnParameters SpawnParams;
+	SpawnParams.Owner = Owner;
+	SpawnParams.Instigator = Owner->GetInstigator();
+	SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AdjustIfPossibleButAlwaysSpawn;
+
+	// Spawn bomb
+	AItem* SpawnedBomb = GetWorld()->SpawnActor<AItem>(BombClass, SpawnLocation, SpawnRotation, SpawnParams);
+	if (!SpawnedBomb)
 	{
-		// Đồng bộ scale của Bomb với ItemMesh của AItem
-		Bomb->MeshComp->SetWorldScale3D(ItemRef->ItemMesh->GetComponentScale());
+		UE_LOG(LogTemp, Warning, TEXT("Failed to spawn bomb actor!"));
+		return;
+	}
 
-		// Thiết lập vận tốc và kích hoạt chuyển động của projectile
-		if (Bomb->ProjectileMovement)
-		{
-			Bomb->ProjectileMovement->Velocity = Velocity;
-			Bomb->ProjectileMovement->ProjectileGravityScale = 1.f;
-			Bomb->ProjectileMovement->Activate();
-		}
+	// Kích hoạt mô phỏng vật lý và áp lực ném
+	if (UPrimitiveComponent* BombPrimitive = Cast<UPrimitiveComponent>(SpawnedBomb->GetComponentByClass(UPrimitiveComponent::StaticClass())))
+	{
+		BombPrimitive->SetSimulatePhysics(true);
+		BombPrimitive->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
+		BombPrimitive->AddImpulse(Velocity, NAME_None, true);
 	}
 	else
 	{
-		UE_LOG(LogTemp, Warning, TEXT("SpawnAndThrowBomb: Failed to spawn GrenadeProjectile hoặc MeshComp là nullptr."));
+		UE_LOG(LogTemp, Warning, TEXT("The spawned bomb does not have a primitive component to apply impulse on."));
 	}
 }
 

@@ -198,6 +198,7 @@ void AItem::HandleHealthMedicine()
     {
         UE_LOG(LogTemp, Warning, TEXT("Health Medicine usage failed: Owner is not a valid character."));
     }
+
 }
 
 void AItem::HandleStaminaMedicine()

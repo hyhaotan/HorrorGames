@@ -54,6 +54,8 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Item Mesh")
 	class UStaticMeshComponent* ItemMesh;
 
+	UStaticMeshComponent* GetItemMesh() const { return ItemMesh; }
+
 	// Data
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Item Data")
 	FDataTableRowHandle ItemRowHandle;

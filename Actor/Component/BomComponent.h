@@ -17,7 +17,6 @@ class UCurveFloat;
 class UTimelineComponent;
 class UAnimMontage;
 class USoundBase;
-class AItem;
 
 UCLASS(ClassGroup = (Custom), meta = (BlueprintSpawnableComponent))
 class HORRORGAME_API UBomComponent : public UActorComponent
@@ -184,6 +183,7 @@ public:
 	UPROPERTY()
 	FTimerHandle BombActivationTime;
 
-	UPROPERTY(EditInstanceOnly, BlueprintReadOnly, Category = "Item")
-	AItem* ItemRef;
+	UPROPERTY(EditDefaultsOnly, Category = "Bomb")
+	TSubclassOf<class AItem> BombClass;
+
 };

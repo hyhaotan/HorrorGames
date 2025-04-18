@@ -132,6 +132,10 @@ public:
 
 	UFUNCTION()
 	void IncreaseStat(float& CurrentValue, float MaxValue, float Amount, const FString& StatName);
+
+	AActor* GetHeldObject() const;
+
+	virtual float TakeDamage(float DamageAmount, const FDamageEvent& DamageEvent, AController* EventInstigator, AActor* DamageCauser) override;
 	//------------------------------------------------PROPERTY--------------------------------------------------------//
 	//------------------------------------------------OTHER--------------------------------------------------------//
 	/** Returns CameraBoom subobject **/
@@ -249,7 +253,7 @@ private:
 	void StopGrabObject();
 	void InteractWithGrabbedObject();
 	void StoreCurrentHeldObject();
-	AActor* GetHeldObject() const;
+
 	void HandleAttachInteract(int32 Index);
 	void RetrieveObject(int32 Index);
 	void RetrieveObject1();
@@ -264,8 +268,6 @@ private:
 	void HandleInventoryWidget();
 
 	void Ticks(float DeltaTime);
-
-	virtual float TakeDamage(float DamageAmount, const FDamageEvent& DamageEvent, AController* EventInstigator, AActor* DamageCauser) override;
 
 	//Handle Stamina and Sprint
 	void HandleStaminaSprint(float DeltaTime);
