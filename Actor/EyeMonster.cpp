@@ -40,6 +40,9 @@ AEyeMonster::AEyeMonster()
     TraceHeight = 1000.f;
     TraceDepth = 2000.f;
     RotationSpeed = 2.5f;
+    LookDamageInterval = 1.0f;
+    LookDamageTimer = 0.0f;
+    bHasInflictedDamage = false;
 }
 
 bool AEyeMonster::GetGroundSpawnLocation(const FVector2D& XY, FVector& OutLocation)
@@ -92,11 +95,10 @@ void AEyeMonster::BeginPlay()
 
 void AEyeMonster::SetupSpawnLocation()
 {
-    // Lấy center + extent gốc
+    // 1) Random vị trí trong volume gốc
     const FVector Center = InitialSpawnCenter;
     const FVector Extent = InitialSpawnExtent;
 
-    // Random trong box gốc
     float RandX = FMath::FRandRange(Center.X - Extent.X, Center.X + Extent.X);
     float RandY = FMath::FRandRange(Center.Y - Extent.Y, Center.Y + Extent.Y);
 
@@ -107,10 +109,13 @@ void AEyeMonster::SetupSpawnLocation()
     }
     else
     {
-        // fallback xuống đáy volume nếu line trace fail
         SetActorLocation(FVector(RandX, RandY, Center.Z - Extent.Z));
     }
+
+    // 2) Tính rotation để quay mặt về player
+    FacePlayerInstant();
 }
+
 
 void AEyeMonster::Tick(float DeltaTime)
 {
@@ -122,46 +127,77 @@ void AEyeMonster::Tick(float DeltaTime)
 
 void AEyeMonster::HandleLookDamage(float DeltaTime)
 {
-    APlayerController* PC = UGameplayStatics::GetPlayerController(this, 0);
-    if (!PC || !PC->GetPawn()) return;
+    APlayerController* PC = UGameplayStatics::GetPlayerController(GetWorld(), 0);
+    APawn* PlayerPawn = PC ? PC->GetPawn() : nullptr;
+    if (!PC || !PlayerPawn) return;
 
-    // Lấy vị trí & hướng camera
-    FVector PlayerLoc; FRotator PlayerRot;
-    PC->GetPlayerViewPoint(PlayerLoc, PlayerRot);
+    // 1) Lấy viewpoint
+    FVector PlayerLocation;
+    FRotator PlayerRotation;
+    PC->GetPlayerViewPoint(PlayerLocation, PlayerRotation);
 
-    FVector ToMonster = (GetActorLocation() - PlayerLoc).GetSafeNormal();
-    float Dot = FVector::DotProduct(PlayerRot.Vector(), ToMonster);
+    // 2) Tính góc nhìn
+    FVector ToMonster = (GetActorLocation() - PlayerLocation).GetSafeNormal();
+    FVector PlayerForward = PlayerRotation.Vector();
+    float   Dot = FVector::DotProduct(PlayerForward, ToMonster);
 
-    // Kiểm tra vật cản
-    FHitResult Hit;
-    FCollisionQueryParams Params;
-    Params.AddIgnoredActor(this);
-    Params.AddIgnoredActor(PC->GetPawn());
-    bool bHit = GetWorld()->LineTraceSingleByChannel(
-        Hit, PlayerLoc, GetActorLocation(), ECC_Visibility, Params);
-    bool bBlocked = bHit && Hit.GetActor() != this;
-
-    if (Dot >= LookThreshold && !bBlocked)
+    if (Dot >= LookThreshold)
     {
-        if (!GetWorldTimerManager().IsTimerActive(LookDamageTimerHandle))
-        {
-            // Phát ngay lần đầu
-         /*   InflictDamage();*/
+        // 3) Line‑trace kiểm tra vật cản (visibility)
+        FHitResult Hit;
+        FCollisionQueryParams Params(SCENE_QUERY_STAT(VisibilityTrace), true, this);
+        Params.AddIgnoredActor(PlayerPawn);
+        // Trace từ camera đến monster
+        bool bBlocked = GetWorld()->LineTraceSingleByChannel(
+            Hit,
+            PlayerLocation,
+            GetActorLocation(),
+            ECC_Visibility,
+            Params
+        ) && Hit.GetActor() != this;
 
-            // Sau đó lặp mỗi 1s
-            GetWorldTimerManager().SetTimer(
-                LookDamageTimerHandle,
-                this,
-                &AEyeMonster::InflictDamage,
-                1.0f,    // interval
-                true     // looping
-            );
+        if (bBlocked)
+        {
+            // Có vật chắn → reset timer, không gây damage
+            LookDamageTimer = 0.0f;
+            return;
+        }
+
+        // 4) Không bị che khuất → cộng dồn ΔTime
+        LookDamageTimer += DeltaTime;
+        if (LookDamageTimer >= LookDamageInterval)
+        {
+            InflictDamage();
+            LookDamageTimer -= LookDamageInterval;
         }
     }
     else
     {
-        // Hủy timer khi người chơi không nhìn
-        GetWorldTimerManager().ClearTimer(LookDamageTimerHandle);
+        // Nhìn đi chỗ khác → reset
+        LookDamageTimer = 0.0f;
+    }
+}
+
+void AEyeMonster::FacePlayerInstant()
+{
+    // 1) Lấy PlayerController + Pawn
+    if (APlayerController* PC = UGameplayStatics::GetPlayerController(GetWorld(), 0))
+    {
+        if (APawn* Pawn = PC->GetPawn())
+        {
+            // 2) Tính LookAt từ monster tới player
+            const FVector MyLoc = GetActorLocation();
+            const FVector PlayerLoc = Pawn->GetActorLocation();
+            FRotator LookAtRot = UKismetMathLibrary::FindLookAtRotation(MyLoc, PlayerLoc);
+
+            // 3) Giữ nguyên pitch hiện tại, đặt roll = 0, áp offset yaw
+            LookAtRot.Pitch = GetActorRotation().Pitch;
+            LookAtRot.Roll = 0.f;
+            LookAtRot.Yaw = FRotator::NormalizeAxis(LookAtRot.Yaw + YawOffset);
+
+            // 4) Apply rotation
+            SetActorRotation(LookAtRot);
+        }
     }
 }
 
@@ -201,20 +237,9 @@ void AEyeMonster::InflictDamage()
 
 void AEyeMonster::RotateToPlayer(float DeltaTime)
 {
-    APlayerController* PC = UGameplayStatics::GetPlayerController(GetWorld(), 0);
-    if (!PC || !PC->GetPawn()) return;
-
-    FVector MyLoc = GetActorLocation();
-    FVector TargetLoc = PC->GetPawn()->GetActorLocation();
-    FRotator DesiredRot = UKismetMathLibrary::FindLookAtRotation(MyLoc, TargetLoc);
-
-    DesiredRot.Pitch = GetActorRotation().Pitch;
-    DesiredRot.Roll = 0.f;
-    // Normalize yaw after applying offset
-    DesiredRot.Yaw = FRotator::NormalizeAxis(DesiredRot.Yaw + YawOffset);
-
-    SetActorRotation(DesiredRot);
+    FacePlayerInstant();
 }
+
 
 void AEyeMonster::DestroySelf()
 {
@@ -225,33 +250,21 @@ void AEyeMonster::DestroySelf()
         return;
     }
 
-    // Save class and current location/properties for respawn
+    // 1) Lưu lại class, offset yaw, và volume gốc
     UClass* MonsterClass = GetClass();
-    FVector SpawnLocation = GetActorLocation();
-    float   SavedYawOffset = YawOffset;
+    float SavedYawOffset = YawOffset;
+    FVector OriginalCenter = InitialSpawnCenter;
+    FVector OriginalExtent = InitialSpawnExtent;
 
-    // Setup delegate to respawn after delay
+    // 2) Tạo delegate respawn
     FTimerDelegate RespawnDelegate = FTimerDelegate::CreateLambda(
-        [World, MonsterClass, SpawnLocation, SavedYawOffset]() mutable
+        [World, MonsterClass, OriginalCenter, OriginalExtent, SavedYawOffset]() mutable
         {
-            // Get player location at respawn time
-            FVector PlayerLoc = FVector::ZeroVector;
-            if (APlayerController* PC = UGameplayStatics::GetPlayerController(World, 0))
-            {
-                if (APawn* Pawn = PC->GetPawn())
-                {
-                    PlayerLoc = Pawn->GetActorLocation();
-                }
-            }
+            // Tạo transform ban đầu tại center gốc (chỉ để spawn deferred, vị trí thực sẽ đc SetupSpawnLocation)
+            FTransform SpawnTransform;
+            SpawnTransform.SetLocation(OriginalCenter);
 
-            // Calculate look-at rotation
-            FRotator LookAtRot = UKismetMathLibrary::FindLookAtRotation(SpawnLocation, PlayerLoc);
-            LookAtRot.Pitch = 0.f;
-            LookAtRot.Roll = 0.f;
-            LookAtRot.Yaw = FRotator::NormalizeAxis(LookAtRot.Yaw + SavedYawOffset);
-
-            // Deferred spawn to set properties before BeginPlay
-            FTransform SpawnTransform(LookAtRot, SpawnLocation);
+            // Spawn deferred để chúng ta còn thiết lập biến trước BeginPlay
             AEyeMonster* NewMonster = World->SpawnActorDeferred<AEyeMonster>(
                 MonsterClass,
                 SpawnTransform,
@@ -261,14 +274,21 @@ void AEyeMonster::DestroySelf()
             );
             if (NewMonster)
             {
-                // Transfer offsets and initial center
+                // 3) Gán lại volume gốc và yaw-offset
+                NewMonster->InitialSpawnCenter = OriginalCenter;
+                NewMonster->InitialSpawnExtent = OriginalExtent;
                 NewMonster->YawOffset = SavedYawOffset;
-                NewMonster->InitialSpawnCenter = SpawnLocation;
+
+                // 4) Finish spawning → BeginPlay chạy, rồi ta random thêm
                 UGameplayStatics::FinishSpawningActor(NewMonster, SpawnTransform);
+
+                // 5) Random vị trí mới trong volume
+                NewMonster->SetupSpawnLocation();
             }
         }
     );
 
+    // 6) Đặt timer để respawn
     World->GetTimerManager().SetTimer(
         RespawnTimerHandle,
         RespawnDelegate,
@@ -276,6 +296,6 @@ void AEyeMonster::DestroySelf()
         false
     );
 
-    // Destroy current instance
+    // Cuối cùng destroy instance cũ
     Destroy();
 }

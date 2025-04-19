@@ -53,6 +53,13 @@ protected:
     UPROPERTY(EditAnywhere, Category = "Look")
     float YawOffset = -90.f;
 
+    UPROPERTY(EditAnywhere, Category = "LookDamage")
+    float LookDamageInterval = 1.0f;
+
+    float LookDamageTimer = 0.0f;
+
+    bool bHasInflictedDamage;
+
     // Rotation
     UPROPERTY(EditAnywhere, Category = "EyeMonster")
     float RotationSpeed;
@@ -78,6 +85,7 @@ protected:
     void InflictDamage();
     void DestroySelf();
     void RotateToPlayer(float DeltaTime);
+    void FacePlayerInstant();
 public:
     virtual void Tick(float DeltaTime) override;
 
