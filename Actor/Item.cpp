@@ -7,6 +7,7 @@
 #include "HorrorGame/Actor/FireZone.h"
 #include "HorrorGame/Actor/GrenadeProjectile.h"
 #include "Component/BomComponent.h"
+#include "Component/FlashLightComponent.h"
 
 #include "Kismet/GameplayStatics.h"
 #include "Components/PrimitiveComponent.h"
@@ -21,6 +22,8 @@
 #include "NiagaraComponent.h"
 #include "NiagaraFunctionLibrary.h"
 #include "GameFramework/ProjectileMovementComponent.h"
+#include "Components/SpotLightComponent.h"
+
 
 // Sets default values
 AItem::AItem()
@@ -50,8 +53,7 @@ AItem::AItem()
     ItemCollision->OnComponentBeginOverlap.AddDynamic(this, &AItem::OnOverlapBegin);
     ItemCollision->OnComponentEndOverlap.AddDynamic(this, &AItem::OnOverlapEnd);
 
-    // Khởi tạo loại item mặc định là Normal
-    ItemCategory = EItemCategory::Normal;
+    bFlashAttached = false;
 }
 
 void AItem::BeginPlay()
@@ -156,33 +158,12 @@ void AItem::InitializeItemData()
     if (ItemRowHandle.DataTable && !ItemRowHandle.RowName.IsNone())
     {
         static const FString ContextString(TEXT("Item Data Context"));
-        FItemData* DataRow = ItemRowHandle.DataTable->FindRow<FItemData>(ItemRowHandle.RowName, ContextString, true);
-        if (DataRow)
+        if (FItemData* DataRow = ItemRowHandle.DataTable->FindRow<FItemData>(ItemRowHandle.RowName, ContextString, true))
         {
-            // Tạo một UItemBase mới và khởi tạo từ dữ liệu DataTable
-            UItemBase* MyItem = NewObject<UItemBase>(this, UItemBase::StaticClass());
-            MyItem->InitializeFromItemData(*DataRow);
-            ItemData = MyItem;
-
-            // Cập nhật giao diện widget nếu có
-            if (ItemWidget)
-            {
-                if (UItemWidget* MyWidget = Cast<UItemWidget>(ItemWidget->GetUserWidgetObject()))
-                {
-                    MyWidget->SetItemData(MyItem->ItemTextData);
-                }
-            }
-
-            // Gán Static Mesh nếu có
-            if (ItemMesh && DataRow->Item3DMeshData.StaticMesh)
-            {
-                ItemMesh->SetStaticMesh(DataRow->Item3DMeshData.StaticMesh);
-                ItemMesh->SetVisibility(true);
-            }
-            else if (ItemMesh)
-            {
-                ItemMesh->SetVisibility(false);
-            }
+            ConfigureItemBase(*DataRow);
+            ConfigureWidget(*DataRow);
+            ConfigureMesh(*DataRow);
+            BindUseFunction(*DataRow);
         }
     }
 }
@@ -198,7 +179,62 @@ void AItem::HandleHealthMedicine()
     {
         UE_LOG(LogTemp, Warning, TEXT("Health Medicine usage failed: Owner is not a valid character."));
     }
+}
 
+void AItem::ConfigureItemBase(const FItemData& DataRow)
+{
+    UItemBase* MyItem = NewObject<UItemBase>(this, UItemBase::StaticClass());
+    MyItem->InitializeFromItemData(DataRow);
+    ItemData = MyItem;
+}
+
+void AItem::ConfigureWidget(const FItemData& DataRow)
+{
+    if (ItemWidget)
+    {
+        if (UItemWidget* MyWidget = Cast<UItemWidget>(ItemWidget->GetUserWidgetObject()))
+        {
+            MyWidget->SetItemData(ItemData->ItemTextData);
+        }
+    }
+}
+
+void AItem::ConfigureMesh(const FItemData& DataRow)
+{
+    if (ItemMesh && DataRow.Item3DMeshData.StaticMesh)
+    {
+        ItemMesh->SetStaticMesh(DataRow.Item3DMeshData.StaticMesh);
+        ItemMesh->SetVisibility(true);
+    }
+    else if (ItemMesh)
+    {
+        ItemMesh->SetVisibility(false);
+    }
+}
+
+void AItem::BindUseFunction(const FItemData& DataRow)
+{
+    switch (DataRow.ItemTypeData)
+    {
+    case EItemTypeData::HealthMedicine:
+        UseItemFunction = &AItem::HandleHealthMedicine;
+        break;
+    case EItemTypeData::StaminaMedicine:
+        UseItemFunction = &AItem::HandleStaminaMedicine;
+        break;
+    case EItemTypeData::General:
+        UseItemFunction = &AItem::HandleMolotovCocktail;
+        break;
+    case EItemTypeData::Flash:
+        UseItemFunction = &AItem::HandleFlashExplosive;
+        break;
+    case EItemTypeData::FlashLight:
+        UseItemFunction = &AItem::HandleFlashLight;
+        break;
+    default:
+        UseItemFunction = nullptr;
+        break;
+    }
 }
 
 void AItem::HandleStaminaMedicine()
@@ -214,29 +250,6 @@ void AItem::HandleStaminaMedicine()
     }
 }
 
-void AItem::HandleUseItem()
-{
-    // Xử lý sử dụng item tùy theo danh mục loại item
-    switch (ItemCategory)
-    {
-    case EItemCategory::HeathMedicine:
-        HandleHealthMedicine();
-        break;
-    case EItemCategory::StaminaMedicine:
-        HandleStaminaMedicine();
-        break;
-    case EItemCategory::General:
-        HandleMolotovCocktail();
-        break;
-    case EItemCategory::Flash:
-        HandleFlashExplosive();
-        break;
-    default:
-        UE_LOG(LogTemp, Warning, TEXT("This item cannot be used."));
-        break;
-    }
-}
-
 void AItem::HandleFlashExplosive()
 {
     if (UBomComponent* BomComp = FindComponentByClass<UBomComponent>())
@@ -249,6 +262,34 @@ void AItem::HandleFlashExplosive()
     }
 }
 
+void AItem::HandleFlashLight()
+{
+    if (!FlashLightComp || !ItemMesh)
+    {
+        return;
+    }
+
+    // Lần đầu, attach spotlight vào socket "SpotLight" trên mesh
+    if (!bFlashAttached)
+    {
+        FlashLightComp->SpotLight->AttachToComponent(
+            ItemMesh,
+            FAttachmentTransformRules(EAttachmentRule::SnapToTarget,true),
+            TEXT("SpotLight")
+        );
+		UE_LOG(LogTemp, Log, TEXT("Flashlight attached to item mesh."));
+
+        bFlashAttached = true;
+    }
+    else
+    {
+		UE_LOG(LogTemp, Log, TEXT("Flashlight already attached to item mesh."));
+    }
+
+    // Bật/Tắt spotlight
+    FlashLightComp->ToggleFlashlight();
+}
+
 void AItem::HandleMolotovCocktail()
 {
     if (UBomComponent* BomComp = FindComponentByClass<UBomComponent>())
@@ -258,5 +299,17 @@ void AItem::HandleMolotovCocktail()
     else
     {
         UE_LOG(LogTemp, Warning, TEXT("HandleMolotovCocktail: BomComponent not found on AItem"));
+    }
+}
+
+void AItem::UseItem()
+{
+    if (UseItemFunction)
+    {
+        (this->*UseItemFunction)();
+    }
+    else
+    {
+        UE_LOG(LogTemp, Warning, TEXT("UseItem: No handler bound for item type."));
     }
 }

@@ -67,15 +67,6 @@ AHorrorGameCharacter::AHorrorGameCharacter()
 	FollowCamera->SetupAttachment(CameraBoom);
 	FollowCamera->bUsePawnControlRotation = true;
 
-	// Create flashlight (SpotLight)
-	Light = CreateDefaultSubobject<USpotLightComponent>(TEXT("Light"));
-	Light->SetupAttachment(FollowCamera);
-	Light->Intensity = 10000.0f;
-	Light->AttenuationRadius = 1000.0f;
-	Light->OuterConeAngle = 25.0f;
-	Light->InnerConeAngle = 18.0f;
-	Light->SetVisibility(false);
-
 	// Initialize physics variables
 	PhysicsHandle = CreateDefaultSubobject<UPhysicsHandleComponent>(TEXT("PhysicsHandle"));
 
@@ -148,8 +139,6 @@ void AHorrorGameCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInpu
 		EnhancedInputComponent->BindAction(MoveAction, ETriggerEvent::Triggered, this, &AHorrorGameCharacter::Move);
 		// Looking
 		EnhancedInputComponent->BindAction(LookAction, ETriggerEvent::Triggered, this, &AHorrorGameCharacter::Look);
-		// Flashlight
-		EnhancedInputComponent->BindAction(ClickAction, ETriggerEvent::Completed, this, &AHorrorGameCharacter::ToggleFlashlight);
 		// Interact
 		EnhancedInputComponent->BindAction(InteractAction, ETriggerEvent::Completed, this, &AHorrorGameCharacter::Interact);
 		// Settings
@@ -179,30 +168,6 @@ void AHorrorGameCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInpu
 	{
 		UE_LOG(LogTemplateCharacter, Error, TEXT("'%s' Failed to find an Enhanced Input component!"), *GetNameSafe(this));
 	}
-}
-
-void AHorrorGameCharacter::ToggleFlashlight()
-{
-	if (!bIsFlashlightEnabled)
-	{
-		EnableFlashlight();
-	}
-	else
-	{
-		DisableFlashlight();
-	}
-}
-
-void AHorrorGameCharacter::EnableFlashlight()
-{
-	bIsFlashlightEnabled = true;
-	Light->SetVisibility(true);
-}
-
-void AHorrorGameCharacter::DisableFlashlight()
-{
-	bIsFlashlightEnabled = false;
-	Light->SetVisibility(false);
 }
 
 void AHorrorGameCharacter::ToggleSettings()
@@ -527,23 +492,18 @@ void AHorrorGameCharacter::UseEquippedItem()
         return;
     }
 
-    // Nếu item thuộc loại không được sử dụng (vd: Normal), thông báo và thoát
-    if (EquippedItem->ItemCategory == EItemCategory::Normal)
-    {
-        UE_LOG(LogTemp, Warning, TEXT("This item is not usable."));
-        return;
-    }
+    // Gọi hàm UseItem() đã được gán trong InitializeItemData()
+    EquippedItem->UseItem();
 
-    // Gọi hành động sử dụng của item
-    EquippedItem->HandleUseItem();
-
+    // Tháo item sau khi dùng (nếu cần)
     EquippedItem = nullptr;
+
+    // Cập nhật giao diện inventory
     if (InventoryWidget)
     {
         InventoryWidget->UpdateInventory(Inventory);
     }
 }
-
 
 // Hàm trợ giúp dùng chung để tăng giá trị của một thuộc tính
 void AHorrorGameCharacter::IncreaseStat(float& CurrentValue, float MaxValue, float Amount, const FString& StatName)

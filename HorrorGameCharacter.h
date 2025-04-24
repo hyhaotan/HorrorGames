@@ -33,9 +33,6 @@ class AHorrorGameCharacter : public ACharacter
 	UCameraComponent* FollowCamera;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = Camera, meta = (AllowPrivateAccess = "true"))
-	class USpotLightComponent* Light;
-
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = Camera, meta = (AllowPrivateAccess = "true"))
 	class UPhysicsHandleComponent* PhysicsHandle;
 	
 	/** MappingContext */
@@ -238,10 +235,6 @@ public:
 	UAnimMontage* DeathMontage;
 private:
 	//------------------------------------------------FUNCTION--------------------------------------------------------//
-	//Flashlight
-	void ToggleFlashlight();
-	void EnableFlashlight();
-	void DisableFlashlight();
 
 	void ToggleSettings();
 	void GetSettingClass();

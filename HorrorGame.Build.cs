@@ -22,6 +22,7 @@ public class HorrorGame : ModuleRules
             "UMG",
             "SlateCore",
             "Slate",
-            "Niagara"});
+            "Niagara",
+            "GameplayCameras"});
     }
 }

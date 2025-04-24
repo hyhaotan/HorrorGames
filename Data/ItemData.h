@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 #include "CoreMinimal.h"
 #include "Engine/DataTable.h"
@@ -44,7 +44,21 @@ struct FItemQuantityData
 UENUM()
 enum class EItemTypeData : uint8
 {
-	Key UMETA(DisplayName = "Key")
+	Key UMETA(DisplayName = "Key") ,
+	Flash UMETA(DisplayName = "Flash"),
+	HealthMedicine UMETA(DisplayName = "HealthMedicine"),
+	StaminaMedicine UMETA(DisplayName = "StaminaMedicine"),
+	General UMETA(DisplayName = "General"),
+	FlashLight UMETA(DisplayName = "FlashLight"),
+	None UMETA(DisplayName = "None")
+};
+
+UENUM(BlueprintType)
+enum class EMedicineSize : uint8
+{
+	Small   UMETA(DisplayName = "Small"),
+	Medium  UMETA(DisplayName = "Medium"),
+	Large   UMETA(DisplayName = "Large"),
 };
 
 USTRUCT(BlueprintType)
@@ -60,6 +74,9 @@ struct FItemData : public FTableRowBase
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Item Data")
 	EItemTypeData ItemTypeData;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Item Data")
+	EMedicineSize MedicineSize;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Item Data")
 	FItemQuantityData ItemQuantityData;
