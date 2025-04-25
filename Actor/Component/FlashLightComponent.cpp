@@ -15,7 +15,7 @@ UFlashLightComponent::UFlashLightComponent()
     SpotLight = CreateDefaultSubobject<USpotLightComponent>(TEXT("FlashSpotLight"));
     SpotLight->SetupAttachment(this);
     SpotLight->SetVisibility(false);
-    SpotLight->bUseInverseSquaredFalloff = false; // nếu muốn linear attenuation
+    SpotLight->bUseInverseSquaredFalloff = false;
     SpotLight->Intensity = 5000.f;
     SpotLight->InnerConeAngle = 10.f;
     SpotLight->OuterConeAngle = 20.f;

@@ -48,6 +48,9 @@ public:
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Item Data")
     UItemBase* ItemData;
 
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Item Data")
+	FItemData ItemDataRow;
+
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Components")
     UFlashLightComponent* FlashLightComp;
 
@@ -77,10 +80,11 @@ private:
     void BindUseFunction(const FItemData& DataRow);
 
     void HandleHealthMedicine();
-    void HandleStaminaMedicine();
     void HandleMolotovCocktail();
     void HandleFlashExplosive();
     void HandleFlashLight();
+    FItemData* GetItemData() const;
+    float CalculateHealAmount(EMedicineSize Size) const;
 
     UFUNCTION()
     void OnOverlapBegin(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor,
@@ -92,4 +96,6 @@ private:
         UPrimitiveComponent* OtherComponent, int32 OtherBodyIndex);
 
     bool bFlashAttached;
+
+	bool bIsItemData;
 };

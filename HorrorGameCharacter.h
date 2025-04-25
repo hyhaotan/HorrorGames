@@ -88,7 +88,7 @@ class AHorrorGameCharacter : public ACharacter
 	UInputAction* CrouchAction;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
-	UInputAction* UseItemAction;
+	UInputAction* UseItemAction;	
 
 public:
 	AHorrorGameCharacter();
@@ -123,9 +123,6 @@ public:
 
 	UFUNCTION()
 	void IncreaseHealth(float Amount);
-
-	UFUNCTION()
-	void IncreaseStamina(float Amount);
 
 	UFUNCTION()
 	void IncreaseStat(float& CurrentValue, float MaxValue, float Amount, const FString& StatName);
@@ -233,6 +230,7 @@ public:
 	//------------------------------------------------ANIMATION--------------------------------------------------------//
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Animation")
 	UAnimMontage* DeathMontage;
+
 private:
 	//------------------------------------------------FUNCTION--------------------------------------------------------//
 

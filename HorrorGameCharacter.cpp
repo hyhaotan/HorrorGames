@@ -162,7 +162,8 @@ void AHorrorGameCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInpu
         EnhancedInputComponent->BindAction(CrouchAction, ETriggerEvent::Completed, this, &AHorrorGameCharacter::ToggleCrouch);
 
         //Uses Item
-        EnhancedInputComponent->BindAction(UseItemAction, ETriggerEvent::Completed, this, &AHorrorGameCharacter::UseEquippedItem);
+        EnhancedInputComponent->BindAction(UseItemAction, ETriggerEvent::Completed, this, &AHorrorGameCharacter::UseEquippedItem); 
+        
 	}
 	else
 	{
@@ -528,12 +529,6 @@ void AHorrorGameCharacter::IncreaseStat(float& CurrentValue, float MaxValue, flo
 void AHorrorGameCharacter::IncreaseHealth(float Amount)
 {
     IncreaseStat(Health, 100.f, Amount, FString("Health"));
-}
-
-// Hàm tăng stamina sử dụng IncreaseStat
-void AHorrorGameCharacter::IncreaseStamina(float Amount)
-{
-    IncreaseStat(CurrentStamina, MaxStamina, Amount, FString("Stamina"));
 }
 
 void AHorrorGameCharacter::RetrieveObject(int32 Index)

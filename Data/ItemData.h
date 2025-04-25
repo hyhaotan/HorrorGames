@@ -2,6 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "Engine/DataTable.h"
+#include "GameFramework/Actor.h"
 #include "ItemData.generated.h"
 
 USTRUCT(BlueprintType)
@@ -47,7 +48,6 @@ enum class EItemTypeData : uint8
 	Key UMETA(DisplayName = "Key") ,
 	Flash UMETA(DisplayName = "Flash"),
 	HealthMedicine UMETA(DisplayName = "HealthMedicine"),
-	StaminaMedicine UMETA(DisplayName = "StaminaMedicine"),
 	General UMETA(DisplayName = "General"),
 	FlashLight UMETA(DisplayName = "FlashLight"),
 	None UMETA(DisplayName = "None")
@@ -75,7 +75,10 @@ struct FItemData : public FTableRowBase
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Item Data")
 	EItemTypeData ItemTypeData;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Item Data")
+	UPROPERTY(EditAnywhere, Transient, Category = "Item Data")
+	bool bIsMedicineType = false;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Item Data", meta = (EditCondition = "bIsMedicineType", EditConditionHides))
 	EMedicineSize MedicineSize;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Item Data")
@@ -83,4 +86,6 @@ struct FItemData : public FTableRowBase
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Item Data")
 	FItem3DMeshData Item3DMeshData;
+
 };
+

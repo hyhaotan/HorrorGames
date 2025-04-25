@@ -153,31 +153,59 @@ void AItem::OnOverlapEnd(UPrimitiveComponent* OverlappedComponent, AActor* Other
     }
 }
 
+FItemData* AItem::GetItemData() const
+{
+    if (!ItemRowHandle.DataTable || ItemRowHandle.RowName.IsNone())
+    {
+        return nullptr;
+    }
+
+    static const FString ContextString(TEXT("Item Data Context"));
+    return ItemRowHandle.DataTable->FindRow<FItemData>(ItemRowHandle.RowName, ContextString, true);
+}
+
 void AItem::InitializeItemData()
 {
-    if (ItemRowHandle.DataTable && !ItemRowHandle.RowName.IsNone())
+    if (FItemData* DataRow = GetItemData())
     {
-        static const FString ContextString(TEXT("Item Data Context"));
-        if (FItemData* DataRow = ItemRowHandle.DataTable->FindRow<FItemData>(ItemRowHandle.RowName, ContextString, true))
-        {
-            ConfigureItemBase(*DataRow);
-            ConfigureWidget(*DataRow);
-            ConfigureMesh(*DataRow);
-            BindUseFunction(*DataRow);
-        }
+        ConfigureItemBase(*DataRow);
+        ConfigureWidget(*DataRow);
+        ConfigureMesh(*DataRow);
+        BindUseFunction(*DataRow);
     }
 }
 
 void AItem::HandleHealthMedicine()
 {
-    if (AHorrorGameCharacter* Character = Cast<AHorrorGameCharacter>(GetOwner()))
+    if (FItemData* DataRow = GetItemData())
     {
-        UE_LOG(LogTemp, Log, TEXT("Using Health Medicine: Increasing health by 25"));
-        Character->IncreaseHealth(25.f);
+        if (AHorrorGameCharacter* Character = Cast<AHorrorGameCharacter>(GetOwner()))
+        {
+            const float HealAmount = CalculateHealAmount(DataRow->MedicineSize);
+            if (HealAmount > 0.f)
+            {
+                Character->IncreaseHealth(HealAmount);
+            }
+        }
+        else
+        {
+            UE_LOG(LogTemp, Warning, TEXT("Health Medicine usage failed: Owner is not a valid character."));
+        }
     }
-    else
+}
+
+float AItem::CalculateHealAmount(EMedicineSize Size) const
+{
+    switch (Size)
     {
-        UE_LOG(LogTemp, Warning, TEXT("Health Medicine usage failed: Owner is not a valid character."));
+    case EMedicineSize::Small:
+        return 25.f;
+    case EMedicineSize::Medium:
+        return 50.f;
+    case EMedicineSize::Large:
+        return 100.f;
+    default:
+        return 0.f;
     }
 }
 
@@ -219,9 +247,6 @@ void AItem::BindUseFunction(const FItemData& DataRow)
     case EItemTypeData::HealthMedicine:
         UseItemFunction = &AItem::HandleHealthMedicine;
         break;
-    case EItemTypeData::StaminaMedicine:
-        UseItemFunction = &AItem::HandleStaminaMedicine;
-        break;
     case EItemTypeData::General:
         UseItemFunction = &AItem::HandleMolotovCocktail;
         break;
@@ -234,19 +259,6 @@ void AItem::BindUseFunction(const FItemData& DataRow)
     default:
         UseItemFunction = nullptr;
         break;
-    }
-}
-
-void AItem::HandleStaminaMedicine()
-{
-    if (AHorrorGameCharacter* Character = Cast<AHorrorGameCharacter>(GetOwner()))
-    {
-        UE_LOG(LogTemp, Log, TEXT("Using Stamina Medicine: Increasing stamina by 20"));
-        Character->IncreaseStamina(20.f);
-    }
-    else
-    {
-        UE_LOG(LogTemp, Warning, TEXT("Stamina Medicine usage failed: Owner is not a valid character."));
     }
 }
 
