@@ -13,6 +13,7 @@
 #include "Engine/DamageEvents.h"
 #include "Kismet/KismetMathLibrary.h"
 #include "Blueprint/UserWidget.h"
+#include "HorrorGame/Controller/GazeLockPlayerController.h"
 
 AEyeMonster::AEyeMonster()
 {
@@ -39,7 +40,6 @@ AEyeMonster::AEyeMonster()
     LookThreshold = 0.8f;
     TraceHeight = 1000.f;
     TraceDepth = 2000.f;
-    RotationSpeed = 2.5f;
     LookDamageInterval = 1.f;
 }
 
@@ -64,6 +64,7 @@ void AEyeMonster::Tick(float DeltaTime)
     Super::Tick(DeltaTime);
     ApplyLookDamage(DeltaTime);
     FacePlayer(DeltaTime);
+
 }
 
 void AEyeMonster::RespawnAndDestroy()
@@ -152,13 +153,8 @@ bool AEyeMonster::GetGroundSpawnLocation(const FVector2D& XY, FVector& OutLocati
 
 void AEyeMonster::ApplyLookDamage(float DeltaTime)
 {
-    if (!CanDamage())
-    {
-        LookDamageTimer = 0.f; // reset để khi mở lại mắt, tính timer từ đầu
-        return;
-    }
-
-    if (!IsPlayerLookingAtMonster())
+    // --- existing damage logic ---
+    if (!CanDamage() || !IsPlayerLookingAtMonster())
     {
         LookDamageTimer = 0.f;
         return;

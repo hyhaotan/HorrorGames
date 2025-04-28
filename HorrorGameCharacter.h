@@ -17,6 +17,7 @@ class UInventory;
 class UInventorySlot;
 class AItem;
 struct FInputActionValue;
+class AMonsterJump;
 
 DECLARE_LOG_CATEGORY_EXTERN(LogTemplateCharacter, Log, All);
 
@@ -24,13 +25,17 @@ UCLASS(config=Game)
 class AHorrorGameCharacter : public ACharacter
 {
 	GENERATED_BODY()
-	/** Camera boom positioning the camera behind the character */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = Camera, meta = (AllowPrivateAccess = "true"))
-	USpringArmComponent* CameraBoom;
+	USpringArmComponent* CameraBoom;          
 
-	/** Follow camera */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = Camera, meta = (AllowPrivateAccess = "true"))
-	UCameraComponent* FollowCamera;
+	UCameraComponent* FollowCamera;           
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = Camera, meta = (AllowPrivateAccess = "true"))
+	USpringArmComponent* ThirdPersonSpringArm;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = Camera, meta = (AllowPrivateAccess = "true"))
+	UCameraComponent* ThirdPersonCamera;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = Camera, meta = (AllowPrivateAccess = "true"))
 	class UPhysicsHandleComponent* PhysicsHandle;
@@ -90,6 +95,9 @@ class AHorrorGameCharacter : public ACharacter
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
 	UInputAction* UseItemAction;	
 
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
+	UInputAction* EscapeAction;
+
 public:
 	AHorrorGameCharacter();
 	
@@ -130,6 +138,12 @@ public:
 	AActor* GetHeldObject() const;
 
 	virtual float TakeDamage(float DamageAmount, const FDamageEvent& DamageEvent, AController* EventInstigator, AActor* DamageCauser) override;
+
+	void EnableFirstPerson();
+	void EnableThirdPerson();
+
+	void SetGrabbingMonster(AMonsterJump* Monster) { GrabbingMonster = Monster; }
+	void ClearGrabbingMonster() { GrabbingMonster = nullptr; }
 	//------------------------------------------------PROPERTY--------------------------------------------------------//
 	//------------------------------------------------OTHER--------------------------------------------------------//
 	/** Returns CameraBoom subobject **/
@@ -170,6 +184,17 @@ public:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "PostProcess")
 	class UPostProcessComponent* PostProcessComponent;
 
+	UPROPERTY(EditDefaultsOnly, Category = "HeadBob")
+	TSubclassOf<UCameraShakeBase> WalkCameraShakeClass;
+
+	/** Camera shake khi chạy */
+	UPROPERTY(EditDefaultsOnly, Category = "HeadBob")
+	TSubclassOf<UCameraShakeBase> SprintCameraShakeClass;
+
+	/** Camera shake khi đứng yên hoặc rơi */
+	UPROPERTY(EditDefaultsOnly, Category = "HeadBob")
+	TSubclassOf<UCameraShakeBase> IdleCameraShakeClass;
+
 	//------------------------------------------------BOOLEAN--------------------------------------------------------//
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Flashlight")
@@ -192,6 +217,8 @@ public:
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Sprint")
 	bool bIsSprint;
+	//------------------------------------------------VECTOR--------------------------------------------------------//	  
+	
 	//------------------------------------------------FLOAT--------------------------------------------------------//
 	
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Grab")
@@ -220,6 +247,9 @@ public:
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Stamina")
 	float StaminaRechargeRate;
+
+	UPROPERTY(EditDefaultsOnly, Category = "HeadBob")
+	float SprintSpeedThreshold = 300.f;
 
 	//------------------------------------------------INT--------------------------------------------------------//
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Grab")
@@ -279,6 +309,10 @@ private:
 
 	bool PerformInteractionLineTrace(FHitResult& OutHitResult) const;
 
+	void InitializeHeadbob();
+
+	void OnEscape(const FInputActionValue& Value);
+
 	//------------------------------------------------BOOLEAN--------------------------------------------------------//
 	UPROPERTY(EditInstanceOnly, Category = "Crouch")
 	bool bIsCrouching;	 
@@ -295,5 +329,8 @@ private:
 	UMenuSettingWidget* MenuSettingWidget;
 
 	AItem* ItemRef;
+
+	UPROPERTY()
+	AMonsterJump* GrabbingMonster;
 };
 

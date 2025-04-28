@@ -9,6 +9,7 @@
 #include "HorrorGame/Widget/Inventory/InventorySlot.h"
 #include "HorrorGame/Widget/Inventory/InventoryItem.h"
 #include "HorrorGame/Item/ItemBase.h"
+#include "HorrorGame/Actor/MonsterJump.h"
 #include "HorrorGame/Widget/Settings/DeathScreenWidget.h"
 
 // Engine
@@ -35,65 +36,71 @@ DEFINE_LOG_CATEGORY(LogTemplateCharacter);
 
 AHorrorGameCharacter::AHorrorGameCharacter()
 {
-	// Set size for collision capsule
-	GetCapsuleComponent()->InitCapsuleSize(42.f, 96.0f);
+    // Set size for collision capsule
+    GetCapsuleComponent()->InitCapsuleSize(42.f, 96.0f);
 
-	// Don't rotate when the controller rotates. Let that just affect the camera.
-	bUseControllerRotationPitch = false;
-	bUseControllerRotationYaw = true;
-	bUseControllerRotationRoll = false;
+    // Controller rotation only affects camera
+    bUseControllerRotationPitch = false;
+    bUseControllerRotationYaw = true;
+    bUseControllerRotationRoll = false;
 
-	// Configure character movement
-	GetCharacterMovement()->bOrientRotationToMovement = true;
-	GetCharacterMovement()->RotationRate = FRotator(0.0f, 500.0f, 0.0f);
-	GetCharacterMovement()->JumpZVelocity = 700.f;
-	GetCharacterMovement()->AirControl = 0.35f;
-	GetCharacterMovement()->MaxWalkSpeed = 500.f;
-	GetCharacterMovement()->MinAnalogWalkSpeed = 20.f;
-	GetCharacterMovement()->BrakingDecelerationWalking = 2000.f;
-	GetCharacterMovement()->BrakingDecelerationFalling = 1500.0f;
+    // Character movement
+    auto Movement = GetCharacterMovement();
+    Movement->bOrientRotationToMovement = true;
+    Movement->RotationRate = FRotator(0.f, 500.f, 0.f);
+    Movement->JumpZVelocity = 700.f;
+    Movement->AirControl = 0.35f;
+    Movement->MaxWalkSpeed = 200.f;    // Combined setting
+    Movement->MinAnalogWalkSpeed = 20.f;
+    Movement->BrakingDecelerationWalking = 2000.f;
+    Movement->BrakingDecelerationFalling = 1500.f;
 
-	// Create a camera boom (attach to socket "head" của Mesh)
-	CameraBoom = CreateDefaultSubobject<USpringArmComponent>(TEXT("CameraBoom"));
-	CameraBoom->SetupAttachment(GetMesh(), TEXT("head"));
-	CameraBoom->TargetArmLength = 400.0f;
-	CameraBoom->bUsePawnControlRotation = true;
-	CameraBoom->CameraLagSpeed = 9.0f;
-	CameraBoom->bEnableCameraRotationLag = true;
-	CameraBoom->SetRelativeLocation(FVector(0.0f, 10.0f, 0.0f));
+    // ===== FIRST-PERSON CAMERA (FP) =====
+    CameraBoom = CreateDefaultSubobject<USpringArmComponent>(TEXT("CameraBoom"));
+    CameraBoom->SetupAttachment(GetMesh(), TEXT("head"));
+    CameraBoom->TargetArmLength = 0.f;    // Right at head
+    CameraBoom->bUsePawnControlRotation = true;
+    CameraBoom->bEnableCameraRotationLag = false;
 
-	// Create a follow camera
-	FollowCamera = CreateDefaultSubobject<UCameraComponent>(TEXT("FollowCamera"));
-	FollowCamera->SetupAttachment(CameraBoom);
-	FollowCamera->bUsePawnControlRotation = true;
+    FollowCamera = CreateDefaultSubobject<UCameraComponent>(TEXT("FollowCamera"));
+    FollowCamera->SetupAttachment(CameraBoom);
+    FollowCamera->bUsePawnControlRotation = true;
+    FollowCamera->Activate();              // FP active by default
 
-	// Initialize physics variables
-	PhysicsHandle = CreateDefaultSubobject<UPhysicsHandleComponent>(TEXT("PhysicsHandle"));
+    // ===== THIRD-PERSON CAMERA (TP) =====
+    ThirdPersonSpringArm = CreateDefaultSubobject<USpringArmComponent>(TEXT("TP_SpringArm"));
+    ThirdPersonSpringArm->SetupAttachment(GetCapsuleComponent());
+    ThirdPersonSpringArm->TargetArmLength = 300.f;
+    ThirdPersonSpringArm->bUsePawnControlRotation = true;
 
-	// Khởi tạo trạng thái flashlight và việc đang giữ vật
-	bIsFlashlightEnabled = false;
-	isGrabbingObject = false;
+    ThirdPersonCamera = CreateDefaultSubobject<UCameraComponent>(TEXT("TP_Camera"));
+    ThirdPersonCamera->SetupAttachment(ThirdPersonSpringArm, USpringArmComponent::SocketName);
+    ThirdPersonCamera->bUsePawnControlRotation = false;
+    ThirdPersonCamera->Deactivate();             // TP off by default
 
-    // Configure character movement
-    GetCharacterMovement()->MaxWalkSpeed = 200.f;
+    // Physics handle
+    PhysicsHandle = CreateDefaultSubobject<UPhysicsHandleComponent>(TEXT("PhysicsHandle"));
 
-    //Set Stamina
-    CurrentStamina = 1.f;
-    MaxStamina = 1.f;
+    // Flashlight & grabbing
+    bIsFlashlightEnabled = false;
+    isGrabbingObject = false;
+
+    // Stamina
+    CurrentStamina = MaxStamina = 1.f;
     StaminaSpringUsageRate = 0.1f;
     StaminaRechargeRate = 0.1f;
-
     CanStaminaRecharge = true;
-    DelayForStaminaRecharge = 2.0f;
+    DelayForStaminaRecharge = 2.f;
 
-	//Set Crouch
-	bIsCrouching = false;
+    // Crouch state
+    bIsCrouching = false;
 
+    // Post-process
     PostProcessComponent = CreateDefaultSubobject<UPostProcessComponent>(TEXT("PostProcessComponent"));
-
-    // Initialize the PostProcessComponent
     PostProcessComponent->SetupAttachment(GetRootComponent());
     PostProcessComponent->bEnabled = true;
+
+    GrabbingMonster = nullptr;
 }
 
 void AHorrorGameCharacter::BeginPlay()
@@ -102,6 +109,7 @@ void AHorrorGameCharacter::BeginPlay()
 	GetSettingClass();
 
     HandleInventoryWidget();
+
 }
 
 void AHorrorGameCharacter::Tick(float DeltaTime)
@@ -111,6 +119,7 @@ void AHorrorGameCharacter::Tick(float DeltaTime)
 
 	HandleStaminaSprint(DeltaTime);
 	UpdatePickupWidget();
+    InitializeHeadbob();
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -160,6 +169,8 @@ void AHorrorGameCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInpu
 
         //Crouch
         EnhancedInputComponent->BindAction(CrouchAction, ETriggerEvent::Completed, this, &AHorrorGameCharacter::ToggleCrouch);
+
+        EnhancedInputComponent->BindAction(EscapeAction, ETriggerEvent::Completed, this, &AHorrorGameCharacter::OnEscape);
 
         //Uses Item
         EnhancedInputComponent->BindAction(UseItemAction, ETriggerEvent::Completed, this, &AHorrorGameCharacter::UseEquippedItem); 
@@ -214,6 +225,22 @@ void AHorrorGameCharacter::Look(const FInputActionValue& Value)
 		AddControllerYawInput(LookAxisVector.X);
 		AddControllerPitchInput(LookAxisVector.Y);
 	}
+}
+
+void AHorrorGameCharacter::EnableFirstPerson()
+{
+    FollowCamera->Activate();
+    CameraBoom->Activate();
+    ThirdPersonCamera->Deactivate();
+    ThirdPersonSpringArm->Deactivate();
+}
+
+void AHorrorGameCharacter::EnableThirdPerson()
+{
+    ThirdPersonSpringArm->Activate();
+    ThirdPersonCamera->Activate();
+    FollowCamera->Deactivate();
+    CameraBoom->Deactivate();
 }
 
 void AHorrorGameCharacter::Interact()
@@ -386,6 +413,38 @@ bool AHorrorGameCharacter::PerformInteractionLineTrace(FHitResult& OutHitResult)
 
     // Thực hiện line trace với channel Visibility
     return GetWorld()->LineTraceSingleByChannel(OutHitResult, Start, End, ECC_Visibility);
+}
+
+void AHorrorGameCharacter::InitializeHeadbob()
+{
+    const float Speed = GetVelocity().Size();
+
+    APlayerController* PC = Cast<APlayerController>(GetController());
+    if (!PC) return;
+
+    if (Speed > 0.f && CanJump())
+    {
+        if (Speed < SprintSpeedThreshold)
+        {
+            PC->ClientStartCameraShake(WalkCameraShakeClass, 1.0f);
+        }
+        else
+        {
+            PC->ClientStartCameraShake(SprintCameraShakeClass, 1.0f);
+        }
+    }
+    else
+    {
+        PC->ClientStartCameraShake(IdleCameraShakeClass, 1.0f);
+    }
+}
+
+void AHorrorGameCharacter::OnEscape(const FInputActionValue& Value)
+{
+    if (GrabbingMonster)
+    {
+        GrabbingMonster->ReceiveEscapeInput();
+    }
 }
 
 void AHorrorGameCharacter::StoreCurrentHeldObject()

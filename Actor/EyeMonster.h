@@ -173,6 +173,4 @@ private:
     void HandleSelfDestruct();
 
     void FinishBlink();
-
-
 };
