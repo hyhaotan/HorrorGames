@@ -5,6 +5,7 @@
 #include "CoreMinimal.h"
 #include "GameFramework/Character.h"
 #include "Logging/LogMacros.h"
+#include "InputActionValue.h"
 #include "HorrorGameCharacter.generated.h"
 
 class USpringArmComponent;
@@ -18,6 +19,7 @@ class UInventorySlot;
 class AItem;
 struct FInputActionValue;
 class AMonsterJump;
+class USanityWidget;
 
 DECLARE_LOG_CATEGORY_EXTERN(LogTemplateCharacter, Log, All);
 
@@ -96,7 +98,16 @@ class AHorrorGameCharacter : public ACharacter
 	UInputAction* UseItemAction;	
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
-	UInputAction* EscapeAction;
+	UInputAction* EscapeWAction;	
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
+	UInputAction* EscapeAAction;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
+	UInputAction* EscapeSAction;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
+	UInputAction* EscapeDAction;
 
 public:
 	AHorrorGameCharacter();
@@ -143,9 +154,18 @@ public:
 	void EnableThirdPerson();
 
 	void SetGrabbingMonster(AMonsterJump* Monster) { GrabbingMonster = Monster; }
-	void ClearGrabbingMonster() { GrabbingMonster = nullptr; }
+	void ClearGrabbingMonster()
+	{
+		GrabbingMonster = nullptr;
+		bIsPlayingPanicShake = false;
+	}
+
+	void RecoverSanity(float Delta);
 	//------------------------------------------------PROPERTY--------------------------------------------------------//
 	//------------------------------------------------OTHER--------------------------------------------------------//
+	UPROPERTY()
+	AMonsterJump* GrabbingMonster;
+
 	/** Returns CameraBoom subobject **/
 	FORCEINLINE class USpringArmComponent* GetCameraBoom() const { return CameraBoom; }
 	/** Returns FollowCamera subobject **/
@@ -195,6 +215,11 @@ public:
 	UPROPERTY(EditDefaultsOnly, Category = "HeadBob")
 	TSubclassOf<UCameraShakeBase> IdleCameraShakeClass;
 
+	UPROPERTY(EditDefaultsOnly, Category = "UI")
+	TSubclassOf<USanityWidget> SanityWidgetClass;
+
+	USanityWidget* SanityWidget;
+
 	//------------------------------------------------BOOLEAN--------------------------------------------------------//
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Flashlight")
@@ -217,6 +242,8 @@ public:
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Sprint")
 	bool bIsSprint;
+
+	bool bIsPlayingPanicShake = false;
 	//------------------------------------------------VECTOR--------------------------------------------------------//	  
 	
 	//------------------------------------------------FLOAT--------------------------------------------------------//
@@ -250,6 +277,12 @@ public:
 
 	UPROPERTY(EditDefaultsOnly, Category = "HeadBob")
 	float SprintSpeedThreshold = 300.f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Sanity")
+	float Sanity = 0.f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Sanity")
+	float MaxSanity = 100.f;
 
 	//------------------------------------------------INT--------------------------------------------------------//
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Grab")
@@ -311,8 +344,8 @@ private:
 
 	void InitializeHeadbob();
 
-	void OnEscape(const FInputActionValue& Value);
-
+	UFUNCTION()
+	void OnEscape(const FInputActionValue& Value, FKey Key);
 	//------------------------------------------------BOOLEAN--------------------------------------------------------//
 	UPROPERTY(EditInstanceOnly, Category = "Crouch")
 	bool bIsCrouching;	 
@@ -329,8 +362,5 @@ private:
 	UMenuSettingWidget* MenuSettingWidget;
 
 	AItem* ItemRef;
-
-	UPROPERTY()
-	AMonsterJump* GrabbingMonster;
 };
 

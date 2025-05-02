@@ -11,6 +11,7 @@
 #include "HorrorGame/Item/ItemBase.h"
 #include "HorrorGame/Actor/MonsterJump.h"
 #include "HorrorGame/Widget/Settings/DeathScreenWidget.h"
+#include "HorrorGame/Widget/SanityWidget.h"
 
 // Engine
 #include "Engine/LocalPlayer.h"
@@ -110,6 +111,16 @@ void AHorrorGameCharacter::BeginPlay()
 
     HandleInventoryWidget();
 
+    if (SanityWidgetClass)
+    {
+        SanityWidget = CreateWidget<USanityWidget>(GetWorld(), SanityWidgetClass);
+        if (SanityWidget)
+        {
+            SanityWidget->AddToViewport();
+            // Đồng bộ ngay ban đầu
+            SanityWidget->SetSanityPercent(Sanity / MaxSanity);
+        }
+    }
 }
 
 void AHorrorGameCharacter::Tick(float DeltaTime)
@@ -170,7 +181,10 @@ void AHorrorGameCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInpu
         //Crouch
         EnhancedInputComponent->BindAction(CrouchAction, ETriggerEvent::Completed, this, &AHorrorGameCharacter::ToggleCrouch);
 
-        EnhancedInputComponent->BindAction(EscapeAction, ETriggerEvent::Completed, this, &AHorrorGameCharacter::OnEscape);
+        EnhancedInputComponent->BindAction(EscapeWAction, ETriggerEvent::Completed, this, &AHorrorGameCharacter::OnEscape, EKeys::W);
+        EnhancedInputComponent->BindAction(EscapeAAction, ETriggerEvent::Completed, this, &AHorrorGameCharacter::OnEscape, EKeys::A);
+        EnhancedInputComponent->BindAction(EscapeSAction, ETriggerEvent::Completed, this, &AHorrorGameCharacter::OnEscape, EKeys::S);
+        EnhancedInputComponent->BindAction(EscapeDAction, ETriggerEvent::Completed, this, &AHorrorGameCharacter::OnEscape, EKeys::D);
 
         //Uses Item
         EnhancedInputComponent->BindAction(UseItemAction, ETriggerEvent::Completed, this, &AHorrorGameCharacter::UseEquippedItem); 
@@ -439,11 +453,21 @@ void AHorrorGameCharacter::InitializeHeadbob()
     }
 }
 
-void AHorrorGameCharacter::OnEscape(const FInputActionValue& Value)
+void AHorrorGameCharacter::OnEscape(const FInputActionValue& Value, FKey Key)
 {
     if (GrabbingMonster)
     {
-        GrabbingMonster->ReceiveEscapeInput();
+        GrabbingMonster->ReceiveEscapeInput(Key);
+    }
+}
+
+void AHorrorGameCharacter::RecoverSanity(float Delta)
+{
+    Sanity = FMath::Clamp(Sanity + Delta, 0.f, MaxSanity);
+
+    if (SanityWidget)
+    {
+        SanityWidget->SetSanityPercent(Sanity / MaxSanity);
     }
 }
 

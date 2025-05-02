@@ -1,6 +1,7 @@
 ﻿#pragma once
 #include "Blueprint/UserWidget.h"
 #include "Components/ProgressBar.h"
+#include "Components/TextBlock.h"
 #include "ProgressBarWidget.generated.h"
 
 UCLASS()
@@ -19,6 +20,18 @@ public:
         if (EscapeProgressBar)
         {
             EscapeProgressBar->SetPercent(InPercent);
+        }
+    }
+
+    UPROPERTY(meta = (BindWidget))
+    class UTextBlock* NextKeyText;
+
+    UFUNCTION(BlueprintCallable, Category = "Escape")
+    void SetNextKey(const FString& KeyName)
+    {
+        if (NextKeyText)
+        {
+            NextKeyText->SetText(FText::FromString(KeyName));
         }
     }
 };
