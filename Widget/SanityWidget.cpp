@@ -28,9 +28,9 @@ void USanityWidget::SetSanityPercent(float Percent)
 
     // Đổi màu theo mức độ
     if (Percent > 0.7f)
-        SanityProgressBar->SetFillColorAndOpacity(FLinearColor::Green);
+        SanityProgressBar->SetFillColorAndOpacity(FLinearColor::Red);
     else if (Percent > 0.3f)
         SanityProgressBar->SetFillColorAndOpacity(FLinearColor::Yellow);
     else
-        SanityProgressBar->SetFillColorAndOpacity(FLinearColor::Red);
+        SanityProgressBar->SetFillColorAndOpacity(FLinearColor::Green);
 }

@@ -29,6 +29,8 @@
 #include "PhysicsEngine/PhysicsHandleComponent.h"
 #include "Kismet/GameplayStatics.h"
 #include "Components/PostProcessComponent.h"
+#include "EngineUtils.h"
+#include "Engine/PostProcessVolume.h"
 
 DEFINE_LOG_CATEGORY(LogTemplateCharacter);
 
@@ -102,6 +104,13 @@ AHorrorGameCharacter::AHorrorGameCharacter()
     PostProcessComponent->bEnabled = true;
 
     GrabbingMonster = nullptr;
+
+    SanityTimeline = CreateDefaultSubobject<UTimelineComponent>(TEXT("SanityTimeline"));
+
+    PPComponent = CreateDefaultSubobject<UPostProcessComponent>(TEXT("SanityPostProcess"));
+    PPComponent->SetupAttachment(GetRootComponent());
+    // Đặt weight ban đầu = 0 (không ảnh hưởng)
+    PPComponent->BlendWeight = 0.f;
 }
 
 void AHorrorGameCharacter::BeginPlay()
@@ -111,16 +120,8 @@ void AHorrorGameCharacter::BeginPlay()
 
     HandleInventoryWidget();
 
-    if (SanityWidgetClass)
-    {
-        SanityWidget = CreateWidget<USanityWidget>(GetWorld(), SanityWidgetClass);
-        if (SanityWidget)
-        {
-            SanityWidget->AddToViewport();
-            // Đồng bộ ngay ban đầu
-            SanityWidget->SetSanityPercent(Sanity / MaxSanity);
-        }
-    }
+    SetupSanityWidget();
+    SetupSanityTimeline();
 }
 
 void AHorrorGameCharacter::Tick(float DeltaTime)
@@ -464,10 +465,97 @@ void AHorrorGameCharacter::OnEscape(const FInputActionValue& Value, FKey Key)
 void AHorrorGameCharacter::RecoverSanity(float Delta)
 {
     Sanity = FMath::Clamp(Sanity + Delta, 0.f, MaxSanity);
+    if (SanityWidget)
+        SanityWidget->SetSanityPercent(Sanity / MaxSanity);
 
+    const float P = Sanity / MaxSanity;
+
+    if (P > 0.6f)
+    {
+        // Khởi động camera shake nếu muốn
+        if (APlayerController* PC = Cast<APlayerController>(GetController()))
+        {
+            PC->PlayerCameraManager->StartCameraShake(LowSanityShake);
+        }
+
+        // Tính alpha từ 0 → 1 khi P từ 0.6 → 1.0
+        const float Alpha = (P - 0.6f) / 0.4f;
+
+        // BlendWeight = alpha để bật dần post‑process
+        PPComponent->BlendWeight = Alpha;
+
+        // Motion Blur
+        PPComponent->Settings.bOverride_MotionBlurAmount = true;
+        PPComponent->Settings.MotionBlurAmount = FMath::Lerp(0.f, 1.f, Alpha);
+
+        // Chromatic Aberration
+        PPComponent->Settings.bOverride_SceneFringeIntensity = true;
+        PPComponent->Settings.SceneFringeIntensity = FMath::Lerp(0.f, 5.f, Alpha);
+
+        // Bloom
+        PPComponent->Settings.bOverride_BloomIntensity = true;
+        PPComponent->Settings.BloomIntensity = FMath::Lerp(0.f, 2.f, Alpha);
+
+        // Vignette
+        PPComponent->Settings.bOverride_VignetteIntensity = true;
+        PPComponent->Settings.VignetteIntensity = FMath::Lerp(0.f, 0.8f, Alpha);
+
+        // Depth of Field (F‑stop nhỏ → DOF mạnh)
+        PPComponent->Settings.bOverride_DepthOfFieldFstop = true;
+        PPComponent->Settings.DepthOfFieldFstop = FMath::Lerp(22.f, 1.2f, Alpha);
+    }
+    else
+    {
+        // Nếu P ≤ 0.6, tắt hoàn toàn post‑process
+        PPComponent->BlendWeight = 0.f;
+    }
+}
+
+void AHorrorGameCharacter::HandleDrainProgress(float Value)
+{
+    if (bIsGrabbed) return;
+
+    const float DrainRate = 5.f;
+    float DeltaSanity = -Value * DrainRate * GetWorld()->GetDeltaSeconds();
+    RecoverSanity(DeltaSanity);
+}
+
+void AHorrorGameCharacter::SetupSanityWidget()
+{
+    if (SanityWidgetClass == nullptr) return;
+
+    SanityWidget = CreateWidget<USanityWidget>(GetWorld(), SanityWidgetClass);
     if (SanityWidget)
     {
+        SanityWidget->AddToViewport();
         SanityWidget->SetSanityPercent(Sanity / MaxSanity);
+    }
+}
+
+void AHorrorGameCharacter::SetupSanityTimeline()
+{
+    if (SanityDrainCurve == nullptr || SanityTimeline == nullptr) return;
+
+    FOnTimelineFloat ProgressDel;
+    ProgressDel.BindUFunction(this, TEXT("HandleDrainProgress"));
+    SanityTimeline->AddInterpFloat(SanityDrainCurve, ProgressDel);
+    SanityTimeline->SetLooping(true);
+    SanityTimeline->PlayFromStart();
+}
+
+void AHorrorGameCharacter::PauseSanityDrain()
+{
+    if (SanityTimeline && SanityTimeline->IsPlaying())
+    {
+        SanityTimeline->Stop();
+    }
+}
+
+void AHorrorGameCharacter::ResumeSanityDrain()
+{
+    if (SanityTimeline && !SanityTimeline->IsPlaying())
+    {
+        SanityTimeline->Play();
     }
 }
 

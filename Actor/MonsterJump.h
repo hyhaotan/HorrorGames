@@ -5,6 +5,9 @@
 #include "Components/BoxComponent.h"
 #include "MonsterJump.generated.h"
 
+UENUM()
+enum class EQTEResult { Perfect, Good, Miss };
+
 UCLASS()
 class HORRORGAME_API AMonsterJump : public ACharacter
 {
@@ -32,10 +35,18 @@ protected:
     void NextQTESequence();
     void CompleteEscape();
     void UpdateWidget();
+    void ApplyStun(float Duration);
+    void ReleaseStun();
+    void BonusIncrementPerStep(float AmountPer);
+    void AdjustDifficulty();
+    EQTEResult EvaluateTiming(float DeltaFromTarget);
 
     // Trigger zone
     UPROPERTY(VisibleAnywhere)
     UBoxComponent* TriggerZone;
+
+    UPROPERTY(EditAnywhere, Category = "Stun")
+	TSubclassOf <class UCameraShakeBase>  StunCameraShake;
 
     // QTE sequence
     TArray<FKey> QTESequence;
@@ -45,13 +56,34 @@ protected:
     // progress
     float EscapeProgress;
     float EscapeTarget = 1.0f;
-    float IncrementPerStep = 0.1f;
+    float IncrementPerStep = 0.05f;
+    float AllowedInputTime = 1.0f;
+    float PerfectThreshold;
+    float GoodThreshold;
+    float LastPromptTime;
+
+    int32 TotalHits = 0;
+    int32 TotalMisses = 0;
+    int32 MissCount = 0;
+	int32 ComboCount = 0;
+    bool bIsStunned = false;
 
     bool bIsGrabbing;
     class AHorrorGameCharacter* CapturedPlayer;
+
+	UPROPERTY(EditAnywhere, Category = "Stun")
+	class UAnimMontage* StunMontage;      
+    
+    UPROPERTY(EditAnywhere, Category = "Stun")
+	class UAnimMontage* StunReverseMontage;
+
+    UPROPERTY(EditAnywhere, Category = "Stun")
+	class USoundBase* StunSound;
 
     // UI
     UPROPERTY(EditDefaultsOnly)
     TSubclassOf<class UProgressBarWidget> ProgressBarClass;
     UProgressBarWidget* EscapeWidget;
+
+    FTimerHandle StunTimerHandle;
 };

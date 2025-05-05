@@ -20,6 +20,8 @@ class AItem;
 struct FInputActionValue;
 class AMonsterJump;
 class USanityWidget;
+class UTimelineComponent;
+class UCurveFloat;
 
 DECLARE_LOG_CATEGORY_EXTERN(LogTemplateCharacter, Log, All);
 
@@ -27,6 +29,7 @@ UCLASS(config=Game)
 class AHorrorGameCharacter : public ACharacter
 {
 	GENERATED_BODY()
+
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = Camera, meta = (AllowPrivateAccess = "true"))
 	USpringArmComponent* CameraBoom;          
 
@@ -161,6 +164,9 @@ public:
 	}
 
 	void RecoverSanity(float Delta);
+
+	void PauseSanityDrain();
+	void ResumeSanityDrain();
 	//------------------------------------------------PROPERTY--------------------------------------------------------//
 	//------------------------------------------------OTHER--------------------------------------------------------//
 	UPROPERTY()
@@ -220,6 +226,21 @@ public:
 
 	USanityWidget* SanityWidget;
 
+	/** Camera shake khi sanity thấp */
+	UPROPERTY(EditAnywhere, Category = "Effects")
+	TSubclassOf<UCameraShakeBase> LowSanityShake;
+
+	/** PostProcess volume để blur/ghost */
+	UPROPERTY(VisibleAnywhere, Category = "Effects")
+	UPostProcessComponent* PPComponent;
+
+	/** Timeline for drain */
+	UPROPERTY(EditAnywhere, Category = "Sanity")
+	UCurveFloat* SanityDrainCurve;
+
+	UPROPERTY()
+	UTimelineComponent* SanityTimeline;
+
 	//------------------------------------------------BOOLEAN--------------------------------------------------------//
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Flashlight")
@@ -244,6 +265,9 @@ public:
 	bool bIsSprint;
 
 	bool bIsPlayingPanicShake = false;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Sanity")
+	bool bIsGrabbed = false;
 	//------------------------------------------------VECTOR--------------------------------------------------------//	  
 	
 	//------------------------------------------------FLOAT--------------------------------------------------------//
@@ -346,6 +370,12 @@ private:
 
 	UFUNCTION()
 	void OnEscape(const FInputActionValue& Value, FKey Key);
+
+	UFUNCTION()
+	void HandleDrainProgress(float Value);
+
+	void SetupSanityWidget();
+	void SetupSanityTimeline();
 	//------------------------------------------------BOOLEAN--------------------------------------------------------//
 	UPROPERTY(EditInstanceOnly, Category = "Crouch")
 	bool bIsCrouching;	 
