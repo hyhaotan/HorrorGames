@@ -182,10 +182,15 @@ void AHorrorGameCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInpu
         //Crouch
         EnhancedInputComponent->BindAction(CrouchAction, ETriggerEvent::Completed, this, &AHorrorGameCharacter::ToggleCrouch);
 
-        EnhancedInputComponent->BindAction(EscapeWAction, ETriggerEvent::Completed, this, &AHorrorGameCharacter::OnEscape, EKeys::W);
-        EnhancedInputComponent->BindAction(EscapeAAction, ETriggerEvent::Completed, this, &AHorrorGameCharacter::OnEscape, EKeys::A);
-        EnhancedInputComponent->BindAction(EscapeSAction, ETriggerEvent::Completed, this, &AHorrorGameCharacter::OnEscape, EKeys::S);
-        EnhancedInputComponent->BindAction(EscapeDAction, ETriggerEvent::Completed, this, &AHorrorGameCharacter::OnEscape, EKeys::D);
+        EnhancedInputComponent->BindAction(EscapeAAction, ETriggerEvent::Completed, this, &AHorrorGameCharacter::OnEscape,EKeys::A);
+        EnhancedInputComponent->BindAction(EscapeSAction, ETriggerEvent::Completed, this, &AHorrorGameCharacter::OnEscape,EKeys::S);
+        EnhancedInputComponent->BindAction(EscapeWAction, ETriggerEvent::Completed, this, &AHorrorGameCharacter::OnEscape,EKeys::W);
+        EnhancedInputComponent->BindAction(EscapeDAction, ETriggerEvent::Completed, this, &AHorrorGameCharacter::OnEscape,EKeys::D);
+
+        EnhancedInputComponent->BindAction(UpAction, ETriggerEvent::Completed, this, &AHorrorGameCharacter::OnEscape, EKeys::Up);
+        EnhancedInputComponent->BindAction(DownAction, ETriggerEvent::Completed, this, &AHorrorGameCharacter::OnEscape, EKeys::Down);
+        EnhancedInputComponent->BindAction(LeftAction, ETriggerEvent::Completed, this, &AHorrorGameCharacter::OnEscape, EKeys::Left);
+        EnhancedInputComponent->BindAction(RightAction, ETriggerEvent::Completed, this, &AHorrorGameCharacter::OnEscape, EKeys::Right);
 
         //Uses Item
         EnhancedInputComponent->BindAction(UseItemAction, ETriggerEvent::Completed, this, &AHorrorGameCharacter::UseEquippedItem); 
@@ -454,11 +459,30 @@ void AHorrorGameCharacter::InitializeHeadbob()
     }
 }
 
-void AHorrorGameCharacter::OnEscape(const FInputActionValue& Value, FKey Key)
+void AHorrorGameCharacter::OnEscape(const FInputActionValue& Value, FKey PressedKey)
 {
-    if (GrabbingMonster)
+    if (!GrabbingMonster) return;
+
+    // Lấy phase hiện tại từ monster
+    EQTEPhase Phase = GrabbingMonster->GetCurrentPhase();
+
+    // Nếu là Opposite phase, chỉ chấp nhận hai phím Key1/Key2 mà monster đã chọn
+    if (Phase == EQTEPhase::Opposite)
     {
-        GrabbingMonster->ReceiveEscapeInput(Key);
+        // 2 phím monster đang dùng
+        FKey Key1 = GrabbingMonster->GetOppositeKey1();
+        FKey Key2 = GrabbingMonster->GetOppositeKey2();
+
+        if (PressedKey == Key1 || PressedKey == Key2)
+        {
+            GrabbingMonster->ReceiveEscapeInput(PressedKey);
+        }
+        // nếu nhấn phím khác, bỏ qua
+    }
+    else
+    {
+        // WASD hoặc Arrows phase: mọi phím bind đều hợp lệ
+        GrabbingMonster->ReceiveEscapeInput(PressedKey);
     }
 }
 

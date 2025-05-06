@@ -10,7 +10,7 @@ class HORRORGAME_API UProgressBarWidget : public UUserWidget
     GENERATED_BODY()
 
 public:
-    // Kết nối từ UMG Designer: ProgressBar named "EscapeProgressBar"
+    // ProgressBar named "EscapeProgressBar" in UMG Designer
     UPROPERTY(meta = (BindWidget))
     UProgressBar* EscapeProgressBar;
 
@@ -23,8 +23,9 @@ public:
         }
     }
 
+    // TextBlock for next QTE key
     UPROPERTY(meta = (BindWidget))
-    class UTextBlock* NextKeyText;
+    UTextBlock* NextKeyText;
 
     UFUNCTION(BlueprintCallable, Category = "Escape")
     void SetNextKey(const FString& KeyName)
@@ -32,6 +33,22 @@ public:
         if (NextKeyText)
         {
             NextKeyText->SetText(FText::FromString(KeyName));
+        }
+    }
+
+    // TextBlock to display current phase
+    UPROPERTY(meta = (BindWidget))
+    UTextBlock* PhaseText;
+
+    /**
+     * Set the displayed QTE phase label (e.g. "WASD", "Arrows", "Opposite").
+     */
+    UFUNCTION(BlueprintCallable, Category = "QTE")
+    void SetPhaseText(const FString& PhaseName)
+    {
+        if (PhaseText)
+        {
+            PhaseText->SetText(FText::FromString(PhaseName));
         }
     }
 };

@@ -5,6 +5,7 @@
 #include "GameFramework/CharacterMovementComponent.h"
 #include "Kismet/GameplayStatics.h"
 #include "TimerManager.h"
+#include "InputCoreTypes.h"
 
 AMonsterJump::AMonsterJump()
 {
@@ -55,10 +56,7 @@ void AMonsterJump::OnOverlapBegin(UPrimitiveComponent* OverlappedComp, AActor* O
     if (ProgressBarClass)
     {
         EscapeWidget = CreateWidget<UProgressBarWidget>(GetWorld(), ProgressBarClass);
-        if (EscapeWidget)
-        {
-            EscapeWidget->AddToViewport();
-        }
+        if (EscapeWidget) EscapeWidget->AddToViewport();
     }
 
     CapturedPlayer = Player;
@@ -72,13 +70,8 @@ void AMonsterJump::StartQTE(bool bClearProgress)
 {
     if (bClearProgress) EscapeProgress = 0.f;
     AdjustDifficulty();
-
-    QTESequence.Empty();
-    TArray<FKey> Pool = { EKeys::W, EKeys::A, EKeys::S, EKeys::D };
-    for (int i = 0; i < SequenceLength; ++i)
-    {
-        QTESequence.Add(Pool[FMath::RandRange(0, Pool.Num() - 1)]);
-    }
+    ChooseRandomPhase();
+    GenerateSequenceByPhase();
     CurrentQTEIndex = 0;
     UpdateWidget();
 }
@@ -98,16 +91,16 @@ void AMonsterJump::AdjustDifficulty()
         SequenceLength = FMath::Clamp(SequenceLength - 1, 2, 8);
         AllowedInputTime += 0.1f;
     }
+    PerfectThreshold = AllowedInputTime * 0.3f;
+    GoodThreshold = AllowedInputTime * 0.7f;
 
     UE_LOG(LogTemp, Log, TEXT("[AdjustDifficulty] SeqLen(after)=%d, AllowedTime(after)=%.2f"), SequenceLength, AllowedInputTime);
     TotalHits = TotalMisses = 0;
 }
 
-EQTEResult AMonsterJump::EvaluateTiming(float Delta)
+EQTEResult AMonsterJump::EvaluateTiming(float DeltaFromTarget) const
 {
-    PerfectThreshold = AllowedInputTime * 0.3f;
-    GoodThreshold = AllowedInputTime * 0.7f;
-    float AbsDelta = FMath::Abs(Delta);
+    float AbsDelta = FMath::Abs(DeltaFromTarget);
     if (AbsDelta <= PerfectThreshold) return EQTEResult::Perfect;
     if (AbsDelta <= GoodThreshold)    return EQTEResult::Good;
     return EQTEResult::Miss;
@@ -116,12 +109,8 @@ EQTEResult AMonsterJump::EvaluateTiming(float Delta)
 void AMonsterJump::NextQTESequence()
 {
     AdjustDifficulty();
-    QTESequence.Empty();
-    TArray<FKey> Pool = { EKeys::W, EKeys::A, EKeys::S, EKeys::D };
-    for (int i = 0; i < SequenceLength; ++i)
-    {
-        QTESequence.Add(Pool[FMath::RandRange(0, Pool.Num() - 1)]);
-    }
+    ChooseRandomPhase();
+    GenerateSequenceByPhase();
     CurrentQTEIndex = 0;
     UpdateWidget();
 }
@@ -137,7 +126,9 @@ void AMonsterJump::ReceiveEscapeInput(FKey PressedKey)
     UE_LOG(LogTemp, Log, TEXT("[QTE] Key=%s, Delta=%.3f, Result=%s"), *PressedKey.GetFName().ToString(), TimeDelta,
         *UEnum::GetValueAsString(Res));
 
-    if (QTESequence.IsValidIndex(CurrentQTEIndex) && PressedKey == QTESequence[CurrentQTEIndex] && Res != EQTEResult::Miss)
+    if (QTESequence.IsValidIndex(CurrentQTEIndex) &&
+        PressedKey == QTESequence[CurrentQTEIndex] &&
+        Res != EQTEResult::Miss)
     {
         float Mult = (Res == EQTEResult::Perfect) ? 1.5f : 1.0f;
         EscapeProgress += IncrementPerStep * Mult;
@@ -154,11 +145,6 @@ void AMonsterJump::ReceiveEscapeInput(FKey PressedKey)
         {
             NextQTESequence();
             return;
-        }
-
-        if (TotalHits > 5)
-        {
-            BonusIncrementPerStep(0.01f);
         }
     }
     else
@@ -180,12 +166,17 @@ void AMonsterJump::UpdateWidget()
 {
     if (!EscapeWidget) return;
     EscapeWidget->SetProgressPercent(EscapeProgress / EscapeTarget);
+
     if (QTESequence.IsValidIndex(CurrentQTEIndex))
-    {
         EscapeWidget->SetNextKey(QTESequence[CurrentQTEIndex].GetFName().ToString());
-        LastPromptTime = GetWorld()->GetTimeSeconds();
-    }
+
+    // Display phase name
+    const FString PhaseName = UEnum::GetValueAsString(CurrentPhase).Replace(TEXT("EQTEPhase::"), TEXT(""));
+    EscapeWidget->SetPhaseText(PhaseName);
+
+    LastPromptTime = GetWorld()->GetTimeSeconds();
 }
+
 
 void AMonsterJump::CompleteEscape()
 {
@@ -255,10 +246,42 @@ void AMonsterJump::ReleaseStun()
         PC->SetIgnoreMoveInput(false);
         PC->SetIgnoreLookInput(false);
     }
-    CapturedPlayer->bIsGrabbed = false;
 }
 
-void AMonsterJump::BonusIncrementPerStep(float AmountPer)
+void AMonsterJump::ChooseRandomPhase()
 {
-    EscapeProgress += AmountPer;
+    int32 Pick = FMath::RandRange(0, 2);
+    CurrentPhase = static_cast<EQTEPhase>(Pick);
+
+    // If Opposite, pick the two keys
+    if (CurrentPhase == EQTEPhase::Opposite)
+    {
+        bool bUseAD = FMath::RandBool();
+        OppositeKey1 = bUseAD ? EKeys::A : EKeys::W;
+        OppositeKey2 = bUseAD ? EKeys::D : EKeys::S;
+    }
+}
+
+void AMonsterJump::GenerateSequenceByPhase()
+{
+    QTESequence.Empty();
+    TArray<FKey> Pool;
+
+    switch (CurrentPhase)
+    {
+    case EQTEPhase::WASD:
+        Pool = { EKeys::W, EKeys::A, EKeys::S, EKeys::D };
+        break;
+    case EQTEPhase::Arrows:
+        Pool = { EKeys::Up, EKeys::Down, EKeys::Left, EKeys::Right };
+        break;
+    case EQTEPhase::Opposite:
+        // alternate between OppositeKey1/Key2
+        for (int32 i = 0; i < SequenceLength; ++i)
+            QTESequence.Add((i % 2 == 0) ? OppositeKey1 : OppositeKey2);
+        return;
+    }
+
+    for (int32 i = 0; i < SequenceLength; ++i)
+        QTESequence.Add(Pool[FMath::RandRange(0, Pool.Num() - 1)]);
 }
