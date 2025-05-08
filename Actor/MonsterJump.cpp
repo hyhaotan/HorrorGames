@@ -48,29 +48,20 @@ void AMonsterJump::OnOverlapBegin(UPrimitiveComponent* OverlappedComp, AActor* O
     AHorrorGameCharacter* Player = Cast<AHorrorGameCharacter>(OtherActor);
     if (!Player) return;
 
-    AttachToComponent(Player->GetMesh(), FAttachmentTransformRules::SnapToTargetNotIncludingScale, TEXT("head"));
-    Player->EnableThirdPerson();
-    Player->GetCharacterMovement()->DisableMovement();
-    Player->SetGrabbingMonster(this);
-
-    if (ProgressBarClass)
-    {
-        EscapeWidget = CreateWidget<UProgressBarWidget>(GetWorld(), ProgressBarClass);
-        if (EscapeWidget) EscapeWidget->AddToViewport();
-    }
-
-    CapturedPlayer = Player;
-    bIsGrabbing = true;
-    CapturedPlayer->bIsGrabbed = true;
-
-    StartQTE(true);
+    InitializeGrabbedPlayer(Player);
 }
 
 void AMonsterJump::StartQTE(bool bClearProgress)
 {
     if (bClearProgress) EscapeProgress = 0.f;
     AdjustDifficulty();
-    ChooseRandomPhase();
+
+    if (!bPhaseInitialized)
+    {
+        ChooseRandomPhase();
+        bPhaseInitialized = true;
+    }
+
     GenerateSequenceByPhase();
     CurrentQTEIndex = 0;
     UpdateWidget();
@@ -109,7 +100,6 @@ EQTEResult AMonsterJump::EvaluateTiming(float DeltaFromTarget) const
 void AMonsterJump::NextQTESequence()
 {
     AdjustDifficulty();
-    ChooseRandomPhase();
     GenerateSequenceByPhase();
     CurrentQTEIndex = 0;
     UpdateWidget();
@@ -246,6 +236,27 @@ void AMonsterJump::ReleaseStun()
         PC->SetIgnoreMoveInput(false);
         PC->SetIgnoreLookInput(false);
     }
+}
+
+void AMonsterJump::InitializeGrabbedPlayer(AHorrorGameCharacter* Player)
+{
+    AttachToComponent(Player->GetMesh(), FAttachmentTransformRules::SnapToTargetNotIncludingScale, TEXT("head"));
+    Player->EnableThirdPerson();
+    Player->GetCharacterMovement()->DisableMovement();
+    Player->SetGrabbingMonster(this);
+
+    if (ProgressBarClass)
+    {
+        EscapeWidget = CreateWidget<UProgressBarWidget>(GetWorld(), ProgressBarClass);
+        if (EscapeWidget) EscapeWidget->AddToViewport();
+    }
+
+    CapturedPlayer = Player;
+    bIsGrabbing = true;
+    CapturedPlayer->bIsGrabbed = true;
+    bPhaseInitialized = false;
+
+    StartQTE(true);
 }
 
 void AMonsterJump::ChooseRandomPhase()

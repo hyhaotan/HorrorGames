@@ -4,14 +4,13 @@
 #include "GameFramework/Actor.h"
 #include "Components/TimelineComponent.h"
 #include "Components/BoxComponent.h"
-#include "HorrorGame/Interface/Interact.h"
 #include "Door.generated.h"
 
 class UStaticMeshComponent;
 class USkeletalMeshComponent;
 
 UCLASS()
-class HORRORGAME_API ADoor : public AActor, public IInteract
+class HORRORGAME_API ADoor : public AActor
 {
 	GENERATED_BODY()
 	
@@ -28,7 +27,7 @@ public:
 	virtual void Tick(float DeltaTime) override;
 
 	// Implement the Interact function from the IInteract interface
-	virtual void Interact() override;
+	void Interact();
 
 	// Reference to the player
 	class AHorrorGameCharacter* Player;

@@ -40,9 +40,6 @@ public:
     UPROPERTY(meta = (BindWidget))
     UTextBlock* PhaseText;
 
-    /**
-     * Set the displayed QTE phase label (e.g. "WASD", "Arrows", "Opposite").
-     */
     UFUNCTION(BlueprintCallable, Category = "QTE")
     void SetPhaseText(const FString& PhaseName)
     {

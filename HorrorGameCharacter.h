@@ -5,6 +5,7 @@
 #include "CoreMinimal.h"
 #include "GameFramework/Character.h"
 #include "Logging/LogMacros.h"
+#include "HorrorGame/Interface/Interact.h"
 #include "HorrorGameCharacter.generated.h"
 
 class USpringArmComponent;
@@ -21,6 +22,7 @@ class AMonsterJump;
 class USanityWidget;
 class UTimelineComponent;
 class UCurveFloat;
+class ANoteActor;
 
 DECLARE_LOG_CATEGORY_EXTERN(LogTemplateCharacter, Log, All);
 
@@ -178,6 +180,13 @@ public:
 
 	void PauseSanityDrain();
 	void ResumeSanityDrain();
+
+	void ShowNoteUI(UTexture2D* NoteImage);
+
+	UFUNCTION()
+	void CloseNoteUI();
+
+	void SetCurrentNoteActor(ANoteActor* Note) { CurrentNote = Note; }
 	//------------------------------------------------PROPERTY--------------------------------------------------------//
 	//------------------------------------------------OTHER--------------------------------------------------------//
 	UPROPERTY()
@@ -251,6 +260,9 @@ public:
 
 	UPROPERTY()
 	UTimelineComponent* SanityTimeline;
+
+	UPROPERTY(EditDefaultsOnly, Category = "UI")
+	TSubclassOf<UUserWidget> NoteWidgetClass;
 
 	//------------------------------------------------BOOLEAN--------------------------------------------------------//
 
@@ -403,5 +415,11 @@ private:
 	UMenuSettingWidget* MenuSettingWidget;
 
 	AItem* ItemRef;
+
+	UPROPERTY()
+	class UNoteWidget* NoteWidgetInstance = nullptr;
+
+	UPROPERTY()
+	ANoteActor* CurrentNote = nullptr;
 };
 

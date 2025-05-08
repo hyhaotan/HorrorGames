@@ -12,6 +12,8 @@
 #include "HorrorGame/Actor/MonsterJump.h"
 #include "HorrorGame/Widget/Settings/DeathScreenWidget.h"
 #include "HorrorGame/Widget/SanityWidget.h"
+#include "HorrorGame/Widget/NoteWidget.h"
+#include "HorrorGame/Actor/NoteActor.h"
 
 // Engine
 #include "Engine/LocalPlayer.h"
@@ -31,6 +33,7 @@
 #include "Components/PostProcessComponent.h"
 #include "EngineUtils.h"
 #include "Engine/PostProcessVolume.h"
+#include "Blueprint/WidgetBlueprintLibrary.h" 
 
 DEFINE_LOG_CATEGORY(LogTemplateCharacter);
 
@@ -268,10 +271,20 @@ void AHorrorGameCharacter::Interact()
 	FHitResult HitResult;
     if(PerformInteractionLineTrace(HitResult))
     {
-        if (ADoor* Door = Cast<ADoor>(HitResult.GetActor()))
+        AActor* HitActor = HitResult.GetActor();
+        if (!HitActor) return;
+
+        if (IInteract* Int = Cast<IInteract>(HitActor))
+        {
+            Int->Interact(this);
+            return;
+        }
+
+        if (ADoor* Door = Cast<ADoor>(HitActor))
         {
             Door->Player = this;
             Door->Interact();
+            return;
         }
     }
 }
@@ -966,7 +979,6 @@ void AHorrorGameCharacter::Sprint()
         SprintSpeed = FMath::Lerp(200.f, 600.f, CurrentStamina / 0.4f);
     }
     GetCharacterMovement()->MaxWalkSpeed = SprintSpeed;
-    UE_LOG(LogTemp, Warning, TEXT("Chạy với tốc độ: %f"), SprintSpeed);
 
     // Ngăn việc hồi phục stamina trong lúc sprint
     CanStaminaRecharge = false;
@@ -1048,5 +1060,45 @@ void AHorrorGameCharacter::HandleDeath()
         PC->SetPause(true);
         // Hiển thị chuột khi chết
         PC->SetShowMouseCursor(true);
+    }
+}
+
+void AHorrorGameCharacter::ShowNoteUI(UTexture2D* NoteImage)
+{
+    if (!NoteWidgetClass) return;
+
+    if (APlayerController* PC = Cast<APlayerController>(GetController()))
+    {
+        // Tạo widget và lưu vào NoteWidgetInstance
+        NoteWidgetInstance = CreateWidget<UNoteWidget>(PC, NoteWidgetClass);
+        if (NoteWidgetInstance)
+        {
+            NoteWidgetInstance->SetupNote(NoteImage);
+            NoteWidgetInstance->AddToViewport();
+
+            PC->bShowMouseCursor = true;
+            UWidgetBlueprintLibrary::SetInputMode_UIOnlyEx(PC, NoteWidgetInstance);
+        }
+    }
+}
+
+void AHorrorGameCharacter::CloseNoteUI()
+{
+    if (NoteWidgetInstance)
+    {
+        NoteWidgetInstance->RemoveFromParent();
+        NoteWidgetInstance = nullptr;
+
+        if (APlayerController* PC = Cast<APlayerController>(GetController()))
+        {
+            PC->bShowMouseCursor = false;
+            UWidgetBlueprintLibrary::SetInputMode_GameOnly(PC);
+        }
+    }
+
+    if (CurrentNote)
+    {
+        CurrentNote->ReturnToOriginal();
+        CurrentNote = nullptr;
     }
 }

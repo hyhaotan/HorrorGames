@@ -23,6 +23,8 @@ enum class EQTEPhase : uint8
     Opposite    UMETA(DisplayName = "OppositePairs")
 };
 
+class AHorrorGameCharacter;
+
 UCLASS()
 class HORRORGAME_API AMonsterJump : public ACharacter
 {
@@ -84,6 +86,8 @@ protected:
     /** Release stun effect */
     void ReleaseStun();
 
+	void InitializeGrabbedPlayer(AHorrorGameCharacter* Player);
+
     // --- Properties ---
 
     // Trigger zone for grabbing player
@@ -144,12 +148,13 @@ private:
     int32 ComboCount = 0;
     bool bIsStunned = false;
     bool bIsGrabbing = false;
+    bool bPhaseInitialized = false;
 
     FKey OppositeKey1;
     FKey OppositeKey2;
 
     // Reference to captured player during QTE
-    class AHorrorGameCharacter* CapturedPlayer = nullptr;
+    AHorrorGameCharacter* CapturedPlayer = nullptr;
 
     // Handle for stun timer
     FTimerHandle StunTimerHandle;
