@@ -123,7 +123,7 @@ class AHorrorGameCharacter : public ACharacter
 	UInputAction* LeftAction;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
-	UInputAction* RightAction;
+	UInputAction* RightAction; 
 
 public:
 	AHorrorGameCharacter();
@@ -181,7 +181,7 @@ public:
 	void PauseSanityDrain();
 	void ResumeSanityDrain();
 
-	void ShowNoteUI(UTexture2D* NoteImage);
+	void ShowNoteUI(UTexture2D* NoteImage, const FText& NoteText);
 
 	UFUNCTION()
 	void CloseNoteUI();

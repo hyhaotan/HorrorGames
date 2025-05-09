@@ -1,6 +1,4 @@
-﻿// Fill out your copyright notice in the Description page of Project Settings.
-
-
+﻿
 #include "HorrorGame/Actor/NoteActor.h"
 #include "HorrorGame/HorrorGameCharacter.h"
 
@@ -23,7 +21,7 @@ void ANoteActor::Interact(AActor* Interactor)
 	{
 		C->SetCurrentNoteActor(this);
 		HideNote();
-		C->ShowNoteUI(NoteImage);
+		C->ShowNoteUI(NoteImage, NoteText);
 	}
 }
 

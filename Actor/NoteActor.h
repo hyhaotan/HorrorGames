@@ -11,8 +11,8 @@ UCLASS()
 class HORRORGAME_API ANoteActor : public AActor, public IInteract
 {
 	GENERATED_BODY()
-	
-public:	
+
+public:
 	virtual void BeginPlay() override;
 
 	// Sets default values for this actor's properties
@@ -23,6 +23,9 @@ public:
 
 	UPROPERTY(EditAnywhere, Category = "Note")
 	UTexture2D* NoteImage;
+
+	UPROPERTY(EditAnywhere, Category = "Note")
+	FText NoteText;
 
 	virtual void Interact(AActor* Interactor) override;
 

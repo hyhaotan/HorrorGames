@@ -8,6 +8,7 @@
 #include "Components/Button.h"
 #include "GameFramework/PlayerController.h"
 #include "Blueprint/WidgetBlueprintLibrary.h" 
+#include "Components/TextBlock.h"
 
 void UNoteWidget::NativeConstruct()
 {
@@ -29,6 +30,14 @@ void UNoteWidget::SetupNote(UTexture2D* InNoteTexture)
 	if (NoteImage && InNoteTexture)
 	{
 		NoteImage->SetBrushFromTexture(InNoteTexture);
+	}
+}
+
+void UNoteWidget::SetupNoteText(const FText& InNoteText)
+{
+	if (NoteText)
+	{
+		NoteText->SetText(InNoteText);
 	}
 }
 

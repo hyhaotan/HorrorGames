@@ -1063,7 +1063,7 @@ void AHorrorGameCharacter::HandleDeath()
     }
 }
 
-void AHorrorGameCharacter::ShowNoteUI(UTexture2D* NoteImage)
+void AHorrorGameCharacter::ShowNoteUI(UTexture2D* NoteImage, const FText& NoteText)
 {
     if (!NoteWidgetClass) return;
 
@@ -1075,6 +1075,7 @@ void AHorrorGameCharacter::ShowNoteUI(UTexture2D* NoteImage)
         {
             NoteWidgetInstance->SetupNote(NoteImage);
             NoteWidgetInstance->AddToViewport();
+			NoteWidgetInstance->SetupNoteText(NoteText);
 
             PC->bShowMouseCursor = true;
             UWidgetBlueprintLibrary::SetInputMode_UIOnlyEx(PC, NoteWidgetInstance);

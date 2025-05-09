@@ -9,6 +9,7 @@
 class UImage;
 class UButton;
 class UTexture2D;
+class UTextBlock;
 
 UCLASS()
 class HORRORGAME_API UNoteWidget : public UUserWidget
@@ -20,6 +21,8 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Note")
 	void SetupNote(UTexture2D* InNoteTexture);
 
+	void SetupNoteText(const FText& InNoteText);
+
 protected:
 	// Các widget con được bind bằng tên (BindWidget)
 	UPROPERTY(meta = (BindWidget))
@@ -27,6 +30,9 @@ protected:
 
 	UPROPERTY(meta = (BindWidget))
 	UButton* CloseButton;
+
+	UPROPERTY(meta = (BindWidget))
+	UTextBlock* NoteText;
 
 	virtual void NativeConstruct() override;
 
