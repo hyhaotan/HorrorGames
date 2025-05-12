@@ -4,6 +4,55 @@
 #include "HorrorGame/Widget/Inventory/InventoryItem.h"
 #include "Components/Image.h"
 #include "Components/TextBlock.h"
+#include "Blueprint/WidgetBlueprintLibrary.h"
+#include "HorrorGame/Widget/ItemDragDropOperation.h"
+#include "HorrorGame/Widget/Inventory/InventorySlot.h"
+#include "Components/CanvasPanel.h"
+#include "HorrorGame/HorrorGameCharacter.h"
+
+FReply UInventoryItem::NativeOnMouseButtonDown(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent)
+{
+    if (InMouseEvent.GetEffectingButton() == EKeys::LeftMouseButton)
+    {
+        return UWidgetBlueprintLibrary::DetectDragIfPressed(InMouseEvent, this, EKeys::LeftMouseButton).NativeReply;
+    }
+    return Super::NativeOnMouseButtonDown(InGeometry, InMouseEvent);
+}
+
+void UInventoryItem::NativeOnDragDetected(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent, UDragDropOperation*& OutOperation)
+{
+    Super::NativeOnDragDetected(InGeometry, InMouseEvent, OutOperation);
+
+    UItemDragDropOperation* DragOp = NewObject<UItemDragDropOperation>(this);
+
+    if (UInventorySlot* ParentSlot = GetTypedOuter<UInventorySlot>())
+    {
+        DragOp->SourceIndex = ParentSlot->SlotIndex;
+        DragOp->bSourceIsBag = ParentSlot->bIsBagSlot;
+    }
+
+    DragOp->DefaultDragVisual = this;
+    DragOp->Pivot = EDragPivot::MouseDown;
+    OutOperation = DragOp;
+}
+
+bool UInventoryItem::NativeOnDragOver(const FGeometry& InGeometry, const FDragDropEvent& InDragDropEvent, UDragDropOperation* InOperation)
+{
+    if (UInventorySlot* ParentSlot = GetTypedOuter<UInventorySlot>())
+    {
+        return ParentSlot->NativeOnDragOver(InGeometry, InDragDropEvent, InOperation);
+    }
+    return Super::NativeOnDragOver(InGeometry, InDragDropEvent, InOperation);
+}
+
+bool UInventoryItem::NativeOnDrop(const FGeometry& InGeometry, const FDragDropEvent& InDragDropEvent, UDragDropOperation* InOperation)
+{
+    if (UInventorySlot* ParentSlot = GetTypedOuter<UInventorySlot>())
+    {
+        return ParentSlot->NativeOnDrop(InGeometry, InDragDropEvent, InOperation);
+    }
+    return Super::NativeOnDrop(InGeometry, InDragDropEvent, InOperation);
+}
 
 void UInventoryItem::SetItemImage(UTexture2D* ItemIcon)
 {
@@ -28,5 +77,21 @@ void UInventoryItem::SetSlotNumber(int32 SlotNumber)
     if (SlotNumberText)
     {
         SlotNumberText->SetText(FText::AsNumber(SlotNumber));
+    }
+}
+
+void UInventoryItem::NativeOnDragCancelled(const FDragDropEvent& InDragDropEvent,UDragDropOperation* InOperation)
+{
+    Super::NativeOnDragCancelled(InDragDropEvent, InOperation);
+
+    // Nếu đây là thao tác của item
+    if (UItemDragDropOperation* Op = Cast<UItemDragDropOperation>(InOperation))
+    {
+        // Lấy owner là character của UI
+        if (AHorrorGameCharacter* Owner =
+            Cast<AHorrorGameCharacter>(GetOwningPlayerPawn()))
+        {
+            Owner->DropInventoryItem(Op->bSourceIsBag, Op->SourceIndex);
+        }
     }
 }

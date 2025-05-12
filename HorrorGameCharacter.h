@@ -23,6 +23,7 @@ class USanityWidget;
 class UTimelineComponent;
 class UCurveFloat;
 class ANoteActor;
+class UInventoryBagWidget;
 
 DECLARE_LOG_CATEGORY_EXTERN(LogTemplateCharacter, Log, All);
 
@@ -125,6 +126,9 @@ class AHorrorGameCharacter : public ACharacter
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
 	UInputAction* RightAction; 
 
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
+	UInputAction* TabAction;
+
 public:
 	AHorrorGameCharacter();
 	
@@ -187,6 +191,11 @@ public:
 	void CloseNoteUI();
 
 	void SetCurrentNoteActor(ANoteActor* Note) { CurrentNote = Note; }
+
+	UFUNCTION()
+	void SwapInventoryItems(bool SourceIsBag, int32 SourceIndex, bool TargetIsBag, int32 TargetIndex);
+
+	void DropInventoryItem(bool bFromBag, int32 Index);
 	//------------------------------------------------PROPERTY--------------------------------------------------------//
 	//------------------------------------------------OTHER--------------------------------------------------------//
 	UPROPERTY()
@@ -264,6 +273,14 @@ public:
 	UPROPERTY(EditDefaultsOnly, Category = "UI")
 	TSubclassOf<UUserWidget> NoteWidgetClass;
 
+	UPROPERTY()
+	TArray<AActor*> InventoryBag;
+
+	UPROPERTY()
+	UInventoryBagWidget* InventoryBagWidget;
+
+	UPROPERTY(EditAnywhere, Category = "UI")
+	TSubclassOf<UInventoryBagWidget> InventoryBagWidgetClass;
 	//------------------------------------------------BOOLEAN--------------------------------------------------------//
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Flashlight")
@@ -291,6 +308,8 @@ public:
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Sanity")
 	bool bIsGrabbed = false;
+
+	bool bIsBagOpen = false;
 	//------------------------------------------------VECTOR--------------------------------------------------------//	  
 	
 	//------------------------------------------------FLOAT--------------------------------------------------------//
@@ -336,6 +355,12 @@ public:
 	int32 InteractLineTraceLength = 500;
 
 	int32 CurrentHeldSlot;
+
+	UPROPERTY(EditDefaultsOnly, Category = "Inventory")
+	int32 MainInventoryCapacity = 3;
+
+	UPROPERTY(EditDefaultsOnly, Category = "Inventory")
+	int32 BagCapacity = 10;
 
 	//------------------------------------------------ANIMATION--------------------------------------------------------//
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Animation")
@@ -399,6 +424,12 @@ private:
 
 	void SetupSanityWidget();
 	void SetupSanityTimeline();
+
+	void AddItemToMainInventory(AItem* HitItem);
+	void AddItemToBag(AItem* HitItem);
+	void ToggleInventoryBag();
+	void HideInventoryBag();
+	void ShowInventoryBag();
 	//------------------------------------------------BOOLEAN--------------------------------------------------------//
 	UPROPERTY(EditInstanceOnly, Category = "Crouch")
 	bool bIsCrouching;	 

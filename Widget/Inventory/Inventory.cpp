@@ -5,45 +5,33 @@
 #include "HorrorGame/Item/ItemBase.h"
 #include "HorrorGame/Actor/Item.h"
 #include "InventorySlot.h"
+#include "HorrorGame/HorrorGameCharacter.h"
 
 void UInventory::UpdateInventory(const TArray<AActor*>& InventoryItems)
 {
-    if (!InventoryGrid || !InventorySlotClass) return;
+    if (!InventoryGrid || !InventorySlotClass || !InventoryItemClass) return;
 
-    // Xóa hết các widget cũ trong UniformGridPanel
     InventoryGrid->ClearChildren();
 
-    const int32 TotalSlots = 3;
+    // Lấy capacity từ character, không hard‑code
+    AHorrorGameCharacter* Player = Cast<AHorrorGameCharacter>(GetOwningPlayerPawn());
+    const int32 TotalSlots = Player ? Player->MainInventoryCapacity : 0;
 
-    // Tạo 3 slot cố định
-    for (int32 SlotIndex = 0; SlotIndex < TotalSlots; SlotIndex++)
+    for (int32 SlotIndex = 0; SlotIndex < TotalSlots; ++SlotIndex)
     {
         UInventorySlot* SlotWidget = CreateWidget<UInventorySlot>(this, InventorySlotClass);
-        UInventoryItem* InventoryItemWidget = CreateWidget<UInventoryItem>(this, InventoryItemClass);
-        if (SlotWidget && InventoryItemWidget)
+        UInventoryItem* ItemWidget = CreateWidget<UInventoryItem>(SlotWidget, InventoryItemClass);
+        SlotWidget->SlotIndex = SlotIndex;
+        SlotWidget->bIsBagSlot = false;
+
+        // set số, hình giống trước
+        ItemWidget->SetSlotNumber(SlotIndex + 1);
+        if (InventoryItems.IsValidIndex(SlotIndex) && InventoryItems[SlotIndex])
         {
-            // Cập nhật số slot (slot bắt đầu từ 1)
-            InventoryItemWidget->SetSlotNumber(SlotIndex + 1);
-
-            // Nếu có item tại vị trí SlotIndex, cập nhật hình ảnh
-            if (InventoryItems.IsValidIndex(SlotIndex) && InventoryItems[SlotIndex] != nullptr)
-            {
-                UTexture2D* ItemIcon = nullptr;
-                if (AItem* ItemActorObj = Cast<AItem>(InventoryItems[SlotIndex]))
-                {
-                    if (ItemActorObj->ItemData)
-                    {
-                        ItemIcon = ItemActorObj->ItemData->ItemTextData.Icon;
-                    }
-                }
-                InventoryItemWidget->SetItemImage(ItemIcon);
-            }
-
-            // Luôn luôn thêm InventoryItemWidget vào slot để hiển thị số thứ tự
-            SlotWidget->SetSlotContent(InventoryItemWidget);
-
-            // Thêm slot widget vào UniformGridPanel (ví dụ: 1 hàng, 3 cột)
-            InventoryGrid->AddChildToUniformGrid(SlotWidget, 0, SlotIndex);
+            if (AItem* It = Cast<AItem>(InventoryItems[SlotIndex]))
+                ItemWidget->SetItemImage(It->ItemData->ItemTextData.Icon);
         }
+        SlotWidget->SetSlotContent(ItemWidget);
+        InventoryGrid->AddChildToUniformGrid(SlotWidget, 0, SlotIndex);
     }
 }

@@ -14,6 +14,7 @@
 #include "HorrorGame/Widget/SanityWidget.h"
 #include "HorrorGame/Widget/NoteWidget.h"
 #include "HorrorGame/Actor/NoteActor.h"
+#include "HorrorGame/Widget/Inventory/InventoryBagWidget.h"
 
 // Engine
 #include "Engine/LocalPlayer.h"
@@ -125,6 +126,9 @@ void AHorrorGameCharacter::BeginPlay()
 
     SetupSanityWidget();
     SetupSanityTimeline();
+
+    Inventory.SetNum(MainInventoryCapacity);
+    InventoryBag.SetNum(BagCapacity);
 }
 
 void AHorrorGameCharacter::Tick(float DeltaTime)
@@ -197,6 +201,8 @@ void AHorrorGameCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInpu
 
         //Uses Item
         EnhancedInputComponent->BindAction(UseItemAction, ETriggerEvent::Completed, this, &AHorrorGameCharacter::UseEquippedItem); 
+        
+        EnhancedInputComponent->BindAction(TabAction, ETriggerEvent::Completed, this, &AHorrorGameCharacter::ToggleInventoryBag); 
         
 	}
 	else
@@ -369,45 +375,123 @@ void AHorrorGameCharacter::InteractWithGrabbedObject()
                     ValidItemCount++;
                 }
             }
-            if (ValidItemCount >= 3)
+            if (ValidItemCount < MainInventoryCapacity)
             {
-                UE_LOG(LogTemp, Warning, TEXT("Inventory đầy, không thể nhặt thêm item."));
-                return;
+                AddItemToMainInventory(HitItem);
             }
-
-            if (HitItem->ItemMesh)
+            else
             {
-                if (HitItem->ItemData)
-                {
-                    int32 WeightItem = HitItem->ItemData->ItemQuantityData.Weight;
-                    HitItem->SetItemWeight(WeightItem);
-                }
-                else
-                {
-                    UE_LOG(LogTemp, Warning, TEXT("ItemData is null!"));
-                }
-
-                HitItem->OnPickup();
-
-                // Cập nhật Inventory: tìm slot trống hoặc thêm vào cuối mảng
-                int32 EmptyIndex = Inventory.IndexOfByPredicate([](AActor* Actor) { return Actor == nullptr; });
-                if (EmptyIndex != INDEX_NONE)
-                {
-                    Inventory[EmptyIndex] = HitItem;
-                }
-                else
-                {
-                    Inventory.Add(HitItem);
-                }
-
-                // Cập nhật giao diện Inventory nếu có widget
-                if (InventoryWidget)
-                {
-                    InventoryWidget->UpdateInventory(Inventory);
-                }
+                // Main full -> đưa vào túi phụ
+                AddItemToBag(HitItem);
             }
         }
     }
+}
+
+void AHorrorGameCharacter::AddItemToBag(AItem* HitItem)
+{
+    int32 EmptyIndex = InventoryBag.IndexOfByPredicate([](AActor* Actor) { return Actor == nullptr; });
+    if (EmptyIndex != INDEX_NONE)
+    {
+        InventoryBag[EmptyIndex] = HitItem;
+        HitItem->OnPickup();
+        if (InventoryBagWidget)
+            InventoryBagWidget->UpdateBag(InventoryBag);
+        UE_LOG(LogTemp, Log, TEXT("Stored into bag at slot %d"), EmptyIndex);
+    }
+    else
+    {
+        UE_LOG(LogTemp, Warning, TEXT("Bag full"));
+    }
+}
+
+void AHorrorGameCharacter::ToggleInventoryBag()
+{
+    // Create widget nếu chưa có
+    if (!InventoryBagWidget && InventoryBagWidgetClass)
+    {
+        InventoryBagWidget = CreateWidget<UInventoryBagWidget>(GetWorld(), InventoryBagWidgetClass);
+    }
+
+    if (InventoryBagWidget)
+    {
+        bIsBagOpen = !bIsBagOpen;
+        if (bIsBagOpen)
+        {
+			ShowInventoryBag();
+        }
+        else
+        {
+            HideInventoryBag();
+        }
+    }
+}
+
+void AHorrorGameCharacter::HideInventoryBag()
+{
+    bIsBagOpen = false;
+    if (InventoryBagWidget)
+    {
+        InventoryBagWidget->RemoveFromViewport();
+    }
+
+    if (APlayerController* PC = Cast<APlayerController>(GetController()))
+    {
+        UWidgetBlueprintLibrary::SetInputMode_GameOnly(PC);
+        PC->bShowMouseCursor = false;
+    }
+}
+
+void AHorrorGameCharacter::ShowInventoryBag()
+{
+    bIsBagOpen = true;
+    InventoryBagWidget->AddToViewport();
+
+    if (APlayerController* PC = Cast<APlayerController>(GetController()))
+    {
+        // Instead of UIOnly, use GameAndUI:
+        FInputModeGameAndUI InputMode;
+        InputMode.SetWidgetToFocus(InventoryBagWidget->TakeWidget());
+        InputMode.SetLockMouseToViewportBehavior(EMouseLockMode::DoNotLock);
+        PC->SetInputMode(InputMode);
+        PC->bShowMouseCursor = true;
+    }
+
+    if (UInventoryBagWidget* BagW = Cast<UInventoryBagWidget>(InventoryBagWidget))
+    {
+        BagW->UpdateBag(InventoryBag);
+    }
+}
+
+void AHorrorGameCharacter::SwapInventoryItems(bool SourceIsBag, int32 SourceIndex, bool TargetIsBag, int32 TargetIndex)
+{
+    TArray<AActor*>& SourceArray = SourceIsBag ? InventoryBag : Inventory;
+    TArray<AActor*>& TargetArray = TargetIsBag ? InventoryBag : Inventory;
+
+    if (SourceArray.IsValidIndex(SourceIndex) && TargetArray.IsValidIndex(TargetIndex))
+    {
+        AActor* Tmp = SourceArray[SourceIndex];
+        SourceArray[SourceIndex] = TargetArray[TargetIndex];
+        TargetArray[TargetIndex] = Tmp;
+
+        if (InventoryWidget)    InventoryWidget->UpdateInventory(Inventory);
+        if (InventoryBagWidget) InventoryBagWidget->UpdateBag(InventoryBag);
+    }
+}
+
+void AHorrorGameCharacter::AddItemToMainInventory(AItem* HitItem)
+{
+    HitItem->OnPickup();
+    int32 EmptyIndex = Inventory.IndexOfByPredicate([](AActor* Actor) { return Actor == nullptr; });
+    if (EmptyIndex != INDEX_NONE)
+        Inventory[EmptyIndex] = HitItem;
+    else
+        Inventory.Add(HitItem);
+
+    if (InventoryWidget)
+        InventoryWidget->UpdateInventory(Inventory);
+
+    UE_LOG(LogTemp, Log, TEXT("Picked up into main inventory."));
 }
 
 void AHorrorGameCharacter::UpdatePickupWidget()
@@ -600,27 +684,27 @@ void AHorrorGameCharacter::StoreCurrentHeldObject()
 {
     if (AActor* HeldObject = GetHeldObject())
     {
-        // Tách vật khỏi nhân vật
         HeldObject->DetachFromActor(FDetachmentTransformRules::KeepWorldTransform);
 
-        // Nếu vật chưa có trong kho thì lưu vào Inventory
-        if (!Inventory.Contains(HeldObject))
+        int32 EmptyIndex = Inventory.IndexOfByPredicate([](AActor* Act) { return Act == nullptr; });
+        if (EmptyIndex != INDEX_NONE)
         {
-            Inventory.Add(HeldObject);
-            UE_LOG(LogTemp, Warning, TEXT("Stored currently held object into Inventory."));
-        }
-
-        // Kiểm tra loại của vật và xử lý tương ứng
-        if (AItem* Item = Cast<AItem>(HeldObject))
-        {
-            Item->OnPickup();
+            Inventory[EmptyIndex] = HeldObject;
+            UE_LOG(LogTemp, Warning, TEXT("Stored into Inventory slot %d."), EmptyIndex);
         }
         else
         {
-            HeldObject->SetActorHiddenInGame(true);
+            Inventory.Add(HeldObject);
+            UE_LOG(LogTemp, Warning, TEXT("Inventory full, appended."));
         }
 
+        if (AItem* Item = Cast<AItem>(HeldObject))
+            Item->OnPickup();
+        else
+            HeldObject->SetActorHiddenInGame(true);
+
         EquippedItem = nullptr;
+        if (InventoryWidget) InventoryWidget->UpdateInventory(Inventory);
     }
 }
 
@@ -853,6 +937,61 @@ void AHorrorGameCharacter::DropObject()
             UE_LOG(LogTemp, Warning, TEXT("Dropped object from Inventory slot %d"), DroppedIndex);
         }
     }
+}
+
+void AHorrorGameCharacter::DropInventoryItem(bool bFromBag, int32 Index)
+{
+    // 1) Chọn mảng nguồn (main hay bag)
+    TArray<AActor*>& SourceArray = bFromBag ? InventoryBag : Inventory;
+
+    if (!SourceArray.IsValidIndex(Index) || !SourceArray[Index])
+        return;
+
+    // 2) Lấy con trỏ đến actor item và loại bỏ khỏi UI trước
+    AActor* DroppedActor = SourceArray[Index];
+    SourceArray[Index] = nullptr;
+
+    // Cập nhật lại UI ngay khi đã clear slot
+    if (InventoryWidget)    InventoryWidget->UpdateInventory(Inventory);
+    if (InventoryBagWidget) InventoryBagWidget->UpdateBag(InventoryBag);
+
+    // 3) Từ đầu giống DropObject(): bật collision để world nhận
+    DroppedActor->SetActorEnableCollision(true);
+
+    // 4) Tính vị trí drop dựa vào camera
+    if (FollowCamera)
+    {
+        FVector CamLoc = FollowCamera->GetComponentLocation();
+        FVector CamFwd = FollowCamera->GetForwardVector();
+        float   DropDist = 200.0f;
+        FVector DropLoc = CamLoc + CamFwd * DropDist;
+
+        // 5) Gọi OnDrop nếu đây là AItem
+        if (AItem* Item = Cast<AItem>(DroppedActor))
+        {
+            // OnDrop sẽ handle detach, set location, collision, physics, hidden…
+            Item->OnDrop(DropLoc);
+        }
+        else
+        {
+            // Không phải AItem → tự detach + show + simulate physics
+            DroppedActor->DetachFromActor(FDetachmentTransformRules::KeepWorldTransform);
+            DroppedActor->SetActorHiddenInGame(false);
+            DroppedActor->SetActorLocation(DropLoc);
+
+            if (UPrimitiveComponent* PrimComp =
+                Cast<UPrimitiveComponent>(DroppedActor->GetComponentByClass(UPrimitiveComponent::StaticClass())))
+            {
+                PrimComp->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
+                PrimComp->SetSimulatePhysics(true);
+                // Thêm một cú đẩy nhỏ
+                PrimComp->AddImpulse(CamFwd * 300.f, NAME_None, true);
+            }
+        }
+    }
+
+    UE_LOG(LogTemp, Log, TEXT("Dropped inventory item from %s slot %d"),
+        bFromBag ? TEXT("Bag") : TEXT("Main"), Index);
 }
 
 void AHorrorGameCharacter::HandleZoom(const FInputActionValue& Value)
