@@ -57,6 +57,8 @@ public:
     using FUseItemFunction = void (AItem::*)();
     FUseItemFunction UseItemFunction;
 
+	//============FUNCTION==================//
+
     UFUNCTION(BlueprintCallable, Category = "Item")
     void UseItem();
 
@@ -69,8 +71,20 @@ public:
     UFUNCTION(BlueprintCallable, Category = "Item Weight")
     void SetItemWeight(int32 Weight);
 
+    void InitializeFrom(const AItem* Source, int32 InQuantity);
+
     UFUNCTION(BlueprintCallable, Category = "Item")
     void AttachToCharacter(USkeletalMeshComponent* CharacterMesh, FName SocketName);
+
+    //============AVAIABLE=================//
+    UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Stack")
+    bool bIsStackable = false;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Stack", meta = (EditCondition = "bIsStackable"))
+    int32 Quantity = 1;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Stack", meta = (EditCondition = "bIsStackable"))
+    int32 MaxStackSize = 1;
 
 private:
     void InitializeItemData();
@@ -78,6 +92,7 @@ private:
     void ConfigureWidget(const FItemData& DataRow);
     void ConfigureMesh(const FItemData& DataRow);
     void BindUseFunction(const FItemData& DataRow);
+    void InitializeStackProperties(const FItemData& DataRow);
 
     void HandleHealthMedicine();
     void HandleMolotovCocktail();
@@ -94,6 +109,8 @@ private:
     UFUNCTION()
     void OnOverlapEnd(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor,
         UPrimitiveComponent* OtherComponent, int32 OtherBodyIndex);
+
+    virtual void OnConstruction(const FTransform& Transform) override;
 
     bool bFlashAttached;
 

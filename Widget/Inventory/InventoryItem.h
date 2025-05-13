@@ -4,6 +4,8 @@
 #include "Blueprint/UserWidget.h"
 #include "InventoryItem.generated.h"
 
+class AItem;
+
 UCLASS()
 class HORRORGAME_API UInventoryItem : public UUserWidget
 {
@@ -16,8 +18,13 @@ public:
     UFUNCTION(BlueprintCallable, Category = "InventorySlot")
     void SetSlotNumber(int32 SlotNumber);
 
+    UFUNCTION(BlueprintCallable, Category = "Item Quantity")
+    void SetItemQuantity();
+
     UFUNCTION(BlueprintCallable)
     UTexture2D* GetCurrentIcon() const { return CurrentIcon; }
+
+    void SetBoundItem(AItem* InItem);
 
 protected:
     // Widget bindings
@@ -26,6 +33,12 @@ protected:
 
     UPROPERTY(meta = (BindWidget))
     class UTextBlock* SlotNumberText;
+
+    UPROPERTY(meta = (BindWidget))
+    UTextBlock* QuantityText;
+
+    UPROPERTY()
+    AItem* BoundItem = nullptr;
 
     // MỚI: biến để lưu icon hiện tại
     UPROPERTY()

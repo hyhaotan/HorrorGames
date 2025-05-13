@@ -9,10 +9,12 @@
 #include "HorrorGame/Widget/Inventory/InventorySlot.h"
 #include "Components/CanvasPanel.h"
 #include "HorrorGame/HorrorGameCharacter.h"
+#include "HorrorGame/Actor/Item.h"
+#include "HorrorGame/Item/ItemBase.h"
 
 FReply UInventoryItem::NativeOnMouseButtonDown(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent)
 {
-    if (InMouseEvent.GetEffectingButton() == EKeys::LeftMouseButton)
+    if (InMouseEvent.GetEffectingButton() == EKeys::LeftMouseButton && BoundItem)
     {
         return UWidgetBlueprintLibrary::DetectDragIfPressed(InMouseEvent, this, EKeys::LeftMouseButton).NativeReply;
     }
@@ -72,11 +74,32 @@ void UInventoryItem::SetItemImage(UTexture2D* ItemIcon)
     }
 }
 
+void UInventoryItem::SetBoundItem(AItem* InItem)
+{
+    BoundItem = InItem;
+    SetItemImage(InItem ? InItem->ItemData->ItemTextData.Icon : nullptr);
+    SetItemQuantity();
+
+}
+
 void UInventoryItem::SetSlotNumber(int32 SlotNumber)
 {
     if (SlotNumberText)
     {
         SlotNumberText->SetText(FText::AsNumber(SlotNumber));
+    }
+}
+
+void UInventoryItem::SetItemQuantity()
+{
+    if (BoundItem && BoundItem->Quantity > 1)
+    {
+        QuantityText->SetText(FText::AsNumber(BoundItem->Quantity));
+        QuantityText->SetVisibility(ESlateVisibility::Visible);
+    }
+    else
+    {
+        QuantityText->SetVisibility(ESlateVisibility::Collapsed);
     }
 }
 

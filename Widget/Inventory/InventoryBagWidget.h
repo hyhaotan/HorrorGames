@@ -17,6 +17,9 @@ public:
     UFUNCTION(BlueprintCallable, Category = "InventoryBag")
     void UpdateBag(const TArray<AActor*>& BagItems);
 
+    UFUNCTION()
+    void HandleSplitRequest(int32 SlotIndex, int32 SplitAmount);
+
 protected:
     // WrapBox chứa các slot, tự động xuống dòng
     UPROPERTY(meta = (BindWidget))

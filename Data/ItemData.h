@@ -70,6 +70,12 @@ struct FItemData : public FTableRowBase
 	FName ID;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Item Data")
+	bool bIsStack = false;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Item Data", meta = (EditCondition = "bIsStack"))
+	int32 MaxStackSize = 1;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Item Data")
 	FItemTextData ItemTextData;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Item Data")

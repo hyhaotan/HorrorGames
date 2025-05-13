@@ -430,6 +430,7 @@ private:
 	void ToggleInventoryBag();
 	void HideInventoryBag();
 	void ShowInventoryBag();
+	bool TryStackIntoExisting(TArray<AActor*>& Container, AItem* NewItem);
 	//------------------------------------------------BOOLEAN--------------------------------------------------------//
 	UPROPERTY(EditInstanceOnly, Category = "Crouch")
 	bool bIsCrouching;	 

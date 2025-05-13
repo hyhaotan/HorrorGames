@@ -390,19 +390,101 @@ void AHorrorGameCharacter::InteractWithGrabbedObject()
 
 void AHorrorGameCharacter::AddItemToBag(AItem* HitItem)
 {
-    int32 EmptyIndex = InventoryBag.IndexOfByPredicate([](AActor* Actor) { return Actor == nullptr; });
+    HitItem->OnPickup();
+
+    // 1. Stack vào các stack trong túi nếu được phép
+    if (HitItem->bIsStackable)
+    {
+        bool bAllStacked = TryStackIntoExisting(InventoryBag, HitItem);
+        if (bAllStacked)
+        {
+            if (InventoryBagWidget)
+                InventoryBagWidget->UpdateBag(InventoryBag);
+            return;
+        }
+    }
+
+    // 2. Nếu còn dư hoặc non-stackable, đưa vào slot trống trong bag
+    int32 EmptyIndex = InventoryBag.IndexOfByPredicate([](AActor* A) { return A == nullptr; });
     if (EmptyIndex != INDEX_NONE)
     {
         InventoryBag[EmptyIndex] = HitItem;
-        HitItem->OnPickup();
-        if (InventoryBagWidget)
-            InventoryBagWidget->UpdateBag(InventoryBag);
-        UE_LOG(LogTemp, Log, TEXT("Stored into bag at slot %d"), EmptyIndex);
     }
     else
     {
-        UE_LOG(LogTemp, Warning, TEXT("Bag full"));
+        UE_LOG(LogTemp, Warning, TEXT("Bag full, cannot pick up"));
+        // Nếu muốn, bạn có thể rollback HitItem->Destroy() hoặc trả về vật phẩm vào world
+        return;
     }
+
+    if (InventoryBagWidget)
+        InventoryBagWidget->UpdateBag(InventoryBag);
+
+    UE_LOG(LogTemp, Log, TEXT("Stored into bag at slot %d"), EmptyIndex);
+}
+
+void AHorrorGameCharacter::AddItemToMainInventory(AItem* HitItem)
+{
+    HitItem->OnPickup();
+
+    // 1. Nếu stackable, thử gộp vào các stack hiện có
+    if (HitItem->bIsStackable)
+    {
+        bool bAllStacked = TryStackIntoExisting(Inventory, HitItem);
+        if (bAllStacked)
+        {
+            // UI refresh nếu cần
+            if (InventoryWidget)
+                InventoryWidget->UpdateInventory(Inventory);
+            return;
+        }
+    }
+
+    // 2. Nếu còn dư hoặc non-stackable, đưa vào slot trống
+    int32 EmptyIndex = Inventory.IndexOfByPredicate([](AActor* A) { return A == nullptr; });
+    if (EmptyIndex != INDEX_NONE)
+    {
+        Inventory[EmptyIndex] = HitItem;
+    }
+    else
+    {
+        Inventory.Add(HitItem);
+    }
+
+    if (InventoryWidget)
+        InventoryWidget->UpdateInventory(Inventory);
+
+    UE_LOG(LogTemp, Log, TEXT("Picked up into main inventory."));
+}
+
+bool AHorrorGameCharacter::TryStackIntoExisting(TArray<AActor*>& Container, AItem* NewItem)
+{
+    for (AActor* Actor : Container)
+    {
+        AItem* Existing = Cast<AItem>(Actor);
+        if (!Existing)
+            continue;
+
+        // Cùng class, cùng loại, cho phép stack, và chưa đầy
+        if (Existing->GetClass() == NewItem->GetClass() &&
+            Existing->bIsStackable &&
+            Existing->Quantity < Existing->MaxStackSize)
+        {
+            int32 SpaceLeft = Existing->MaxStackSize - Existing->Quantity;
+            int32 ToMove = FMath::Min(SpaceLeft, NewItem->Quantity);
+
+            Existing->Quantity += ToMove;
+            NewItem->Quantity -= ToMove;
+
+            // Nếu đã chuyển hết, xóa actor thừa
+            if (NewItem->Quantity <= 0)
+            {
+                NewItem->Destroy();
+                return true;
+            }
+        }
+    }
+    return false;
 }
 
 void AHorrorGameCharacter::ToggleInventoryBag()
@@ -463,6 +545,8 @@ void AHorrorGameCharacter::ShowInventoryBag()
     }
 }
 
+
+
 void AHorrorGameCharacter::SwapInventoryItems(bool SourceIsBag, int32 SourceIndex, bool TargetIsBag, int32 TargetIndex)
 {
     TArray<AActor*>& SourceArray = SourceIsBag ? InventoryBag : Inventory;
@@ -477,21 +561,6 @@ void AHorrorGameCharacter::SwapInventoryItems(bool SourceIsBag, int32 SourceInde
         if (InventoryWidget)    InventoryWidget->UpdateInventory(Inventory);
         if (InventoryBagWidget) InventoryBagWidget->UpdateBag(InventoryBag);
     }
-}
-
-void AHorrorGameCharacter::AddItemToMainInventory(AItem* HitItem)
-{
-    HitItem->OnPickup();
-    int32 EmptyIndex = Inventory.IndexOfByPredicate([](AActor* Actor) { return Actor == nullptr; });
-    if (EmptyIndex != INDEX_NONE)
-        Inventory[EmptyIndex] = HitItem;
-    else
-        Inventory.Add(HitItem);
-
-    if (InventoryWidget)
-        InventoryWidget->UpdateInventory(Inventory);
-
-    UE_LOG(LogTemp, Log, TEXT("Picked up into main inventory."));
 }
 
 void AHorrorGameCharacter::UpdatePickupWidget()

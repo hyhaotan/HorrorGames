@@ -5,15 +5,21 @@
 #include "InventoryItem.h" // Forward include to recognize UInventoryItem
 #include "InventorySlot.generated.h"
 
-/**
- * Widget for an individual inventory slot, handling drag-and-drop and highlights.
- */
+class UQuantitySelectionWidget;
+
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(
+    FOnSplitRequested,
+    int32, SlotIndex,
+    int32, Amount
+);
+
 UCLASS()
 class HORRORGAME_API UInventorySlot : public UUserWidget
 {
     GENERATED_BODY()
 
 public:
+
     /** Set the content widget (item) inside this slot */
     UFUNCTION(BlueprintCallable, Category = "InventorySlot")
     void SetSlotContent(UInventoryItem* InventoryItemWidget);
@@ -38,16 +44,19 @@ public:
     UPROPERTY(BlueprintReadOnly)
     bool bIsBagSlot;
 
-    // Drag-and-drop overrides
-    virtual bool NativeOnDragOver(
-        const FGeometry& InGeometry,
-        const FDragDropEvent& InDragDropEvent,
-        UDragDropOperation* InOperation) override;
+    UPROPERTY()
+    class AItem* BoundItemActor = nullptr;
 
-    virtual bool NativeOnDrop(
-        const FGeometry& InGeometry,
-        const FDragDropEvent& InDragDropEvent,
-        UDragDropOperation* InOperation) override;
+    UPROPERTY(BlueprintAssignable, Category = "Inventory")
+    FOnSplitRequested OnSplitRequested;
+                                            
+    /** Class of quantity selector */
+    UPROPERTY(EditAnywhere, Category = "UI")
+    TSubclassOf<UQuantitySelectionWidget> QuantitySelectionClass;
+
+    virtual bool NativeOnDragOver( const FGeometry& InGeometry,const FDragDropEvent& InDragDropEvent,UDragDropOperation* InOperation) override;
+    virtual bool NativeOnDrop(const FGeometry& InGeometry,const FDragDropEvent& InDragDropEvent,UDragDropOperation* InOperation) override;
+    virtual FReply NativeOnMouseButtonUp(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent) override;
 
 private:
 

@@ -7,6 +7,8 @@
 #include "HorrorGame/Widget/ItemDragDropOperation.h"
 #include "HorrorGame/HorrorGameCharacter.h"
 #include "Components/SizeBox.h"
+#include "HorrorGame/Actor/Item.h"
+#include "HorrorGame/Widget/Inventory/QuantitySelectionWidget.h"
 
 void UInventorySlot::SetSlotContent(UInventoryItem* InventoryItemWidget)
 {
@@ -43,4 +45,26 @@ bool UInventorySlot::NativeOnDrop(const FGeometry& InGeometry, const FDragDropEv
         }
     }
     return Super::NativeOnDrop(InGeometry, InDragDropEvent, InOperation);
+}
+
+FReply UInventorySlot::NativeOnMouseButtonUp(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent)
+{
+    if (InMouseEvent.GetEffectingButton() == EKeys::RightMouseButton && bIsBagSlot)
+    {
+        // giờ đây bạn đã có actor lưu sẵn
+        if (BoundItemActor && BoundItemActor->bIsStackable && BoundItemActor->Quantity > 1)
+        {
+            if (UQuantitySelectionWidget* Dialog = CreateWidget<UQuantitySelectionWidget>(this, QuantitySelectionClass))
+            {
+                Dialog->Initialize(SlotIndex, BoundItemActor->Quantity);
+                Dialog->OnConfirmed.BindLambda([this](int32 Index, int32 Amount)
+                    {
+                        OnSplitRequested.Broadcast(Index, Amount);
+                    });
+                Dialog->AddToViewport();
+            }
+            return FReply::Handled();
+        }
+    }
+    return Super::NativeOnMouseButtonUp(InGeometry, InMouseEvent);
 }

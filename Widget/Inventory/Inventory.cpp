@@ -29,7 +29,7 @@ void UInventory::UpdateInventory(const TArray<AActor*>& InventoryItems)
         if (InventoryItems.IsValidIndex(SlotIndex) && InventoryItems[SlotIndex])
         {
             if (AItem* It = Cast<AItem>(InventoryItems[SlotIndex]))
-                ItemWidget->SetItemImage(It->ItemData->ItemTextData.Icon);
+                ItemWidget->SetBoundItem(It);
         }
         SlotWidget->SetSlotContent(ItemWidget);
         InventoryGrid->AddChildToUniformGrid(SlotWidget, 0, SlotIndex);

@@ -99,6 +99,18 @@ void AItem::SetItemWeight(int32 Weight)
     }
 }
 
+void AItem::OnConstruction(const FTransform& Transform)
+{
+    Super::OnConstruction(Transform);
+
+    // If non-stackable, enforce single quantity
+    if (!bIsStackable)
+    {
+        Quantity = 1;
+        MaxStackSize = 1;
+    }
+}
+
 void AItem::AttachToCharacter(USkeletalMeshComponent* CharacterMesh, FName SocketName)
 {
     if (!CharacterMesh)
@@ -172,7 +184,18 @@ void AItem::InitializeItemData()
         ConfigureWidget(*DataRow);
         ConfigureMesh(*DataRow);
         BindUseFunction(*DataRow);
+        InitializeStackProperties(*DataRow);
     }
+}
+
+void AItem::InitializeFrom(const AItem* Source, int32 InQuantity)
+{
+    bIsStackable = Source->bIsStackable;
+    Quantity = InQuantity;
+    MaxStackSize = Source->MaxStackSize;
+    ItemRowHandle = Source->ItemRowHandle;
+    ItemDataRow = Source->ItemDataRow;
+    ItemData = Source->ItemData;
 }
 
 void AItem::HandleHealthMedicine()
@@ -238,6 +261,15 @@ void AItem::ConfigureMesh(const FItemData& DataRow)
     {
         ItemMesh->SetVisibility(false);
     }
+}
+
+void AItem::InitializeStackProperties(const FItemData& DataRow)
+{
+    bIsStackable = DataRow.bIsStack;
+
+    Quantity = 1;
+
+    MaxStackSize = bIsStackable? DataRow.MaxStackSize: 1;
 }
 
 void AItem::BindUseFunction(const FItemData& DataRow)
