@@ -3,77 +3,86 @@
 #include "CoreMinimal.h"
 #include "GameFramework/Actor.h"
 #include "Components/TimelineComponent.h"
-#include "Components/BoxComponent.h"
 #include "Door.generated.h"
 
 class UStaticMeshComponent;
-class USkeletalMeshComponent;
+class UBoxComponent;
+class UCurveFloat;
+class AHorrorGameCharacter;
+class UItemWidget;
+class UWidgetComponent;
+class USphereComponent;
 
 UCLASS()
 class HORRORGAME_API ADoor : public AActor
 {
-	GENERATED_BODY()
-	
-public:	
-	// Sets default values for this actor's properties
-	ADoor();
+    GENERATED_BODY()
+
+public:
+    ADoor();
 
 protected:
-	// Called when the game starts or when spawned
-	virtual void BeginPlay() override;
+    virtual void BeginPlay() override;
+    virtual void Tick(float DeltaTime) override;
 
-public:	
-	// Called every frame
-	virtual void Tick(float DeltaTime) override;
+public:
+    /** Called by character interaction */
+    void Interact();
 
-	// Implement the Interact function from the IInteract interface
-	void Interact();
+    /** Cached player character pointer */
+    AHorrorGameCharacter* Player;
 
-	// Reference to the player
-	class AHorrorGameCharacter* Player;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Item Widget")
+    UWidgetComponent* ItemWidget;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Box Item")
+    USphereComponent* SphereComponent;
+
+    UPROPERTY()
+    UItemWidget* PickupWidget;
+
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Item|UI")
+    TSubclassOf<UItemWidget> PickupWidgetClass;
 private:
-	// Door frame mesh
-	UPROPERTY(VisibleAnywhere, Category = "Components")
-	UStaticMeshComponent* DoorFrame;
+    /** Door frame mesh */
+    UPROPERTY(VisibleAnywhere, Category = "Components")
+    UStaticMeshComponent* DoorFrame;
 
-	// Door mesh
-	UPROPERTY(VisibleAnywhere, Category = "Components")
-	UStaticMeshComponent* Door;
+    /** Actual door mesh that will rotate */
+    UPROPERTY(VisibleAnywhere, Category = "Components")
+    UStaticMeshComponent* Door;
 
-	UPROPERTY(VisibleAnywhere, Category = "Components")
-	USkeletalMeshComponent* REFInside;
+    /** Float curve asset for the door animation timeline */
+    UPROPERTY(EditAnywhere, Category = "Door")
+    UCurveFloat* CurveFloat;
 
-	UPROPERTY(VisibleAnywhere, Category = "Components")
-	USkeletalMeshComponent* REFOutside;
+    /** Timeline for smooth door animation */
+    FTimeline DoorTimeline;
 
-	// Box collision for interaction
-	UPROPERTY(VisibleAnywhere, Category = "Components")
-	class UBoxComponent* BoxCollision;
+    /** Rotation angle when opening the door */
+    UPROPERTY(EditAnywhere, Category = "Door", meta = (ClampMin = "0.0", ClampMax = "180.0"))
+    float DoorRotateAngle;
 
-	// Timeline for door animation
-	UPROPERTY(VisibleAnywhere, Category = "Timeline")
-	FTimeline Timeline;
+    /** State flag tracking whether the door is closed */
+    bool bIsDoorClosed;
 
-	// Curve for door rotation
-	UPROPERTY(EditAnywhere, Category = "Timeline")
-	class UCurveFloat* CurveFloat;
+    /** Determines rotation direction based on character side */
+    bool bDoorOnSameSide;
 
-	// Is the door currently closed
-	bool bIsDoorClose = true;
+    /** Callback for timeline update driving the rotation */
+    UFUNCTION()
+    void OpenDoor(float Value);
 
-	// Door rotation angle
-	UPROPERTY(EditAnywhere, Category = "Door")
-	float DoorRotateAngle = 90.f;
+    /** Determine if the player is on which side of the door */
+    void SetDoorSameSide();
 
-	// Whether the player is on the same side of the door
-	bool bDoorOnSameSide;
 
-	bool bIsPlayerInside;
+    UFUNCTION()
+    void OnOverlapBegin(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor,
+        UPrimitiveComponent* OtherComponent, int32 OtherBodyIndex,
+        bool bFromSweep, const FHitResult& SweepResult);
 
-	// Function to animate door rotation
-	UFUNCTION()
-	void OpenDoor(float Value);
-
-	// Determine if the door should rotate in the same direction
-	void SetDoorSameSide();
+    UFUNCTION()
+    void OnOverlapEnd(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor,
+        UPrimitiveComponent* OtherComponent, int32 OtherBodyIndex);
 };

@@ -1,11 +1,13 @@
 ﻿#include "MonsterJump.h"
 #include "HorrorGame/HorrorGameCharacter.h"
-#include "HorrorGame/Widget/ProgressBarWidget.h"
+#include "HorrorGame/Widget/Progress/ProgressBarWidget.h"
+
 #include "Blueprint/WidgetBlueprintLibrary.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "Kismet/GameplayStatics.h"
 #include "TimerManager.h"
 #include "InputCoreTypes.h"
+
 
 AMonsterJump::AMonsterJump()
 {
@@ -56,12 +58,7 @@ void AMonsterJump::StartQTE(bool bClearProgress)
     if (bClearProgress) EscapeProgress = 0.f;
     AdjustDifficulty();
 
-    if (!bPhaseInitialized)
-    {
-        ChooseRandomPhase();
-        bPhaseInitialized = true;
-    }
-
+    ChooseRandomPhase();
     GenerateSequenceByPhase();
     CurrentQTEIndex = 0;
     UpdateWidget();
@@ -116,6 +113,7 @@ void AMonsterJump::ReceiveEscapeInput(FKey PressedKey)
     UE_LOG(LogTemp, Log, TEXT("[QTE] Key=%s, Delta=%.3f, Result=%s"), *PressedKey.GetFName().ToString(), TimeDelta,
         *UEnum::GetValueAsString(Res));
 
+    EscapeWidget->PlayPress();
     if (QTESequence.IsValidIndex(CurrentQTEIndex) &&
         PressedKey == QTESequence[CurrentQTEIndex] &&
         Res != EQTEResult::Miss)
@@ -158,11 +156,13 @@ void AMonsterJump::UpdateWidget()
     EscapeWidget->SetProgressPercent(EscapeProgress / EscapeTarget);
 
     if (QTESequence.IsValidIndex(CurrentQTEIndex))
-        EscapeWidget->SetNextKey(QTESequence[CurrentQTEIndex].GetFName().ToString());
+    {
+        UTexture2D* Icon = GetKeyIconTexture(QTESequence[CurrentQTEIndex]);
+        EscapeWidget->SetNextKeyImage(Icon);
+    }
 
-    // Display phase name
-    const FString PhaseName = UEnum::GetValueAsString(CurrentPhase).Replace(TEXT("EQTEPhase::"), TEXT(""));
-    EscapeWidget->SetPhaseText(PhaseName);
+    UTexture2D* PhaseTex = GetPhaseIconTexture(CurrentPhase);
+    EscapeWidget->SetPhaseImage(PhaseTex);
 
     LastPromptTime = GetWorld()->GetTimeSeconds();
 }
@@ -259,18 +259,60 @@ void AMonsterJump::InitializeGrabbedPlayer(AHorrorGameCharacter* Player)
     StartQTE(true);
 }
 
+UTexture2D* AMonsterJump::GetKeyIconTexture(const FKey& Key) const
+{
+    //cách 1 dùng TMap
+    const FName Name = Key.GetFName();
+    if (const auto* SoftPtr = KeyIcons.Find(Name))
+    {
+        return SoftPtr->LoadSynchronous();
+    }
+    return nullptr;
+
+	//cách 2 dùng DataTable
+    //if (!KeyIconTable) return nullptr;
+
+    //static const FString Context = TEXT("GetKeyIconTexture");
+    //FName RowName = Key.GetFName();
+
+    //FQTEKeyIconRow* Row = KeyIconTable->FindRow<FQTEKeyIconRow>(RowName, Context);
+    //if (Row && Row->Icon.IsValid())
+    //{
+    //    return Row->Icon.LoadSynchronous();
+    //}
+    //return nullptr;
+}
+
+UTexture2D* AMonsterJump::GetPhaseIconTexture(EQTEPhase Phase) const
+{
+	//cách 1 dùng TMap
+    if (const auto* SoftPtr = PhaseIcons.Find(Phase))
+    {
+        return SoftPtr->LoadSynchronous();
+    }
+    return nullptr;
+
+	//cách 2 dùng DataTable
+   /* if (!PhaseIconTable) return nullptr;
+
+    static const FString Context = TEXT("GetPhaseIconTexture");
+
+    for (auto& Pair : PhaseIconTable->GetRowMap())
+    {
+        FQTEPhaseIconRow* Row = (FQTEPhaseIconRow*)Pair.Value;
+        if (Row && Row->Phase == Phase)
+        {
+            if (Row->Icon.IsValid())
+                return Row->Icon.LoadSynchronous();
+        }
+    }
+    return nullptr;*/
+}
+
 void AMonsterJump::ChooseRandomPhase()
 {
-    int32 Pick = FMath::RandRange(0, 2);
+    int32 Pick = FMath::RandRange(0, 1);
     CurrentPhase = static_cast<EQTEPhase>(Pick);
-
-    // If Opposite, pick the two keys
-    if (CurrentPhase == EQTEPhase::Opposite)
-    {
-        bool bUseAD = FMath::RandBool();
-        OppositeKey1 = bUseAD ? EKeys::A : EKeys::W;
-        OppositeKey2 = bUseAD ? EKeys::D : EKeys::S;
-    }
 }
 
 void AMonsterJump::GenerateSequenceByPhase()
@@ -286,11 +328,6 @@ void AMonsterJump::GenerateSequenceByPhase()
     case EQTEPhase::Arrows:
         Pool = { EKeys::Up, EKeys::Down, EKeys::Left, EKeys::Right };
         break;
-    case EQTEPhase::Opposite:
-        // alternate between OppositeKey1/Key2
-        for (int32 i = 0; i < SequenceLength; ++i)
-            QTESequence.Add((i % 2 == 0) ? OppositeKey1 : OppositeKey2);
-        return;
     }
 
     for (int32 i = 0; i < SequenceLength; ++i)

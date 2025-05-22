@@ -10,6 +10,8 @@
 #include "HorrorGame/Actor/Item.h"
 #include "HorrorGame/Widget/Inventory/QuantitySelectionWidget.h"
 
+TWeakObjectPtr<UQuantitySelectionWidget> UInventorySlot::CurrentOpenQuantityDialog = nullptr;
+
 void UInventorySlot::SetSlotContent(UInventoryItem* InventoryItemWidget)
 {
     if (ItemContainer)
@@ -49,22 +51,62 @@ bool UInventorySlot::NativeOnDrop(const FGeometry& InGeometry, const FDragDropEv
 
 FReply UInventorySlot::NativeOnMouseButtonUp(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent)
 {
+    // Only respond to right-click on bag slots
     if (InMouseEvent.GetEffectingButton() == EKeys::RightMouseButton && bIsBagSlot)
     {
-        // giờ đây bạn đã có actor lưu sẵn
+        // Close any existing dialog
+        if (CurrentOpenQuantityDialog.IsValid())
+        {
+            CurrentOpenQuantityDialog->RemoveFromParent();
+            CurrentOpenQuantityDialog = nullptr;
+        }
+
+        // If this slot's dialog is already open, consume event
+        if (QuantityDialogWidget && QuantityDialogWidget->IsInViewport())
+        {
+            QuantityDialogWidget = nullptr;
+            return FReply::Handled();
+        }
+
+        // Only open when item is stackable and count >1
         if (BoundItemActor && BoundItemActor->bIsStackable && BoundItemActor->Quantity > 1)
         {
-            if (UQuantitySelectionWidget* Dialog = CreateWidget<UQuantitySelectionWidget>(this, QuantitySelectionClass))
-            {
-                Dialog->Initialize(SlotIndex, BoundItemActor->Quantity);
-                Dialog->OnConfirmed.BindLambda([this](int32 Index, int32 Amount)
-                    {
-                        OnSplitRequested.Broadcast(Index, Amount);
-                    });
-                Dialog->AddToViewport();
-            }
+            SetQuantitySelectionWidget(InGeometry, InMouseEvent);
             return FReply::Handled();
         }
     }
+
     return Super::NativeOnMouseButtonUp(InGeometry, InMouseEvent);
+}
+
+void UInventorySlot::SetQuantitySelectionWidget(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent)
+{
+    // Create and track the dialog
+    QuantityDialogWidget = CreateWidget<UQuantitySelectionWidget>(GetOwningPlayer(), QuantitySelectionClass);
+    if (!QuantityDialogWidget) return;
+
+    CurrentOpenQuantityDialog = QuantityDialogWidget;
+
+    // Initialize with slot index and max quantity
+    QuantityDialogWidget->Initialize(SlotIndex, BoundItemActor->Quantity);
+
+    // Bind confirmation to split logic
+    QuantityDialogWidget->OnConfirmed.BindLambda([this](int32 Index, int32 Amount)
+        {
+            OnSplitRequested.Broadcast(Index, Amount);
+            if (CurrentOpenQuantityDialog.IsValid())
+            {
+                CurrentOpenQuantityDialog->RemoveFromParent();
+                CurrentOpenQuantityDialog = nullptr;
+            }
+            QuantityDialogWidget = nullptr;
+        });
+
+    // Position dialog next to slot
+    const FVector2D MouseScreenPos = InMouseEvent.GetScreenSpacePosition();
+    const FVector2D SlotSizeOnScreen = InGeometry.GetLocalSize() * InGeometry.GetAccumulatedLayoutTransform().GetScale();
+    const FVector2D DialogPos = MouseScreenPos + FVector2D(SlotSizeOnScreen.X + 5.f, 0.f);
+
+    QuantityDialogWidget->SetPositionInViewport(DialogPos, true);
+    QuantityDialogWidget->AddToViewport();
 }

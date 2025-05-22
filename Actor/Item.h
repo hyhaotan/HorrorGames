@@ -17,8 +17,10 @@ class UAnimMontage;
 class USoundBase;
 class UTimelineComponent;
 class UWidgetComponent;
-class UBoxComponent;
+class USphereComponent;
 class UFlashLightComponent;
+class UWidgetAnimation;
+class UItemWidget;
 
 UCLASS()
 class HORRORGAME_API AItem : public AActor
@@ -37,7 +39,7 @@ public:
     UWidgetComponent* ItemWidget;
 
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Box Item")
-    UBoxComponent* ItemCollision;
+    USphereComponent* SphereComponent;
 
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Item Mesh")
     UStaticMeshComponent* ItemMesh;
@@ -51,16 +53,18 @@ public:
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Item Data")
 	FItemData ItemDataRow;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Components")
-    UFlashLightComponent* FlashLightComp;
+    UPROPERTY()
+    UItemWidget* PickupWidget;
 
-    using FUseItemFunction = void (AItem::*)();
-    FUseItemFunction UseItemFunction;
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Item|UI")
+    TSubclassOf<UItemWidget> PickupWidgetClass;
+
+	class UInteractableComponent* InteractableComp;
 
 	//============FUNCTION==================//
 
     UFUNCTION(BlueprintCallable, Category = "Item")
-    void UseItem();
+    virtual void UseItem();
 
     UFUNCTION(BlueprintCallable, Category = "Item")
     void OnPickup();
@@ -68,14 +72,14 @@ public:
     UFUNCTION(BlueprintCallable, Category = "Item")
     void OnDrop(const FVector& DropLocation);
 
-    UFUNCTION(BlueprintCallable, Category = "Item Weight")
-    void SetItemWeight(int32 Weight);
-
-    void InitializeFrom(const AItem* Source, int32 InQuantity);
-
     UFUNCTION(BlueprintCallable, Category = "Item")
     void AttachToCharacter(USkeletalMeshComponent* CharacterMesh, FName SocketName);
 
+    void InitializeItemData();
+
+    void InitializeFrom(const AItem* Source, int32 InQuantity);
+
+    FItemData* GetItemData() const;
     //============AVAIABLE=================//
     UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Stack")
     bool bIsStackable = false;
@@ -87,19 +91,10 @@ public:
     int32 MaxStackSize = 1;
 
 private:
-    void InitializeItemData();
-    void ConfigureItemBase(const FItemData& DataRow);
-    void ConfigureWidget(const FItemData& DataRow);
-    void ConfigureMesh(const FItemData& DataRow);
-    void BindUseFunction(const FItemData& DataRow);
-    void InitializeStackProperties(const FItemData& DataRow);
 
-    void HandleHealthMedicine();
-    void HandleMolotovCocktail();
-    void HandleFlashExplosive();
-    void HandleFlashLight();
-    FItemData* GetItemData() const;
-    float CalculateHealAmount(EMedicineSize Size) const;
+    void ConfigureItemBase(const FItemData& DataRow);
+    void ConfigureMesh(const FItemData& DataRow);
+    void InitializeStackProperties(const FItemData& DataRow);
 
     UFUNCTION()
     void OnOverlapBegin(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor,
@@ -111,8 +106,6 @@ private:
         UPrimitiveComponent* OtherComponent, int32 OtherBodyIndex);
 
     virtual void OnConstruction(const FTransform& Transform) override;
-
-    bool bFlashAttached;
 
 	bool bIsItemData;
 };

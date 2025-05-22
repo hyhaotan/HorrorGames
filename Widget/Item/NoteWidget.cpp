@@ -1,7 +1,7 @@
 ﻿// Fill out your copyright notice in the Description page of Project Settings.
 
 
-#include "HorrorGame/Widget/NoteWidget.h"
+#include "NoteWidget.h"
 #include "HorrorGame/HorrorGameCharacter.h"
 
 #include "Components/Image.h"

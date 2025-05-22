@@ -2,15 +2,17 @@
 
 
 #include "HorrorGame/Widget/Inventory/InventoryBagWidget.h"
-#include "Components/WrapBoxSlot.h"
 #include "HorrorGame/Widget/Inventory/InventoryItem.h"
 #include "HorrorGame/Actor/Item.h"
 #include "HorrorGame/Item/ItemBase.h"
-#include "Components/WrapBox.h"
 #include "HorrorGame/Widget/Inventory/InventorySlot.h"
+#include "HorrorGame/HorrorGameCharacter.h"
+
+#include "Components/WrapBoxSlot.h"
+#include "Components/WrapBox.h"
 #include "Components/SizeBox.h"
 #include "Components/Overlay.h"
-#include "HorrorGame/HorrorGameCharacter.h"
+#include "Animation/WidgetAnimation.h"
 
 void UInventoryBagWidget::UpdateBag(const TArray<AActor*>& BagItems)
 {
@@ -53,6 +55,7 @@ void UInventoryBagWidget::UpdateBag(const TArray<AActor*>& BagItems)
 
 void UInventoryBagWidget::HandleSplitRequest(int32 SlotIndex, int32 SplitAmount)
 {
+    UE_LOG(LogTemp, Warning, TEXT("[SplitRequest] Slot=%d Amount=%d"), SlotIndex, SplitAmount);
     // Lấy reference Character và mảng InventoryBag
     AHorrorGameCharacter* Player = Cast<AHorrorGameCharacter>(GetOwningPlayerPawn());
     if (!Player) return;
@@ -84,4 +87,20 @@ void UInventoryBagWidget::HandleSplitRequest(int32 SlotIndex, int32 SplitAmount)
 
     // Refresh UI
     UpdateBag(Items);
+}
+
+void UInventoryBagWidget::ShowInventoryAnim()
+{
+    if (ShowInventory)
+    {
+		PlayAnimation(ShowInventory);
+    }
+}
+
+void UInventoryBagWidget::HideInventoryAnim()
+{
+	if (HideInventory)
+	{
+		PlayAnimation(HideInventory);
+	}
 }

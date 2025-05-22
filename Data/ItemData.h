@@ -14,6 +14,9 @@ struct FItemTextData
 	FText Name;
 
 	UPROPERTY(EditAnywhere)
+	FText Description;
+
+	UPROPERTY(EditAnywhere)
 	int32 price;
 
 	UPROPERTY(EditAnywhere)

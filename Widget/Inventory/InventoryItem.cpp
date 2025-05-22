@@ -11,9 +11,12 @@
 #include "HorrorGame/HorrorGameCharacter.h"
 #include "HorrorGame/Actor/Item.h"
 #include "HorrorGame/Item/ItemBase.h"
+#include "HorrorGame/Widget/Inventory/ItemInfoWidget.h"
+#include "HorrorGame/Widget/Inventory/InventoryBagWidget.h"
 
 FReply UInventoryItem::NativeOnMouseButtonDown(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent)
 {
+    SetCursor(EMouseCursor::GrabHand);
     if (InMouseEvent.GetEffectingButton() == EKeys::LeftMouseButton && BoundItem)
     {
         return UWidgetBlueprintLibrary::DetectDragIfPressed(InMouseEvent, this, EKeys::LeftMouseButton).NativeReply;
@@ -24,9 +27,9 @@ FReply UInventoryItem::NativeOnMouseButtonDown(const FGeometry& InGeometry, cons
 void UInventoryItem::NativeOnDragDetected(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent, UDragDropOperation*& OutOperation)
 {
     Super::NativeOnDragDetected(InGeometry, InMouseEvent, OutOperation);
-
+    bIsDragging = true;
     UItemDragDropOperation* DragOp = NewObject<UItemDragDropOperation>(this);
-
+    
     if (UInventorySlot* ParentSlot = GetTypedOuter<UInventorySlot>())
     {
         DragOp->SourceIndex = ParentSlot->SlotIndex;
@@ -49,11 +52,73 @@ bool UInventoryItem::NativeOnDragOver(const FGeometry& InGeometry, const FDragDr
 
 bool UInventoryItem::NativeOnDrop(const FGeometry& InGeometry, const FDragDropEvent& InDragDropEvent, UDragDropOperation* InOperation)
 {
+	bIsDragging = false;
     if (UInventorySlot* ParentSlot = GetTypedOuter<UInventorySlot>())
     {
         return ParentSlot->NativeOnDrop(InGeometry, InDragDropEvent, InOperation);
     }
     return Super::NativeOnDrop(InGeometry, InDragDropEvent, InOperation);
+}
+
+void UInventoryItem::NativeOnDragCancelled(const FDragDropEvent& InDragDropEvent, UDragDropOperation* InOperation)
+{
+    Super::NativeOnDragCancelled(InDragDropEvent, InOperation);
+
+	bIsDragging = false;
+    if (UItemDragDropOperation* Op = Cast<UItemDragDropOperation>(InOperation))
+    {
+        if (AHorrorGameCharacter* Owner = Cast<AHorrorGameCharacter>(GetOwningPlayerPawn()))
+        {
+            Owner->DropInventoryItem(Op->bSourceIsBag, Op->SourceIndex);
+        }
+    }
+}
+
+void UInventoryItem::NativeOnMouseEnter(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent)
+{
+	Super::NativeOnMouseEnter(InGeometry, InMouseEvent);
+    bIsHovering = true;
+    if (BoundItem && !ActiveInfoWidget)
+    {
+        ActiveInfoWidget = CreateWidget<UItemInfoWidget>(GetOwningPlayer(), ItemInfoWidgetClass);
+        if (!ActiveInfoWidget) return;
+
+        ActiveInfoWidget->AddToViewport(1000);
+        ActiveInfoWidget->InitializeWithItem(BoundItem);
+
+        FVector2D MousePos = FSlateApplication::IsInitialized()
+            ? FSlateApplication::Get().GetCursorPos()
+            : FVector2D(100, 100);
+
+        const float OffsetX = 16.f;
+        const float OffsetY = -180.f;
+        ActiveInfoWidget->SetAlignmentInViewport(FVector2D(0.f, 0.f));
+        ActiveInfoWidget->SetPositionInViewport(MousePos + FVector2D(OffsetX, OffsetY), true);
+    }
+}
+
+void UInventoryItem::NativeOnMouseLeave(const FPointerEvent& InMouseEvent)
+{
+    Super::NativeOnMouseLeave(InMouseEvent);
+    if (ActiveInfoWidget)
+    {
+        ActiveInfoWidget->RemoveFromParent();
+        ActiveInfoWidget = nullptr;
+    }
+}
+
+FCursorReply UInventoryItem::NativeOnCursorQuery(const FGeometry& InGeometry, const FPointerEvent& InCursorEvent)
+{
+    if (bIsDragging) 
+    {
+        return FCursorReply::Cursor(EMouseCursor::GrabHand);
+    }
+    else if (bIsHovering)
+    {
+        return FCursorReply::Cursor(EMouseCursor::Hand);
+    }
+
+    return Super::NativeOnCursorQuery(InGeometry, InCursorEvent);
 }
 
 void UInventoryItem::SetItemImage(UTexture2D* ItemIcon)
@@ -103,18 +168,3 @@ void UInventoryItem::SetItemQuantity()
     }
 }
 
-void UInventoryItem::NativeOnDragCancelled(const FDragDropEvent& InDragDropEvent,UDragDropOperation* InOperation)
-{
-    Super::NativeOnDragCancelled(InDragDropEvent, InOperation);
-
-    // Nếu đây là thao tác của item
-    if (UItemDragDropOperation* Op = Cast<UItemDragDropOperation>(InOperation))
-    {
-        // Lấy owner là character của UI
-        if (AHorrorGameCharacter* Owner =
-            Cast<AHorrorGameCharacter>(GetOwningPlayerPawn()))
-        {
-            Owner->DropInventoryItem(Op->bSourceIsBag, Op->SourceIndex);
-        }
-    }
-}

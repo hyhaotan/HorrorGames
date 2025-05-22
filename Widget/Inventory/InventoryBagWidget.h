@@ -7,6 +7,8 @@
 #include "InventoryItem.h"
 #include "InventoryBagWidget.generated.h"
 
+class UWidgetAnimation;
+
 UCLASS()
 class HORRORGAME_API UInventoryBagWidget : public UUserWidget
 {
@@ -19,6 +21,15 @@ public:
 
     UFUNCTION()
     void HandleSplitRequest(int32 SlotIndex, int32 SplitAmount);
+
+    UPROPERTY(meta = (BindWidgetAnim), Transient)
+    UWidgetAnimation* ShowInventory;
+
+    UPROPERTY(meta = (BindWidgetAnim), Transient)
+    UWidgetAnimation* HideInventory;
+
+	void ShowInventoryAnim();
+	void HideInventoryAnim();
 
 protected:
     // WrapBox chứa các slot, tự động xuống dòng

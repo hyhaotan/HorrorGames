@@ -40,9 +40,6 @@ public:
 	void HandleMolotovCocktail();
 
 	UFUNCTION(BlueprintCallable, Category = "Bomb")
-	float ActivationTime(float Seconds);
-
-	UFUNCTION(BlueprintCallable, Category = "Bomb")
 	void ThrowBomb(const FVector& TargetLocation, float ProjectileSpeed);
 
 	UFUNCTION(BlueprintCallable, Category = "Bomb")
@@ -110,37 +107,37 @@ public:
 	//----------------------------------------------------------------
 
 	// Particle & Effects
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Effects")
-	UParticleSystem* GrenadeExplosive;
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "MolotovCocktail")
+	UParticleSystem* MolotovExplosive;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Flash")
 	UParticleSystem* FlashExplosive;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Effects")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "MolotovCocktail")
 	UParticleSystem* IgniteEffect;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Effects")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "MolotovCocktail")
 	UNiagaraSystem* FireEffect;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Flash | Widget")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Flash")
 	TSubclassOf<UUserWidget> FlashWidgetClass;
 
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Effects")
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "MolotovCocktail")
 	TSubclassOf<AFireZone> FireZoneClass;
 
-	UPROPERTY(EditDefaultsOnly, Category = "GrenadeProjectile")
-	TSubclassOf<AGrenadeProjectile> GrenadeClass;
+	UPROPERTY(EditDefaultsOnly, Category = "Projectile")
+	TSubclassOf<AGrenadeProjectile> ProjectileClass;
 
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Effects")
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Flash")
 	UPostProcessComponent* FlashPostProcess;
 
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Effects")
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Flash")
 	UMaterialInstanceDynamic* FlashMaterialInstance;
 
 	//UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Flash")
 	//TSubclassOf<UCameraShakeBase> FlashCameraShake;
 
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Grenade")
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Explosion")
 	UParticleSystem* ExplosionEffect;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Flash")
@@ -157,7 +154,7 @@ public:
 	UPROPERTY(EditDefaultsOnly, Category = "Flash")
 	USoundBase* FlashSound;
 
-	UPROPERTY(EditDefaultsOnly, Category = "Grenade")
+	UPROPERTY(EditDefaultsOnly, Category = "MolotovCocktail")
 	USoundBase* MolotovCocktailSound;
 
 	// Các biến cấu hình
@@ -176,14 +173,13 @@ public:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Bomb")
 	float ActivationDelay = 3.0f;
 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "ProjectileSpeed")
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Projectile")
 	float ProjectileSpeeds = 1000.0f;
 
 	// Timer handle cho bomb activation
 	UPROPERTY()
 	FTimerHandle BombActivationTime;
 
-	UPROPERTY(EditDefaultsOnly, Category = "Bomb")
-	TSubclassOf<class AItem> BombClass;
-
+	UPROPERTY()
+	class AItem* CurrentBomb;
 };

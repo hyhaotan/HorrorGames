@@ -13,24 +13,27 @@ void UInventory::UpdateInventory(const TArray<AActor*>& InventoryItems)
 
     InventoryGrid->ClearChildren();
 
-    // Lấy capacity từ character, không hard‑code
     AHorrorGameCharacter* Player = Cast<AHorrorGameCharacter>(GetOwningPlayerPawn());
     const int32 TotalSlots = Player ? Player->MainInventoryCapacity : 0;
 
     for (int32 SlotIndex = 0; SlotIndex < TotalSlots; ++SlotIndex)
     {
+        // Tạo slot và item widget
         UInventorySlot* SlotWidget = CreateWidget<UInventorySlot>(this, InventorySlotClass);
         UInventoryItem* ItemWidget = CreateWidget<UInventoryItem>(SlotWidget, InventoryItemClass);
+
+        // Thiết lập index / loại slot
         SlotWidget->SlotIndex = SlotIndex;
         SlotWidget->bIsBagSlot = false;
-
-        // set số, hình giống trước
         ItemWidget->SetSlotNumber(SlotIndex + 1);
-        if (InventoryItems.IsValidIndex(SlotIndex) && InventoryItems[SlotIndex])
-        {
-            if (AItem* It = Cast<AItem>(InventoryItems[SlotIndex]))
-                ItemWidget->SetBoundItem(It);
-        }
+
+        // Luôn gán BoundItem, dù nullptr cũng được để widget tự ẩn số lượng
+        AItem* It = nullptr;
+        if (InventoryItems.IsValidIndex(SlotIndex))
+            It = Cast<AItem>(InventoryItems[SlotIndex]);
+        ItemWidget->SetBoundItem(It);
+
+        // Đặt content và add vào grid
         SlotWidget->SetSlotContent(ItemWidget);
         InventoryGrid->AddChildToUniformGrid(SlotWidget, 0, SlotIndex);
     }

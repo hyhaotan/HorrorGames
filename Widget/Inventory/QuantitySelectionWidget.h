@@ -6,9 +6,6 @@
 #include "Blueprint/UserWidget.h"
 #include "QuantitySelectionWidget.generated.h"
 
-/**
- * 
- */
 UCLASS()
 class HORRORGAME_API UQuantitySelectionWidget : public UUserWidget
 {

@@ -1,12 +1,24 @@
-﻿
-#pragma once
+﻿#pragma once
 
 #include "CoreMinimal.h"
 #include "GameFramework/Character.h"
 #include "Components/BoxComponent.h"
+#include "Engine/DataTable.h"
+#include "HorrorGame/Data/QTEIconRow.h"
 #include "MonsterJump.generated.h"
 
-// QTE result enumeration
+class AHorrorGameCharacter;
+class UDataTable;
+class UTexture2D;
+class UProgressBarWidget;
+
+UENUM(BlueprintType)
+enum class EQTEPhase : uint8
+{
+    WASD        UMETA(DisplayName = "WASD"),
+    Arrows      UMETA(DisplayName = "Arrows"),
+};
+
 UENUM(BlueprintType)
 enum class EQTEResult : uint8
 {
@@ -15,37 +27,21 @@ enum class EQTEResult : uint8
     Miss    UMETA(DisplayName = "Miss")
 };
 
-UENUM(BlueprintType)
-enum class EQTEPhase : uint8
-{
-    WASD        UMETA(DisplayName = "WASD"),
-    Arrows      UMETA(DisplayName = "Arrows"),
-    Opposite    UMETA(DisplayName = "OppositePairs")
-};
-
-class AHorrorGameCharacter;
-
 UCLASS()
 class HORRORGAME_API AMonsterJump : public ACharacter
 {
     GENERATED_BODY()
 
 public:
-    // Constructor & overrides
     AMonsterJump();
     virtual void BeginPlay() override;
     virtual void Tick(float DeltaTime) override;
 
-    // Input handling
-    /** Called when the player presses the escape key during QTE */
     void ReceiveEscapeInput(FKey PressedKey);
 
-    FKey GetOppositeKey1() const { return OppositeKey1; }
-    FKey GetOppositeKey2() const { return OppositeKey2; }
     EQTEPhase GetCurrentPhase() const { return CurrentPhase; }
 
 protected:
-    // --- Overlap / Trigger ---
     UFUNCTION()
     void OnOverlapBegin(
         UPrimitiveComponent* OverlappedComp,
@@ -56,53 +52,31 @@ protected:
         const FHitResult& SweepResult
     );
 
-    // --- QTE workflow ---
-    /** Initialize or reset QTE sequence */
     void StartQTE(bool bClearProgress);
-
-    /** Generate next key in sequence without resetting progress */
     void NextQTESequence();
-
-    /** Evaluate input timing against thresholds */
     EQTEResult EvaluateTiming(float DeltaFromTarget) const;
-
-    /** Update on-screen QTE widget */
     void UpdateWidget();
-
-    /** Handle QTE completion */
     void CompleteEscape();
-
-    /** Adjust difficulty dynamically based on performance */
     void AdjustDifficulty();
-
-    // hàm chọn random phase
     void ChooseRandomPhase();
-    // hàm sinh sequence theo phase
     void GenerateSequenceByPhase();
 
-    // --- Stun effects ---
-    /** Apply stun effect for duration */
     void ApplyStun(float Duration);
-    /** Release stun effect */
     void ReleaseStun();
 
-	void InitializeGrabbedPlayer(AHorrorGameCharacter* Player);
+    void InitializeGrabbedPlayer(AHorrorGameCharacter* Player);
 
-    // --- Properties ---
-
-    // Trigger zone for grabbing player
     UPROPERTY(VisibleAnywhere, Category = "Trigger")
     UBoxComponent* TriggerZone;
 
-    // QTE configuration
     UPROPERTY(EditAnywhere, Category = "QTE")
     int32 SequenceLength = 4;
 
     UPROPERTY(EditAnywhere, Category = "QTE|Timing")
-    float AllowedInputTime = 1.0f;   
+    float AllowedInputTime = 1.0f;
 
     UPROPERTY(EditAnywhere, Category = "QTE|Timing")
-    float PerfectThreshold;             
+    float PerfectThreshold;
 
     UPROPERTY(EditAnywhere, Category = "QTE|Timing")
     float GoodThreshold;
@@ -116,7 +90,6 @@ protected:
     UPROPERTY(EditAnywhere, Category = "QTE|Progress")
     float IncrementPerStep = 0.05f;
 
-    // Sound & animation for stun
     UPROPERTY(EditAnywhere, Category = "Stun|Animation")
     UAnimMontage* StunMontage;
 
@@ -129,15 +102,27 @@ protected:
     UPROPERTY(EditAnywhere, Category = "Stun|Effects")
     USoundBase* StunSound;
 
-    // UI widget for escape progress
     UPROPERTY(EditDefaultsOnly, Category = "UI")
-    TSubclassOf<class UProgressBarWidget> ProgressBarClass;
+    TSubclassOf<UProgressBarWidget> ProgressBarClass;
 
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "QTE")
     EQTEPhase CurrentPhase;
 
+    //UPROPERTY(EditAnywhere, Category = "QTE|Data")
+    //UDataTable* KeyIconTable;
+
+    //UPROPERTY(EditAnywhere, Category = "QTE|Data")
+    //UDataTable* PhaseIconTable;
+
+    /** Map key → icon texture */
+    UPROPERTY(EditAnywhere, Category = "QTE")
+    TMap<FName, TSoftObjectPtr<UTexture2D>> KeyIcons;
+
+    /** Map phase → icon texture */
+    UPROPERTY(EditAnywhere, Category = "QTE")
+    TMap<EQTEPhase, TSoftObjectPtr<UTexture2D>> PhaseIcons;
+
 private:
-    // Runtime state
     TArray<FKey> QTESequence;
     int32 CurrentQTEIndex = 0;
     float LastPromptTime = 0.0f;
@@ -150,15 +135,10 @@ private:
     bool bIsGrabbing = false;
     bool bPhaseInitialized = false;
 
-    FKey OppositeKey1;
-    FKey OppositeKey2;
-
-    // Reference to captured player during QTE
     AHorrorGameCharacter* CapturedPlayer = nullptr;
-
-    // Handle for stun timer
     FTimerHandle StunTimerHandle;
-
-    // Runtime widget instance
     UProgressBarWidget* EscapeWidget = nullptr;
+
+    UTexture2D* GetKeyIconTexture(const FKey& Key) const;
+    UTexture2D* GetPhaseIconTexture(EQTEPhase Phase) const;
 };

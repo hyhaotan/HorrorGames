@@ -1,116 +1,160 @@
 ﻿#include "HorrorGame/Actor/Door.h"
-#include "Components/StaticMeshComponent.h"
-#include "Components/BoxComponent.h"
+#include "HorrorGame/Widget/Item/ItemWidget.h"
 #include "HorrorGame/HorrorGameCharacter.h"
+
+#include "Components/StaticMeshComponent.h"
 #include "Kismet/GameplayStatics.h"
 #include "Engine/World.h"
-#include "GameFramework/CharacterMovementComponent.h"
+#include "Components/SphereComponent.h"
+#include "Components/WidgetComponent.h"
+#include "Animation/WidgetAnimation.h"
 
-// Sets default values
 ADoor::ADoor()
 {
-	PrimaryActorTick.bCanEverTick = true;
+    PrimaryActorTick.bCanEverTick = true;
 
-	// Create and attach the door frame
-	DoorFrame = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("DoorFrame"));
-	SetRootComponent(DoorFrame);
+    // Create components
+    DoorFrame = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("DoorFrame"));
+    SetRootComponent(DoorFrame);
 
-	// Create and attach the door
-	Door = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("Door"));
-	Door->SetupAttachment(DoorFrame);
+    Door = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("Door"));
+    Door->SetupAttachment(DoorFrame);
 
-	// Create and attach the collision box
-	BoxCollision = CreateDefaultSubobject<UBoxComponent>(TEXT("Box Collision"));
-	BoxCollision->SetupAttachment(DoorFrame);
+    SphereComponent = CreateDefaultSubobject<USphereComponent>(TEXT("SphereComp"));
+    SphereComponent->InitSphereRadius(100.f);
+    SphereComponent->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
+    SphereComponent->SetCollisionResponseToAllChannels(ECR_Ignore);
+    SphereComponent->SetCollisionResponseToChannel(ECC_Pawn, ECR_Overlap);
+    SphereComponent->SetupAttachment(DoorFrame);
 
-	REFInside = CreateDefaultSubobject<USkeletalMeshComponent>(TEXT("REFInside"));
-	REFInside->SetupAttachment(DoorFrame);
-	REFInside->bHiddenInGame = true;
+    ItemWidget = CreateDefaultSubobject<UWidgetComponent>(TEXT("ItemWidget"));
+    ItemWidget->SetupAttachment(SphereComponent);
+    ItemWidget->SetWidgetSpace(EWidgetSpace::Screen);
+    ItemWidget->SetDrawSize(FVector2D(50, 85));
+    ItemWidget->SetVisibility(false);
 
-	REFOutside = CreateDefaultSubobject<USkeletalMeshComponent>(TEXT("REFOutside"));
-	REFOutside->SetupAttachment(DoorFrame);
-	REFOutside->bHiddenInGame = true;
+    SphereComponent->OnComponentBeginOverlap.AddDynamic(this, &ADoor::OnOverlapBegin);
+    SphereComponent->OnComponentEndOverlap.AddDynamic(this, &ADoor::OnOverlapEnd);
 
-	bIsDoorClose = true; // Door is initially closed
-	bIsPlayerInside = false; // Player starts outside
+    // Default values
+    DoorRotateAngle = 90.f;
+    bIsDoorClosed = true;
+    bDoorOnSameSide = false;
+    Player = nullptr;
 }
 
-// Called when the game starts or when spawned
 void ADoor::BeginPlay()
 {
-	Super::BeginPlay();
+    Super::BeginPlay();
 
-	// Initialize the timeline if the curve is set
-	if (CurveFloat)
-	{
-		FOnTimelineFloat TimelineProgress;
-		TimelineProgress.BindUFunction(this, FName("OpenDoor"));
-		Timeline.AddInterpFloat(CurveFloat, TimelineProgress);
-	}
+    if (CurveFloat)
+    {
+        FOnTimelineFloat TimelineProgress;
+        TimelineProgress.BindUFunction(this, FName("OpenDoor"));
+        DoorTimeline.AddInterpFloat(CurveFloat, TimelineProgress);
+    }
 }
 
-// Called every frame
 void ADoor::Tick(float DeltaTime)
 {
-	Super::Tick(DeltaTime);
+    Super::Tick(DeltaTime);
+    DoorTimeline.TickTimeline(DeltaTime);
+}
 
-	// Update the timeline
-	Timeline.TickTimeline(DeltaTime);
+void ADoor::OnOverlapBegin(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor,
+    UPrimitiveComponent* OtherComponent, int32 OtherBodyIndex,
+    bool bFromSweep, const FHitResult& SweepResult)
+{
+    if (OtherActor != this && ItemWidget)
+    {
+        if (AHorrorGameCharacter* MyChar = Cast<AHorrorGameCharacter>(OtherActor))
+        {
+            MyChar->SetCurrentInteractItem(this);
+        }
+
+        ItemWidget->SetVisibility(true);
+        DoorFrame->SetRenderCustomDepth(true);
+        if (UItemWidget* PW = Cast<UItemWidget>(ItemWidget->GetUserWidgetObject()))
+        {
+            PW->PlayShow();
+        }
+    }
+}
+
+void ADoor::OnOverlapEnd(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor,
+    UPrimitiveComponent* OtherComponent, int32 OtherBodyIndex)
+{
+    if (OtherActor != this && ItemWidget)
+    {
+        if (AHorrorGameCharacter* MyChar = Cast<AHorrorGameCharacter>(OtherActor))
+        {
+            MyChar->ClearCurrentInteractItem(this);
+        }
+
+        DoorFrame->SetRenderCustomDepth(false);
+        if (UItemWidget* PW = Cast<UItemWidget>(ItemWidget->GetUserWidgetObject()))
+        {
+            FTimerHandle TimerHandle;
+            PW->PlayHide();
+
+            if (PW->HideAnim)
+            {
+                // Lấy end time của animation
+                const float HideTime = PW->HideAnim->GetEndTime();
+
+                // Tạo delegate với lambda để ẩn widget
+                FTimerDelegate HideDel;
+                HideDel.BindLambda([this]()
+                    {
+                        ItemWidget->SetVisibility(false);
+                    });
+
+                // Đặt timer
+                GetWorld()->GetTimerManager().SetTimer(
+                    /*out*/ TimerHandle,
+                    HideDel,
+                    HideTime,
+                    false
+                );
+            }
+            else
+            {
+                // không có animation thì ẩn luôn
+                ItemWidget->SetVisibility(false);
+            }
+        }
+    }
 }
 
 void ADoor::Interact()
 {
-	if (bIsDoorClose)
-	{
-		UE_LOG(LogTemp, Warning, TEXT("Door is opening"));
-		Timeline.Play();
-		bIsDoorClose = false;
-	}
-	else
-	{
-		UE_LOG(LogTemp, Warning, TEXT("Door is closing"));
-		Timeline.Reverse();
-		bIsDoorClose = true;
-	}
-
-	// Get the player
-	Player = Cast<AHorrorGameCharacter>(UGameplayStatics::GetPlayerCharacter(GetWorld(), 0));
-	if (Player)
-	{
-		// Toggle between REFInside and REFOutside
-		if (!bIsPlayerInside)
-		{
-			Player->SetActorLocation(REFInside->GetComponentLocation());
-			bIsPlayerInside = true;
-			UE_LOG(LogTemp, Warning, TEXT("Player moved to REFInside"));
-			Player->GetCharacterMovement()->DisableMovement();
-		}
-		else
-		{
-			Player->SetActorLocation(REFOutside->GetComponentLocation());
-			bIsPlayerInside = false;
-			UE_LOG(LogTemp, Warning, TEXT("Player moved to REFOutside"));
-			Player->GetCharacterMovement()->SetMovementMode(MOVE_Walking);
-		}
-	}
+    SetDoorSameSide();
+    if (bIsDoorClosed)
+    {
+        UE_LOG(LogTemp, Warning, TEXT("Door is opening"));
+        DoorTimeline.Play();
+        bIsDoorClosed = false;
+    }
+    else
+    {
+        UE_LOG(LogTemp, Warning, TEXT("Door is closing"));
+        DoorTimeline.Reverse();
+        bIsDoorClosed = true;
+    }
 }
 
 void ADoor::OpenDoor(float Value)
 {
-	float Angle = bDoorOnSameSide ? -DoorRotateAngle : DoorRotateAngle;
-	FRotator Rot = FRotator(0.f, Angle * Value, 0.f);
-	Door->SetRelativeRotation(Rot);
+    const float Angle = bDoorOnSameSide ? -DoorRotateAngle : DoorRotateAngle;
+    Door->SetRelativeRotation(FRotator(0.f, Angle * Value, 0.f));
 }
 
 void ADoor::SetDoorSameSide()
 {
-	if (Player)
-	{
-		// Calculate vectors for door and player
-		FVector PlayerForward = Player->GetActorForwardVector();
-		FVector DoorForward = GetActorForwardVector();
+    if (!Player) return;
 
-		// Determine if the player is on the same side
-		bDoorOnSameSide = FVector::DotProduct(PlayerForward, DoorForward) >= 0;
-	}
+    FVector DoorToPlayer = Player->GetActorLocation() - GetActorLocation();
+    FVector DoorForward = GetActorForwardVector();
+
+    bDoorOnSameSide = FVector::DotProduct(DoorToPlayer, DoorForward) >= 0;
 }

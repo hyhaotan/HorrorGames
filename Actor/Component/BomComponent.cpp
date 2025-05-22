@@ -22,7 +22,7 @@
 
 UBomComponent::UBomComponent()
 {
-	PrimaryComponentTick.bCanEverTick = true;
+	PrimaryComponentTick.bCanEverTick = false;
 	// Khởi tạo các giá trị mặc định nếu cần
 	ProjectileSpeeds = 1000.f;
 	FlashDuration = 1.0f;
@@ -43,11 +43,6 @@ void UBomComponent::TickComponent(float DeltaTime, ELevelTick TickType, FActorCo
 {
 	Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
 	// Xử lý tick nếu cần
-}
-
-float UBomComponent::ActivationTime(float Seconds)
-{
-	return Seconds;
 }
 
 FVector UBomComponent::GetSpawnLocation() const
@@ -146,12 +141,6 @@ void UBomComponent::ThrowBomb(const FVector& TargetLocation, float InProjectileS
 
 void UBomComponent::SpawnAndThrowBomb(const FVector& Velocity)
 {
-	// Kiểm tra class bomb đã được thiết lập chưa
-	if (!BombClass)
-	{
-		UE_LOG(LogTemp, Warning, TEXT("BombClass is not set in the BombComponent!"));
-		return;
-	}
 
 	// Lấy owner để xác định vị trí spawn
 	AActor* Owner = GetOwner();
@@ -172,7 +161,7 @@ void UBomComponent::SpawnAndThrowBomb(const FVector& Velocity)
 	SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AdjustIfPossibleButAlwaysSpawn;
 
 	// Spawn bomb
-	AItem* SpawnedBomb = GetWorld()->SpawnActor<AItem>(BombClass, SpawnLocation, SpawnRotation, SpawnParams);
+	AGrenadeProjectile* SpawnedBomb = GetWorld()->SpawnActor<AGrenadeProjectile>(ProjectileClass, SpawnLocation, SpawnRotation, SpawnParams);
 	if (!SpawnedBomb)
 	{
 		UE_LOG(LogTemp, Warning, TEXT("Failed to spawn bomb actor!"));
@@ -204,7 +193,7 @@ void UBomComponent::ActivateAndThrowBomb(const FVector& TargetLocation, float In
 	{
 		UE_LOG(LogTemp, Log, TEXT("ActivateAndThrowBomb: Flash bomb activated."));
 		ThrowBomb(TargetLocation, InProjectileSpeed);
-		GetWorld()->GetTimerManager().SetTimer(BombActivationTime, this, &UBomComponent::ExplodeFlash, ActivationTime(3.0f), false);
+		GetWorld()->GetTimerManager().SetTimer(BombActivationTime, this, &UBomComponent::ExplodeFlash,3.0f, false);
 	}
 	else
 	{
@@ -214,7 +203,7 @@ void UBomComponent::ActivateAndThrowBomb(const FVector& TargetLocation, float In
 			UGameplayStatics::SpawnEmitterAtLocation(GetWorld(), IgniteEffect, GetOwner()->GetActorLocation());
 		}
 		ThrowBomb(TargetLocation, InProjectileSpeed);
-		GetWorld()->GetTimerManager().SetTimer(BombActivationTime, this, &UBomComponent::MolotovCocktail, ActivationTime(3.0f), false);
+		GetWorld()->GetTimerManager().SetTimer(BombActivationTime, this, &UBomComponent::MolotovCocktail, 3.0f, false);
 	}
 }
 
