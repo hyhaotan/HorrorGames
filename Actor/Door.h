@@ -3,6 +3,7 @@
 #include "CoreMinimal.h"
 #include "GameFramework/Actor.h"
 #include "Components/TimelineComponent.h"
+#include "HorrorGame/Interface/Interact.h"
 #include "Door.generated.h"
 
 class UStaticMeshComponent;
@@ -14,7 +15,7 @@ class UWidgetComponent;
 class USphereComponent;
 
 UCLASS()
-class HORRORGAME_API ADoor : public AActor
+class HORRORGAME_API ADoor : public AActor,public IInteract
 {
     GENERATED_BODY()
 
@@ -26,11 +27,10 @@ protected:
     virtual void Tick(float DeltaTime) override;
 
 public:
-    /** Called by character interaction */
-    void Interact();
+    virtual void Interact(AHorrorGameCharacter* Player) override;
 
     /** Cached player character pointer */
-    AHorrorGameCharacter* Player;
+    AHorrorGameCharacter* Players;
 
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Item Widget")
     UWidgetComponent* ItemWidget;

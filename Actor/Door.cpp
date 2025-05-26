@@ -40,7 +40,7 @@ ADoor::ADoor()
     DoorRotateAngle = 90.f;
     bIsDoorClosed = true;
     bDoorOnSameSide = false;
-    Player = nullptr;
+    Players = nullptr;
 }
 
 void ADoor::BeginPlay()
@@ -126,8 +126,10 @@ void ADoor::OnOverlapEnd(UPrimitiveComponent* OverlappedComponent, AActor* Other
     }
 }
 
-void ADoor::Interact()
+void ADoor::Interact(AHorrorGameCharacter* Player)
 {
+    if (!Player) return;
+
     SetDoorSameSide();
     if (bIsDoorClosed)
     {
@@ -151,9 +153,9 @@ void ADoor::OpenDoor(float Value)
 
 void ADoor::SetDoorSameSide()
 {
-    if (!Player) return;
+    if (!Players) return;
 
-    FVector DoorToPlayer = Player->GetActorLocation() - GetActorLocation();
+    FVector DoorToPlayer = Players->GetActorLocation() - GetActorLocation();
     FVector DoorForward = GetActorForwardVector();
 
     bDoorOnSameSide = FVector::DotProduct(DoorToPlayer, DoorForward) >= 0;

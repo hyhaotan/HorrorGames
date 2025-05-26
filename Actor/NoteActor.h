@@ -31,7 +31,7 @@ public:
 	UPROPERTY(EditAnywhere, Category = "Note")
 	FText NoteText;
 
-	virtual void Interact(AActor* Interactor) override;
+	virtual void Interact(AHorrorGameCharacter* Player) override;
 
 	void HideNote();
 

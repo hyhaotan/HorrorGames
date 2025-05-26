@@ -22,6 +22,6 @@ class HORRORGAME_API IInteract
 
 	// Add interface functions to this class. This is the class that will be inherited to implement this interface.
 public:
-	//virtual void Interact(class AHorrorGameCharacter* Interactor) = 0;
-	virtual void Interact(AActor* Interactor) = 0;
+	virtual void Interact(class AHorrorGameCharacter* Interactor) = 0;
+	//virtual void Interact(AActor* Interactor) = 0;
 };

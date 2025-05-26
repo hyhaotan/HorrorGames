@@ -99,15 +99,13 @@ void ANoteActor::OnOverlapEnd(UPrimitiveComponent* OverlappedComponent, AActor* 
     }
 }
 
-void ANoteActor::Interact(AActor* Interactor)
+void ANoteActor::Interact(AHorrorGameCharacter* Player)
 {
-	// Tell the character to show the note UI
-	if (AHorrorGameCharacter* C = Cast<AHorrorGameCharacter>(Interactor))
-	{
-		C->SetCurrentNoteActor(this);
-		HideNote();
-		C->ShowNoteUI(NoteImage, NoteText);
-	}
+    if (!Player) return;
+
+    Player->SetCurrentNoteActor(this);
+    HideNote();
+    Player->ShowNoteUI(NoteImage, NoteText);
 }
 
 void ANoteActor::HideNote()

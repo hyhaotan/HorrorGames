@@ -397,7 +397,7 @@ private:
 	//------------------------------------------------AVAIABLE--------------------------------------------------------//
 	//------------------------------------------------BOOLEAN--------------------------------------------------------//
 	UPROPERTY(EditInstanceOnly, Category = "Crouch")
-	bool bIsCrouching;	 
+	bool bIsCrouching;
 	
 	//------------------------------------------------VECTOR--------------------------------------------------------//
 	FVector ComputeDropLocation(float Distance = 200.f) const;
@@ -422,6 +422,6 @@ private:
 	UPROPERTY(EditAnywhere, Category = "CrossHair")
 	UTexture2D* CrossHairIcon;
 
-
+	IInteract* CurrentInteract = nullptr;
 };
 

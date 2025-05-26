@@ -59,8 +59,6 @@ public:
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Item|UI")
     TSubclassOf<UItemWidget> PickupWidgetClass;
 
-	class UInteractableComponent* InteractableComp;
-
 	//============FUNCTION==================//
 
     UFUNCTION(BlueprintCallable, Category = "Item")

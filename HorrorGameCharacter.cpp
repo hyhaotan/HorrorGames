@@ -291,13 +291,6 @@ void AHorrorGameCharacter::Interact()
             Int->Interact(this);
             return;
         }
-
-        if (ADoor* Door = Cast<ADoor>(HitActor))
-        {
-            Door->Player = this;
-            Door->Interact();
-            return;
-        }
     }
 }
 

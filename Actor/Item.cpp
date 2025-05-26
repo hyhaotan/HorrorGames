@@ -147,7 +147,6 @@ void AItem::OnOverlapBegin(UPrimitiveComponent* OverlappedComponent, AActor* Oth
         }
 
         ItemWidget->SetVisibility(true);
-        ItemMesh->SetRenderCustomDepth(true);
         if (UItemWidget* PW = Cast<UItemWidget>(ItemWidget->GetUserWidgetObject()))
         {
             PW->PlayShow();
@@ -165,7 +164,6 @@ void AItem::OnOverlapEnd(UPrimitiveComponent* OverlappedComponent, AActor* Other
             MyChar->ClearCurrentInteractItem(this);
         }
 
-        ItemMesh->SetRenderCustomDepth(false);
         if (UItemWidget* PW = Cast<UItemWidget>(ItemWidget->GetUserWidgetObject()))
         {
             FTimerHandle TimerHandle;
@@ -184,12 +182,7 @@ void AItem::OnOverlapEnd(UPrimitiveComponent* OverlappedComponent, AActor* Other
                     });
 
                 // Đặt timer
-                GetWorld()->GetTimerManager().SetTimer(
-                    /*out*/ TimerHandle,
-                    HideDel,
-                    HideTime,
-                    false
-                );
+                GetWorld()->GetTimerManager().SetTimer(TimerHandle,HideDel,HideTime,false);
             }
             else
             {
