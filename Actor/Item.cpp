@@ -27,32 +27,6 @@
 AItem::AItem()
 {
     PrimaryActorTick.bCanEverTick = false;
-
-    // Tạo ItemMesh, đặt làm RootComponent và bật simulate physics
-    ItemMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("ItemMesh"));
-    RootComponent = ItemMesh;
-    ItemMesh->SetSimulatePhysics(true);
-    ItemMesh->SetRenderCustomDepth(false);
-    ItemMesh->SetCustomDepthStencilValue(1);
-
-    // Tạo SphereComponent và attach vào ItemMesh
-    SphereComponent = CreateDefaultSubobject<USphereComponent>(TEXT("SphereComp"));
-    SphereComponent->InitSphereRadius(100.f);
-    SphereComponent->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
-    SphereComponent->SetCollisionResponseToAllChannels(ECR_Ignore);
-    SphereComponent->SetCollisionResponseToChannel(ECC_Pawn, ECR_Overlap);
-    SphereComponent->SetupAttachment(ItemMesh);
-
-    // Tạo ItemWidget, attach vào ItemCollision và cấu hình
-    ItemWidget = CreateDefaultSubobject<UWidgetComponent>(TEXT("ItemWidget"));
-    ItemWidget->SetupAttachment(SphereComponent);
-    ItemWidget->SetWidgetSpace(EWidgetSpace::Screen);
-    ItemWidget->SetDrawSize(FVector2D(50, 85));
-    ItemWidget->SetVisibility(false);
-
-    // Gán các sự kiện overlap cho ItemCollision
-    SphereComponent->OnComponentBeginOverlap.AddDynamic(this, &AItem::OnOverlapBegin);
-    SphereComponent->OnComponentEndOverlap.AddDynamic(this, &AItem::OnOverlapEnd);
 }
 
 void AItem::BeginPlay()
@@ -71,9 +45,9 @@ void AItem::OnPickup()
     // Ẩn vật phẩm, vô hiệu collision và tắt simulate physics nếu cần
     SetActorHiddenInGame(true);
     SetActorEnableCollision(false);
-    if (ItemMesh && ItemMesh->IsSimulatingPhysics())
+    if (Mesh && Mesh->IsSimulatingPhysics())
     {
-        ItemMesh->SetSimulatePhysics(false);
+        Mesh->SetSimulatePhysics(false);
     }
 }
 
@@ -82,10 +56,10 @@ void AItem::OnDrop(const FVector& DropLocation)
     // Hiển thị lại vật phẩm, bật collision, bật simulate physics và đặt vị trí
     SetActorHiddenInGame(false);
     SetActorEnableCollision(true);
-    if (ItemMesh)
+    if (Mesh)
     {
-        ItemMesh->SetSimulatePhysics(true);
-        ItemMesh->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
+        Mesh->SetSimulatePhysics(true);
+        Mesh->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
     }
     SetActorLocation(DropLocation);
 }
@@ -113,9 +87,9 @@ void AItem::AttachToCharacter(USkeletalMeshComponent* CharacterMesh, FName Socke
     // Hiển thị vật phẩm, vô hiệu collision và tắt simulate physics nếu đang bật
     SetActorHiddenInGame(false);
     SetActorEnableCollision(false);
-    if (ItemMesh && ItemMesh->IsSimulatingPhysics())
+    if (Mesh && Mesh->IsSimulatingPhysics())
     {
-        ItemMesh->SetSimulatePhysics(false);
+        Mesh->SetSimulatePhysics(false);
     }
 
     // Attach vật phẩm vào mesh của nhân vật theo socket chỉ định
@@ -131,65 +105,6 @@ void AItem::AttachToCharacter(USkeletalMeshComponent* CharacterMesh, FName Socke
     else
     {
         UE_LOG(LogTemp, Warning, TEXT("Failed to set Owner. CharacterMesh->GetOwner() returned null or invalid type."));
-    }
-}
-
-
-void AItem::OnOverlapBegin(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor,
-    UPrimitiveComponent* OtherComponent, int32 OtherBodyIndex,
-    bool bFromSweep, const FHitResult& SweepResult)
-{
-    if (OtherActor != this && ItemWidget)
-    {
-        if (AHorrorGameCharacter* MyChar = Cast<AHorrorGameCharacter>(OtherActor))
-        {
-            MyChar->SetCurrentInteractItem(this);
-        }
-
-        ItemWidget->SetVisibility(true);
-        if (UItemWidget* PW = Cast<UItemWidget>(ItemWidget->GetUserWidgetObject()))
-        {
-            PW->PlayShow();
-        }
-    }
-}
-
-void AItem::OnOverlapEnd(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor,
-    UPrimitiveComponent* OtherComponent, int32 OtherBodyIndex)
-{
-    if (OtherActor != this && ItemWidget)
-    {
-        if (AHorrorGameCharacter* MyChar = Cast<AHorrorGameCharacter>(OtherActor))
-        {
-            MyChar->ClearCurrentInteractItem(this);
-        }
-
-        if (UItemWidget* PW = Cast<UItemWidget>(ItemWidget->GetUserWidgetObject()))
-        {
-            FTimerHandle TimerHandle;
-            PW->PlayHide();
-
-            if (PW->HideAnim)
-            {
-                // Lấy end time của animation
-                const float HideTime = PW->HideAnim->GetEndTime();
-
-                // Tạo delegate với lambda để ẩn widget
-                FTimerDelegate HideDel;
-                HideDel.BindLambda([this]()
-                    {
-                        ItemWidget->SetVisibility(false);
-                    });
-
-                // Đặt timer
-                GetWorld()->GetTimerManager().SetTimer(TimerHandle,HideDel,HideTime,false);
-            }
-            else
-            {
-                // không có animation thì ẩn luôn
-                ItemWidget->SetVisibility(false);
-            }
-        }
     }
 }
 
@@ -233,14 +148,14 @@ void AItem::ConfigureItemBase(const FItemData& DataRow)
 
 void AItem::ConfigureMesh(const FItemData& DataRow)
 {
-    if (ItemMesh && DataRow.Item3DMeshData.StaticMesh)
+    if (Mesh && DataRow.Item3DMeshData.StaticMesh)
     {
-        ItemMesh->SetStaticMesh(DataRow.Item3DMeshData.StaticMesh);
-        ItemMesh->SetVisibility(true);
+        Mesh->SetStaticMesh(DataRow.Item3DMeshData.StaticMesh);
+        Mesh->SetVisibility(true);
     }
-    else if (ItemMesh)
+    else if (Mesh)
     {
-        ItemMesh->SetVisibility(false);
+        Mesh->SetVisibility(false);
     }
 }
 

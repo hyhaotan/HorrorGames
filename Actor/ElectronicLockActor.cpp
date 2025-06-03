@@ -1,204 +1,195 @@
 ﻿#include "HorrorGame/Actor/ElectronicLockActor.h"
+#include "HorrorGame/HorrorGameCharacter.h"
 #include "HorrorGame/Widget/ElectronicLockWidget.h"
 #include "HorrorGame/Widget/Item/ItemWidget.h"
-
 #include "Components/SphereComponent.h"
 #include "Components/StaticMeshComponent.h"
 #include "Components/WidgetComponent.h"
 #include "Camera/CameraComponent.h"
-#include "HorrorGame/HorrorGameCharacter.h"
 #include "Kismet/GameplayStatics.h"
+#include "TimerManager.h"
 #include "Animation/WidgetAnimation.h"
+#include "Components/TimelineComponent.h"
 
 AElectronicLockActor::AElectronicLockActor()
 {
-    PrimaryActorTick.bCanEverTick = false;
+    PrimaryActorTick.bCanEverTick = true;
 
-    SphereComponent = CreateDefaultSubobject<USphereComponent>(TEXT("SphereComp"));
-    SphereComponent->InitSphereRadius(100.f);
-    SphereComponent->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
-    SphereComponent->SetCollisionResponseToAllChannels(ECR_Ignore);
-    SphereComponent->SetCollisionResponseToChannel(ECC_Pawn, ECR_Overlap);
-    RootComponent = SphereComponent;
+    DoorFrame = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("DoorFrame"));
+    DoorFrame->SetupAttachment(RootComponent);
 
-    LockMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("LockMesh"));
-    LockMesh->SetupAttachment(RootComponent);
-    LockMesh->SetSimulatePhysics(true);
-    LockMesh->SetRenderCustomDepth(false);
-
-    ItemWidget = CreateDefaultSubobject<UWidgetComponent>(TEXT("ItemWidget"));
-    ItemWidget->SetupAttachment(RootComponent);
-    ItemWidget->SetWidgetSpace(EWidgetSpace::Screen);
-    ItemWidget->SetDrawSize(FVector2D(300, 200));
-    ItemWidget->SetVisibility(false);
+    Door = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("Door"));
+    Door->SetupAttachment(DoorFrame);
 
     LockCamera = CreateDefaultSubobject<UCameraComponent>(TEXT("LockCamera"));
     LockCamera->SetupAttachment(RootComponent);
-    LockCamera->SetRelativeLocation(FVector(-200.f, 0.f, 100.f));
     LockCamera->bAutoActivate = false;
 
-    SphereComponent->OnComponentBeginOverlap.AddDynamic(this, &AElectronicLockActor::OnOverlapBegin);
-    SphereComponent->OnComponentEndOverlap.AddDynamic(this, &AElectronicLockActor::OnOverlapEnd);
-
-    bIsOpen = false;
+    DoorTimeline = CreateDefaultSubobject<UTimelineComponent>(TEXT("DoorTimeline"));
+    bTimelineInitialized = false;
 }
 
 void AElectronicLockActor::BeginPlay()
 {
     Super::BeginPlay();
+
+    if (DoorOpenCurve && DoorTimeline)
+    {
+        FOnTimelineFloat ProgressFun;
+        ProgressFun.BindUFunction(this, FName("HandleDoorProgress"));
+        DoorTimeline->AddInterpFloat(DoorOpenCurve, ProgressFun);
+
+        FOnTimelineEvent FinishFun;
+        FinishFun.BindUFunction(this, FName("OnDoorTimelineFinished"));
+        DoorTimeline->SetTimelineFinishedFunc(FinishFun);
+    }
+}
+
+void AElectronicLockActor::Tick(float DeltaTime)
+{
+	Super::Tick(DeltaTime);
+
 }
 
 void AElectronicLockActor::AddDigit(int32 Digit)
 {
-    if (bIsOpen) return;
+    if (bIsOpen)
+    {
+        return;
+    }
 
     EnteredCode.Add(Digit);
     OnCodeUpdated.Broadcast(EnteredCode);
 
     if (EnteredCode.Num() >= CorrectCode.Num())
     {
-        if (EnteredCode == CorrectCode)
-        {
-            OpenDoor();
-        }
-        else
-        {
-            EnteredCode.Empty();
-            OnCodeError.Broadcast();
-        }
+        VerifyCode();
     }
 }
 
 void AElectronicLockActor::VerifyCode()
 {
-    // Explicit verify, in case you clear and press enter without full length
     if (EnteredCode == CorrectCode)
     {
-        OpenDoor();
+        OpenDoor(90.0f);
     }
     else
     {
-        EnteredCode.Empty();
+        ElectronicLockWidget->ShowError(); 
         OnCodeError.Broadcast();
+
+        GetWorld()->GetTimerManager().SetTimer(
+            ClearCodeHandle, this, &AElectronicLockActor::DelayClearCodeInput, 1.0f, false);
     }
+}
+
+void AElectronicLockActor::ClearEnteredCode()
+{
+    EnteredCode.Empty();
+    OnCodeUpdated.Broadcast(EnteredCode);
+}
+
+void AElectronicLockActor::DecreseCode()
+{
+    //Step 1:Use Pop to remove the last digit
+    if (EnteredCode.Num() > 0)
+    {
+        EnteredCode.Pop();
+    }
+
+	//step 3: If the last digit is 0, remove it from the array
+	//int32 LastIndex = EnteredCode.Num() - 1;
+	//if (LastIndex >= 0)
+	//{
+	//	EnteredCode.RemoveAt(LastIndex);
+	//}
+    OnCodeUpdated.Broadcast(EnteredCode);
 }
 
 void AElectronicLockActor::Interact(AHorrorGameCharacter* Player)
 {
-    if (!Player) return;
-
-    // Chuyển view target sang camera của ổ khoá
-    APlayerController* PC = UGameplayStatics::GetPlayerController(this, 0);
-    PC->SetViewTargetWithBlend(LockCamera->GetOwner(), 0.5f);
-
-    // Khóa input của player
-    Player->DisableInput(PC);
-
-    // Tạo và hiển thị widget
-    if (!ElectronicLockWidget && ElectronicLockWidgetClass)
+    if (!Player || bIsOpen)
     {
-        ElectronicLockWidget = CreateWidget<UElectronicLockWidget>(
-            PC, ElectronicLockWidgetClass
-        );
+        return;
+    }
 
-        ElectronicLockWidget->AddToViewport();
-        ElectronicLockWidget->BindLockActor(this);
+    PlayerCharacter = Player;
+    APlayerController* PC = UGameplayStatics::GetPlayerController(this, 0);
+    if (PC)
+    {
+        PC->SetViewTargetWithBlend(Mesh->GetOwner(), 0.5f);
         PC->SetShowMouseCursor(true);
+        Player->DisableInput(PC);
+
+        if (!ElectronicLockWidget && ElectronicLockWidgetClass)
+        {
+            ElectronicLockWidget = CreateWidget<UElectronicLockWidget>(PC, ElectronicLockWidgetClass);
+            ElectronicLockWidget->BindLockActor(this);
+            ElectronicLockWidget->AddToViewport();
+        }
+        else if (ElectronicLockWidget)
+        {
+            ElectronicLockWidget->SetVisibility(ESlateVisibility::Visible);
+        }
     }
 }
 
-void AElectronicLockActor::UnInteract(AHorrorGameCharacter* Player)
+void AElectronicLockActor::EnableMovementPlayer(AHorrorGameCharacter* Player, bool bIsCanceled)
 {
-    if (!Player || !ElectronicLockWidget) return;
+    if (!Player)
+    {
+        return;
+    }
 
-    // Remove widget và restore view target
-    ElectronicLockWidget->RemoveFromParent();
     APlayerController* PC = UGameplayStatics::GetPlayerController(this, 0);
-    PC->SetShowMouseCursor(false);
-    PC->SetViewTargetWithBlend(Player, 0.5f);
-
-    // Cho phép player control lại
-    Player->EnableInput(PC);
-}
-
-void AElectronicLockActor::OnOverlapBegin(UPrimitiveComponent* OverlappedComp, AActor* OtherActor,
-    UPrimitiveComponent* OtherComp, int32 OtherBodyIndex,
-    bool bFromSweep, const FHitResult& SweepResult)
-{
-    if (OtherActor != this && ItemWidget)
+    if (PC)
     {
-        if (AHorrorGameCharacter* Player = Cast<AHorrorGameCharacter>(OtherActor))
-        {
-            Player->SetCurrentInteractItem(this);
-        }
+        PC->SetShowMouseCursor(false);
+        PC->SetViewTargetWithBlend(Player, 0.5f);
+        Player->EnableInput(PC);
 
-        ItemWidget->SetVisibility(true);
-        LockMesh->SetRenderCustomDepth(true);
-        if (UItemWidget* PW = Cast<UItemWidget>(ItemWidget->GetUserWidgetObject()))
+        if (bIsCanceled && ElectronicLockWidget)
         {
-            PW->PlayShow();
+            ElectronicLockWidget->SetVisibility(ESlateVisibility::Collapsed);
         }
     }
 }
 
-
-void AElectronicLockActor::OnOverlapEnd(UPrimitiveComponent* OverlappedComp, AActor* OtherActor,
-    UPrimitiveComponent* OtherComp, int32 OtherBodyIndex)
+void AElectronicLockActor::OpenDoor(float DeltaTime)
 {
-    if (OtherActor != this && ItemWidget)
-    {
-        if (AHorrorGameCharacter* Player = Cast<AHorrorGameCharacter>(OtherActor))
-        {
-            Player->ClearCurrentInteractItem(this);
-        }
-
-        if (UItemWidget* PW = Cast<UItemWidget>(ItemWidget->GetUserWidgetObject()))
-        {
-            FTimerHandle TimerHandle;
-            PW->PlayHide();
-
-            if (PW->HideAnim)
-            {
-                // Lấy end time của animation
-                const float HideTime = PW->HideAnim->GetEndTime();
-
-                // Tạo delegate với lambda để ẩn widget
-                FTimerDelegate HideDel;
-                HideDel.BindLambda([this]()
-                    {
-                        ItemWidget->SetVisibility(false);
-                    });
-
-                // Đặt timer
-                GetWorld()->GetTimerManager().SetTimer(TimerHandle, HideDel, HideTime, false);
-            }
-            else
-            {
-                // không có animation thì ẩn luôn
-                ItemWidget->SetVisibility(false);
-            }
-        }
-    }
-}
-
-void AElectronicLockActor::OpenDoor()
-{
-    if (bIsOpen || !DoorActor) return;
+    if (bIsOpen || !DoorTimeline) return;
     bIsOpen = true;
 
-    if (APlayerController* PC = UGameplayStatics::GetPlayerController(this, 0))
-    {
-        PC->SetViewTargetWithBlend(this, 0.5f);
-    }
+    DoorTimeline->PlayFromStart();
+}
 
-    FRotator TargetRot = DoorActor->GetActorRotation() + FRotator(0.f, 90.f, 0.f);
-    DoorActor->SetActorRotation(TargetRot);
+void AElectronicLockActor::DelayClearCodeInput()
+{
+    ClearEnteredCode();
+}
 
-    if (APlayerController* PC = UGameplayStatics::GetPlayerController(this, 0))
+void AElectronicLockActor::HandleDoorProgress(float Value)
+{
+    float TargetYaw = 90.f;
+    FRotator R = FRotator(0, Value * TargetYaw, 0);
+    Door->SetRelativeRotation(R);
+}
+
+void AElectronicLockActor::OnDoorTimelineFinished()
+{
+    APlayerController* PC = UGameplayStatics::GetPlayerController(this, 0);
+    if (PC && PlayerCharacter)
     {
-        PC->SetViewTargetWithBlend(PC->GetPawn(), 0.5f);
+        PC->SetViewTargetWithBlend(PlayerCharacter, 0.5f);
         PC->SetShowMouseCursor(false);
+        PlayerCharacter->EnableInput(PC);
     }
 
+    if (ElectronicLockWidget)
+    {
+        ElectronicLockWidget->RemoveFromParent();
+        ElectronicLockWidget = nullptr;
+    }
     ItemWidget->SetVisibility(false);
+    Mesh->SetRenderCustomDepth(false);
 }

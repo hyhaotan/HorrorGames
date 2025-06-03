@@ -5,14 +5,11 @@
 #include "CoreMinimal.h"
 #include "GameFramework/Actor.h"
 #include "HorrorGame/Interface/Interact.h"
+#include "HorrorGame/Actor/InteractableActor.h"
 #include "NoteActor.generated.h"
 
-class UItemWidget;
-class UWidgetComponent;
-class USphereComponent;
-
 UCLASS()
-class HORRORGAME_API ANoteActor : public AActor, public IInteract
+class HORRORGAME_API ANoteActor : public AInteractableActor, public IInteract
 {
 	GENERATED_BODY()
 
@@ -21,9 +18,6 @@ public:
 
 	// Sets default values for this actor's properties
 	ANoteActor();
-
-	UPROPERTY(VisibleAnywhere)
-	UStaticMeshComponent* Mesh;
 
 	UPROPERTY(EditAnywhere, Category = "Note")
 	UTexture2D* NoteImage;
@@ -36,27 +30,6 @@ public:
 	void HideNote();
 
 	void ReturnToOriginal();
-
-	UFUNCTION()
-	void OnOverlapBegin(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor,
-		UPrimitiveComponent* OtherComponent, int32 OtherBodyIndex,
-		bool bFromSweep, const FHitResult& SweepResult);
-
-	UFUNCTION()
-	void OnOverlapEnd(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor,
-		UPrimitiveComponent* OtherComponent, int32 OtherBodyIndex);
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Item Widget")
-	UWidgetComponent* ItemWidget;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Box Item")
-	USphereComponent* SphereComponent;
-
-	UPROPERTY()
-	UItemWidget* PickupWidget;
-
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Item|UI")
-	TSubclassOf<UItemWidget> PickupWidgetClass;
 
 private:
 	FTransform OriginalTransform;

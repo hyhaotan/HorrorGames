@@ -17,24 +17,8 @@ ADoor::ADoor()
     DoorFrame = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("DoorFrame"));
     SetRootComponent(DoorFrame);
 
-    Door = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("Door"));
-    Door->SetupAttachment(DoorFrame);
-
-    SphereComponent = CreateDefaultSubobject<USphereComponent>(TEXT("SphereComp"));
-    SphereComponent->InitSphereRadius(100.f);
-    SphereComponent->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
-    SphereComponent->SetCollisionResponseToAllChannels(ECR_Ignore);
-    SphereComponent->SetCollisionResponseToChannel(ECC_Pawn, ECR_Overlap);
-    SphereComponent->SetupAttachment(DoorFrame);
-
-    ItemWidget = CreateDefaultSubobject<UWidgetComponent>(TEXT("ItemWidget"));
-    ItemWidget->SetupAttachment(SphereComponent);
-    ItemWidget->SetWidgetSpace(EWidgetSpace::Screen);
-    ItemWidget->SetDrawSize(FVector2D(50, 85));
-    ItemWidget->SetVisibility(false);
-
-    SphereComponent->OnComponentBeginOverlap.AddDynamic(this, &ADoor::OnOverlapBegin);
-    SphereComponent->OnComponentEndOverlap.AddDynamic(this, &ADoor::OnOverlapEnd);
+    Mesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("Door"));
+    Mesh->SetupAttachment(DoorFrame);
 
     // Default values
     DoorRotateAngle = 90.f;
@@ -61,71 +45,6 @@ void ADoor::Tick(float DeltaTime)
     DoorTimeline.TickTimeline(DeltaTime);
 }
 
-void ADoor::OnOverlapBegin(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor,
-    UPrimitiveComponent* OtherComponent, int32 OtherBodyIndex,
-    bool bFromSweep, const FHitResult& SweepResult)
-{
-    if (OtherActor != this && ItemWidget)
-    {
-        if (AHorrorGameCharacter* MyChar = Cast<AHorrorGameCharacter>(OtherActor))
-        {
-            MyChar->SetCurrentInteractItem(this);
-        }
-
-        ItemWidget->SetVisibility(true);
-        DoorFrame->SetRenderCustomDepth(true);
-        if (UItemWidget* PW = Cast<UItemWidget>(ItemWidget->GetUserWidgetObject()))
-        {
-            PW->PlayShow();
-        }
-    }
-}
-
-void ADoor::OnOverlapEnd(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor,
-    UPrimitiveComponent* OtherComponent, int32 OtherBodyIndex)
-{
-    if (OtherActor != this && ItemWidget)
-    {
-        if (AHorrorGameCharacter* MyChar = Cast<AHorrorGameCharacter>(OtherActor))
-        {
-            MyChar->ClearCurrentInteractItem(this);
-        }
-
-        DoorFrame->SetRenderCustomDepth(false);
-        if (UItemWidget* PW = Cast<UItemWidget>(ItemWidget->GetUserWidgetObject()))
-        {
-            FTimerHandle TimerHandle;
-            PW->PlayHide();
-
-            if (PW->HideAnim)
-            {
-                // Lấy end time của animation
-                const float HideTime = PW->HideAnim->GetEndTime();
-
-                // Tạo delegate với lambda để ẩn widget
-                FTimerDelegate HideDel;
-                HideDel.BindLambda([this]()
-                    {
-                        ItemWidget->SetVisibility(false);
-                    });
-
-                // Đặt timer
-                GetWorld()->GetTimerManager().SetTimer(
-                    /*out*/ TimerHandle,
-                    HideDel,
-                    HideTime,
-                    false
-                );
-            }
-            else
-            {
-                // không có animation thì ẩn luôn
-                ItemWidget->SetVisibility(false);
-            }
-        }
-    }
-}
-
 void ADoor::Interact(AHorrorGameCharacter* Player)
 {
     if (!Player) return;
@@ -148,7 +67,7 @@ void ADoor::Interact(AHorrorGameCharacter* Player)
 void ADoor::OpenDoor(float Value)
 {
     const float Angle = bDoorOnSameSide ? -DoorRotateAngle : DoorRotateAngle;
-    Door->SetRelativeRotation(FRotator(0.f, Angle * Value, 0.f));
+    Mesh->SetRelativeRotation(FRotator(0.f, Angle * Value, 0.f));
 }
 
 void ADoor::SetDoorSameSide()

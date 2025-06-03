@@ -308,15 +308,15 @@ void AHorrorGameCharacter::GrabObject()
         {
             // Lưu tham chiếu đối tượng AItem vào ItemRef
             ItemRef = HitItem;
-            if (ItemRef->ItemMesh)
+            if (ItemRef->Mesh)
             {
                 // Giảm InterpolationSpeed để tạo cảm giác nặng hơn
                 PhysicsHandle->InterpolationSpeed = 5.0f;
 
                 // Đảm bảo simulate physics đang được bật cho item
-                if (!ItemRef->ItemMesh->IsSimulatingPhysics())
+                if (!ItemRef->Mesh->IsSimulatingPhysics())
                 {
-                    ItemRef->ItemMesh->SetSimulatePhysics(true);
+                    ItemRef->Mesh->SetSimulatePhysics(true);
                 }
 
                 // Tính khoảng cách ban đầu giữa camera và vị trí va chạm
@@ -324,7 +324,7 @@ void AHorrorGameCharacter::GrabObject()
 
                 // Dùng Physics Handle để bắt giữ item
                 PhysicsHandle->GrabComponentAtLocationWithRotation(
-                    ItemRef->ItemMesh,
+                    ItemRef->Mesh,
                     NAME_None,
                     HitResult.Location,
                     FollowCamera->GetComponentRotation()

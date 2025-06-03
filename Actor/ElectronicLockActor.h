@@ -3,6 +3,7 @@
 #include "CoreMinimal.h"
 #include "GameFramework/Actor.h"
 #include "HorrorGame/Interface/Interact.h"
+#include "HorrorGame/Actor/InteractableActor.h"
 #include "ElectronicLockActor.generated.h"
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnCodeUpdated, const TArray<int32>&, Entered);
@@ -16,7 +17,7 @@ class AHorrorGameCharacter;
 class UElectronicLockWidget;
 
 UCLASS()
-class HORRORGAME_API AElectronicLockActor : public AActor,public IInteract
+class HORRORGAME_API AElectronicLockActor : public AInteractableActor, public IInteract
 {
     GENERATED_BODY()
 
@@ -24,17 +25,24 @@ public:
     AElectronicLockActor();
     virtual void BeginPlay() override;
 
+	virtual void Tick(float DeltaTime) override;
+
+    /** Interact interface */
+    virtual void Interact(AHorrorGameCharacter* Player) override;
+
+	void EnableMovementPlayer(AHorrorGameCharacter* Player, bool bIsCanceled);
+
     /** Add a digit to the entered code */
     void AddDigit(int32 Digit);
-
-    /** Clear the entered code */
-    void ClearEnteredCode() { EnteredCode.Empty(); }
 
     /** Verify entered code against correct code */
     void VerifyCode();
 
-    virtual void Interact(AHorrorGameCharacter* Player) override;
-    void UnInteract(AHorrorGameCharacter* Player);
+    /** Clear current code input */
+    void ClearEnteredCode();
+
+    /**Decrese code input**/
+    void DecreseCode();
 
     /** Delegate broadcast when code updates */
     UPROPERTY(BlueprintAssignable)
@@ -44,12 +52,9 @@ public:
     UPROPERTY(BlueprintAssignable)
     FOnCodeError OnCodeError;
 
-protected:
-    UPROPERTY(VisibleAnywhere)
-    USphereComponent* SphereComponent;
+    TArray<int32> EnteredCode;
 
-    UPROPERTY(EditAnywhere, Category = "LockMesh")
-    UStaticMeshComponent* LockMesh;
+protected:
 
     UPROPERTY(EditAnywhere, Category = "Door")
     UStaticMeshComponent* Door;
@@ -58,40 +63,49 @@ protected:
     UStaticMeshComponent* DoorFrame;
 
     UPROPERTY(VisibleAnywhere)
-    UWidgetComponent* ItemWidget;
-
-    UPROPERTY(VisibleAnywhere)
     UCameraComponent* LockCamera;
 
+    /** UI class */
     UPROPERTY(EditDefaultsOnly, Category = "UI")
     TSubclassOf<UElectronicLockWidget> ElectronicLockWidgetClass;
 
-    UPROPERTY()
-    UElectronicLockWidget* ElectronicLockWidget;
+private:
+    /** Widget instance */
+    UElectronicLockWidget* ElectronicLockWidget = nullptr;
 
-    /** Door actor to open */
+    /** Target door actor (optional) */
     UPROPERTY(EditAnywhere)
-    AActor* DoorActor;
+    AActor* DoorActor = nullptr;
 
-    /** The correct sequence */
+    /** Correct code sequence */
     UPROPERTY(EditAnywhere)
     TArray<int32> CorrectCode;
 
-    /** Current entered sequence */
-    TArray<int32> EnteredCode;
+    FTimerHandle ClearCodeHandle;
 
-    /** Has the lock been opened? */
     bool bIsOpen = false;
 
-private:
+    /** Curve asset để điều khiển góc quay của cửa */
+    UPROPERTY(EditAnywhere, Category = "Lock|Animation")
+    UCurveFloat* DoorOpenCurve;
+
+    /** Timeline để tween góc quay */
+    UPROPERTY()
+    class UTimelineComponent* DoorTimeline;
+
+    /** Hàm callback của timeline */
     UFUNCTION()
-    void OnOverlapBegin(UPrimitiveComponent* OverlappedComp, AActor* OtherActor,
-        UPrimitiveComponent* OtherComp, int32 OtherBodyIndex,
-        bool bFromSweep, const FHitResult& SweepResult);
+    void HandleDoorProgress(float Value);
+
+    /** Đã bind xong timeline chưa */
+    bool bTimelineInitialized;
+
+    AHorrorGameCharacter* PlayerCharacter = nullptr;
+
+    void OpenDoor(float InTargetYaw);
+
+	void DelayClearCodeInput();
 
     UFUNCTION()
-    void OnOverlapEnd(UPrimitiveComponent* OverlappedComp, AActor* OtherActor,
-        UPrimitiveComponent* OtherComp, int32 OtherBodyIndex);
-
-    void OpenDoor();
+    void OnDoorTimelineFinished();
 };

@@ -9,12 +9,12 @@ AFlashLight::AFlashLight()
 {
     // Tạo component flashlight
     FlashLightComp = CreateDefaultSubobject<UFlashLightComponent>(TEXT("FlashLightComp"));
-    FlashLightComp->SetupAttachment(ItemMesh);
+    FlashLightComp->SetupAttachment(Mesh);
 }
 
 void AFlashLight::UseItem()
 {
-    if (!FlashLightComp || !ItemMesh)
+    if (!FlashLightComp || !Mesh)
     {
         return;
     }
@@ -23,7 +23,7 @@ void AFlashLight::UseItem()
     if (!bFlashAttached)
     {
         FlashLightComp->SpotLight->AttachToComponent(
-            ItemMesh,
+            Mesh,
             FAttachmentTransformRules(EAttachmentRule::SnapToTarget, true),
             TEXT("SpotLight")
         );

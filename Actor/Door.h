@@ -4,6 +4,7 @@
 #include "GameFramework/Actor.h"
 #include "Components/TimelineComponent.h"
 #include "HorrorGame/Interface/Interact.h"
+#include "HorrorGame/Actor/InteractableActor.h"
 #include "Door.generated.h"
 
 class UStaticMeshComponent;
@@ -15,7 +16,7 @@ class UWidgetComponent;
 class USphereComponent;
 
 UCLASS()
-class HORRORGAME_API ADoor : public AActor,public IInteract
+class HORRORGAME_API ADoor : public AInteractableActor,public IInteract
 {
     GENERATED_BODY()
 
@@ -31,26 +32,10 @@ public:
 
     /** Cached player character pointer */
     AHorrorGameCharacter* Players;
-
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Item Widget")
-    UWidgetComponent* ItemWidget;
-
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Box Item")
-    USphereComponent* SphereComponent;
-
-    UPROPERTY()
-    UItemWidget* PickupWidget;
-
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Item|UI")
-    TSubclassOf<UItemWidget> PickupWidgetClass;
 private:
     /** Door frame mesh */
     UPROPERTY(VisibleAnywhere, Category = "Components")
     UStaticMeshComponent* DoorFrame;
-
-    /** Actual door mesh that will rotate */
-    UPROPERTY(VisibleAnywhere, Category = "Components")
-    UStaticMeshComponent* Door;
 
     /** Float curve asset for the door animation timeline */
     UPROPERTY(EditAnywhere, Category = "Door")
@@ -75,14 +60,4 @@ private:
 
     /** Determine if the player is on which side of the door */
     void SetDoorSameSide();
-
-
-    UFUNCTION()
-    void OnOverlapBegin(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor,
-        UPrimitiveComponent* OtherComponent, int32 OtherBodyIndex,
-        bool bFromSweep, const FHitResult& SweepResult);
-
-    UFUNCTION()
-    void OnOverlapEnd(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor,
-        UPrimitiveComponent* OtherComponent, int32 OtherBodyIndex);
 };

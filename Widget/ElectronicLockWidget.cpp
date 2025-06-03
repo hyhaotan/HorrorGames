@@ -21,6 +21,8 @@ bool UElectronicLockWidget::Initialize()
     if (DigitButton7) DigitButton7->OnClicked.AddDynamic(this, &UElectronicLockWidget::OnDigit7Clicked);
     if (DigitButton8) DigitButton8->OnClicked.AddDynamic(this, &UElectronicLockWidget::OnDigit8Clicked);
     if (DigitButton9) DigitButton9->OnClicked.AddDynamic(this, &UElectronicLockWidget::OnDigit9Clicked);
+    if (CancelButton) CancelButton->OnClicked.AddDynamic(this, &UElectronicLockWidget::OnCancelClicked);
+    if (DecreseButton) DecreseButton->OnClicked.AddDynamic(this, &UElectronicLockWidget::OnDecreseClicked);
 
     // Bind Clear and Enter
     if (ClearButton)
@@ -83,8 +85,17 @@ void UElectronicLockWidget::OnEnterClicked()
 
 void UElectronicLockWidget::OnCancelClicked()
 {
-    AHorrorGameCharacter* Player = Cast<AHorrorGameCharacter>(GetOwningPlayer());
-    BoundLock->UnInteract(Player);
+	AHorrorGameCharacter* Player = Cast<AHorrorGameCharacter>(GetOwningPlayerPawn());
+    BoundLock->EnableMovementPlayer(Player,true);
+}
+
+void UElectronicLockWidget::OnDecreseClicked()
+{
+    if (BoundLock)
+    {
+        BoundLock->DecreseCode();
+		UpdateCodeDisplay(BoundLock->EnteredCode);
+    }
 }
 
 void UElectronicLockWidget::UpdateCodeDisplay(const TArray<int32>& CurrentCode)

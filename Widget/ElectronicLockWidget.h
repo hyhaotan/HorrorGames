@@ -18,6 +18,14 @@ public:
     /** Binds this widget to the lock actor */
     void BindLockActor(AElectronicLockActor* LockActor);
 
+    /** Flash error color */
+    UFUNCTION()
+    void ShowError();
+
+    /** Update the displayed code */
+    UFUNCTION()
+    void UpdateCodeDisplay(const TArray<int32>& CurrentCode);
+
 protected:
     /** Core digit handler */
     void OnDigitClicked(int32 Digit);
@@ -55,13 +63,8 @@ protected:
     UFUNCTION()
     void OnCancelClicked();
 
-    /** Update the displayed code */
     UFUNCTION()
-    void UpdateCodeDisplay(const TArray<int32>& CurrentCode);
-
-    /** Flash error color */
-    UFUNCTION()
-    void ShowError();
+    void OnDecreseClicked();
 
     /** Digit buttons 0-9 */
     UPROPERTY(meta = (BindWidget)) UButton* DigitButton0;
@@ -79,6 +82,7 @@ protected:
     UPROPERTY(meta = (BindWidget)) UButton* ClearButton;
     UPROPERTY(meta = (BindWidget)) UButton* EnterButton;
     UPROPERTY(meta = (BindWidget)) UButton* CancelButton;
+    UPROPERTY(meta = (BindWidget)) UButton* DecreseButton;
     UPROPERTY(meta = (BindWidget)) UTextBlock* CodeText;
 
 private:
