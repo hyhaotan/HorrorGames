@@ -1,7 +1,7 @@
 ﻿#include "LobbyFriendListPopup.h"
-#include "HorrorGame/Widget/Menu/LobbyWidget.h"
+#include "HorrorGame/Widget/Lobby/LobbyWidget.h"
 #include "HorrorGame/Object/FriendEntryData.h"
-#include "HorrorGame/Widget/Menu/FriendListEntryWidget.h"
+#include "HorrorGame/Widget/Lobby/FriendListEntryWidget.h"
 #include "OnlineSubsystemUtils.h"
 #include "Components/ListView.h"
 

@@ -28,7 +28,5 @@ public class HorrorGame : ModuleRules
             "OnlineSubsystem",
             "OnlineSubsystemUtils",
             "OnlineSubsystemSteam"});
-
-        //DynamicallyLoadedModuleNames.Add("OnlineSubsystemSteam");
     }
 }

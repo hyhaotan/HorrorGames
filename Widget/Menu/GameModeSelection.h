@@ -2,71 +2,121 @@
 
 #include "CoreMinimal.h"
 #include "Blueprint/UserWidget.h"
+#include "HorrorGame/Data/SessionSettingsData.h"
 #include "GameModeSelection.generated.h"
 
+// Forward declarations
 class UButton;
-class ULobbyWidget;
+class UWidgetAnimation;
 class UMainMenu;
-
-UENUM(BlueprintType)
-enum class EGameModeState : uint8
-{
-    None        UMETA(DisplayName = "None"),
-    Single      UMETA(DisplayName = "SinglePlayer"),
-    Multiplayer UMETA(DisplayName = "Multiplayer"),
-    Back        UMETA(DisplayName = "Back")
-};
+class UServerBrowserWidget;
+class UCreateSessionWidget;
 
 UCLASS()
 class HORRORGAME_API UGameModeSelection : public UUserWidget
 {
-    GENERATED_BODY()
+	GENERATED_BODY()
 
 public:
-    virtual void NativeConstruct() override;
+	// Gọi khi widget đươc tạo xong
+	virtual void NativeConstruct() override;
 
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "GameMode")
-    EGameModeState CurrentState = EGameModeState::None;
+	static const FName SessionName;
+	static const FName RoomNameKey;
+	static const FName PasswordKey;
+	static const FName MapNameKey;
+
+	void ShowAnimGameMode() { PlayAnimation(ShowAnim); }
+	void HideAnimGameMode() { PlayAnimation(HideAnim); }
 
 protected:
-    UPROPERTY(meta = (BindWidget))
-    UButton* SinglePlayerButton;
+	/** Single Player button */
+	UPROPERTY(meta = (BindWidget))
+	UButton* SinglePlayerButton;
 
-    UPROPERTY(meta = (BindWidget))
-    UButton* MultiplayerButton;
+	/** Multiplayer button */
+	UPROPERTY(meta = (BindWidget))
+	UButton* MultiplayerButton;
 
-    UPROPERTY(meta = (BindWidget))
-    UButton* BackButton;
+	/** Back button */
+	UPROPERTY(meta = (BindWidget))
+	UButton* BackButton;
 
-    UPROPERTY(Transient, meta = (BindWidgetAnim))
-    UWidgetAnimation* ShowAnim;
+	UPROPERTY(meta = (BindWidgetAnim), Transient)
+	UWidgetAnimation* ShowAnim;
 
-    UPROPERTY(Transient, meta = (BindWidgetAnim))
-    UWidgetAnimation* HideAnim;
+	UPROPERTY(meta = (BindWidgetAnim), Transient)
+	UWidgetAnimation* HideAnim;
 
-    UPROPERTY(EditAnywhere, Category = "UI")
-    TSubclassOf<ULobbyWidget> LobbyWidgetClass;
+	/** Class của MainMenu để về lại */
+	UPROPERTY(EditAnywhere, Category = "Widgets")
+	TSubclassOf<UMainMenu> MainMenuClass;
 
-    UPROPERTY(EditAnywhere, Category = "Classes")
-    TSubclassOf<UMainMenu> MainMenuClass;
+	/** Class của ServerBrowserWidget để show danh sách server */
+	UPROPERTY(EditAnywhere, Category = "Widgets")
+	TSubclassOf<UServerBrowserWidget> ServerBrowserWidgetClass;
 
-private:
-    const FName SessionName = NAME_GameSession;
+	/** Class của CreateSessionWidget để chuyển sang tạo lobby nếu user muốn tự host */
+	UPROPERTY(EditAnywhere, Category = "Widgets")
+	TSubclassOf<UCreateSessionWidget> CreateSessionWidgetClass;
 
-    UFUNCTION()
-    void OnSinglePlayerButtonClicked();
+	/** Instance hiện đang hiển CreateSessionWidget (nếu có) */
+	UPROPERTY()
+	UCreateSessionWidget* ActiveCreateSessionWidget = nullptr;
 
-    UFUNCTION()
-    void OnMultiplayerButtonClicked();
+	/** Trạng thái menu hiện tại */
+	enum class EGameModeState : uint8
+	{
+		None,
+		Single,
+		Multiplayer,
+		Back
+	};
+	EGameModeState CurrentState;
 
-    UFUNCTION()
-    void OnBackButtonClicked();
+	/** Tên session (static) */
+	static const FName SessionName;
 
-    UFUNCTION()
-    void OnHideAnimationFinished();
+	/** Custom key RoomName */
+	static const FName RoomNameKey;
 
-    void OnCreateSessionComplete(FName InSessionName, bool bWasSuccessful);
+	/** Custom key Password */
+	static const FName PasswordKey;
 
-    void StartSinglePlayer();
-    void StartMultiplayer();
+	/** Custom key MapName */
+	static const FName MapNameKey;
+
+	// =============================
+	// ===    UFUNCTIONs       ===
+	// =============================
+
+	/** Khi user bấm Single Player */
+	UFUNCTION()
+	void OnSinglePlayerButtonClicked();
+
+	/** Khi user bấm Multiplayer */
+	UFUNCTION()
+	void OnMultiplayerButtonClicked();
+
+	/** Khi user bấm Back */
+	UFUNCTION()
+	void OnBackButtonClicked();
+
+	/** Callback khi HideAnim play xong */
+	UFUNCTION()
+	void OnHideAnimationFinished();
+
+	/** Lắng nghe thông báo user bấm “Create” từ CreateSessionWidget */
+	UFUNCTION()
+	void OnCreateSessionRequest(const FSessionSettingsData& SessionData);
+
+	/** Callback khi CreateSession API trả về */
+	UFUNCTION()
+	void OnCreateSessionComplete(FName InSessionName, bool bWasSuccessful);
+
+	/** Thực sự gọi OpenLevel cho SinglePlayer */
+	void StartSinglePlayer();
+
+	/** Tạo session với dữ liệu do user nhập */
+	void StartMultiplayer(const FSessionSettingsData& SessionData);
 };

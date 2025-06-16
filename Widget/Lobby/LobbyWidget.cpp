@@ -1,16 +1,12 @@
 ﻿#include "LobbyWidget.h"
 #include "LobbySlotWidget.h"
-#include "HorrorGame/Widget/Menu/LobbyFriendListPopup.h"
+#include "LobbyFriendListPopup.h"
 #include "HorrorGame/Object/FriendEntryData.h"
 #include "FriendListEntryWidget.h"
 #include "Components/PanelWidget.h"
-#include "OnlineSubsystem.h"
-#include "OnlineSessionSettings.h"
-#include "OnlineSessionClient.h"
 #include "OnlineSubsystemUtils.h"
 #include "Kismet/GameplayStatics.h"
 
-// Define static constants
 const FName ULobbyWidget::SessionName = FName(TEXT("GameSession"));
 const FName ULobbyWidget::MapNameSettingKey = FName(TEXT("GameMap"));
 
@@ -20,17 +16,15 @@ void ULobbyWidget::NativeConstruct()
 
 	// 1) Grab the Steam subsystem
 	OnlineSubsystem = IOnlineSubsystem::Get(TEXT("Steam"));
-	if (OnlineSubsystem)
-	{
-		FriendsInterface = OnlineSubsystem->GetFriendsInterface();
-		SessionInterface = OnlineSubsystem->GetSessionInterface();
-		IdentityInterface = OnlineSubsystem->GetIdentityInterface();
-	}
-	else
+	if (!OnlineSubsystem)
 	{
 		Log(TEXT("Could not find OnlineSubsystem Steam"), ELogVerbosity::Error);
 		return;
 	}
+
+	FriendsInterface = OnlineSubsystem->GetFriendsInterface();
+	SessionInterface = OnlineSubsystem->GetSessionInterface();
+	IdentityInterface = OnlineSubsystem->GetIdentityInterface();
 
 	// 2) Login to Steam if possible
 	if (IdentityInterface.IsValid())
@@ -57,40 +51,37 @@ void ULobbyWidget::NativeConstruct()
 		InviteAcceptedHandle = SessionInterface->AddOnSessionUserInviteAcceptedDelegate_Handle(
 			FOnSessionUserInviteAcceptedDelegate::CreateUObject(this, &ULobbyWidget::OnSessionInviteAccepted)
 		);
+
+		// Khởi StartSession ngay (nếu session đã có)
+		SessionInterface->StartSession(SessionName);
 	}
 
-	// 4) Initialize our 4 slots: slot 0 is the local player, the rest are empty
+	// 4) Initialize slots
 	const int32 NumSlots = 4;
 	LobbySlots.SetNum(NumSlots);
 	LobbySlotWidgets.SetNum(NumSlots);
 
-	// Fill slot 0 with local player info
+	FLobbySlotData LocalSlot;
+	LocalSlot.bOccupied = true;
+	if (IdentityInterface.IsValid())
 	{
-		FLobbySlotData LocalSlot;
-		LocalSlot.bOccupied = true;
-
-		if (IdentityInterface.IsValid())
+		TSharedPtr<const FUniqueNetId> LocalId = IdentityInterface->GetUniquePlayerId(0);
+		if (LocalId.IsValid())
 		{
-			TSharedPtr<const FUniqueNetId> LocalId = IdentityInterface->GetUniquePlayerId(0);
-			if (LocalId.IsValid())
-			{
-				LocalSlot.PlayerId = FUniqueNetIdRepl(LocalId.ToSharedRef());
-				LocalSlot.DisplayName = IdentityInterface->GetPlayerNickname(0);
-			}
-			else
-			{
-				LocalSlot.DisplayName = TEXT("LocalPlayer");
-			}
+			LocalSlot.PlayerId = FUniqueNetIdRepl(LocalId.ToSharedRef());
+			LocalSlot.DisplayName = IdentityInterface->GetPlayerNickname(0);
 		}
 		else
 		{
 			LocalSlot.DisplayName = TEXT("LocalPlayer");
 		}
-
-		LobbySlots[0] = LocalSlot;
 	}
+	else
+	{
+		LocalSlot.DisplayName = TEXT("LocalPlayer");
+	}
+	LobbySlots[0] = LocalSlot;
 
-	// The rest are empty
 	for (int32 i = 1; i < NumSlots; ++i)
 	{
 		FLobbySlotData EmptySlot;
@@ -99,7 +90,7 @@ void ULobbyWidget::NativeConstruct()
 		LobbySlots[i] = EmptySlot;
 	}
 
-	// Now spawn 4 ULobbySlotWidget instances and add them to SlotsContainer
+	// 5) Spawn slot widgets vào container
 	if (!SlotsContainer)
 	{
 		Log(TEXT("SlotsContainer was not bound in UMG"), ELogVerbosity::Error);
@@ -130,9 +121,6 @@ void ULobbyWidget::NativeConstruct()
 		LobbySlotWidgets[i] = SlotWdg;
 		SlotsContainer->AddChild(SlotWdg);
 	}
-
-	// 5) Optionally create a session immediately (host)
-	CreatePartySession();
 }
 
 void ULobbyWidget::OnLoginComplete(int32 LocalPlayerNum, bool bWasSuccessful, const FUniqueNetId& UserId, const FString& Error)
@@ -144,7 +132,6 @@ void ULobbyWidget::OnLoginComplete(int32 LocalPlayerNum, bool bWasSuccessful, co
 	}
 	Log(TEXT("Steam Login succeeded"));
 
-	// Once logged in, read our friend list so we can show it when needed
 	if (FriendsInterface.IsValid())
 	{
 		FriendsInterface->ReadFriendsList(
@@ -163,7 +150,7 @@ void ULobbyWidget::OnReadFriendsListComplete(int32 LocalPlayerNum, bool bWasSucc
 		return;
 	}
 	Log(TEXT("ReadFriendsListComplete: friends have been loaded"));
-	// We don’t store them here because ULobbyFriendListPopup will pull them on demand.
+	// Popup sẽ load dữ liệu khi cần.
 }
 
 void ULobbyWidget::CreatePartySession()
@@ -178,22 +165,36 @@ void ULobbyWidget::CreatePartySession()
 	Settings.bUsesPresence = true;
 	Settings.bAllowJoinViaPresence = true;
 
-	// Store which map to load when the session starts
+	// Custom: lưu map mặc định khi session bắt đầu
 	Settings.Set(MapNameSettingKey, FString(TEXT("YourGameMapName")), EOnlineDataAdvertisementType::ViaOnlineService);
 
-	UE_LOG(LogTemp, Log, TEXT("[LobbyWidget] Creating session (host)"));
+	Log(TEXT("Creating session (host)"));
 	SessionInterface->CreateSession(0, SessionName, Settings);
 }
 
 void ULobbyWidget::OnCreateSessionComplete(FName InSessionName, bool bWasSuccessful)
 {
-	UE_LOG(LogTemp, Warning, TEXT("[GameModeSelection] OnCreateSessionComplete: bWasSuccessful = %s"), bWasSuccessful ? TEXT("true") : TEXT("false"));
+	Log(FString::Printf(TEXT("OnCreateSessionComplete: %s"), bWasSuccessful ? TEXT("true") : TEXT("false")), ELogVerbosity::Warning);
+
 	if (!bWasSuccessful)
 	{
-		UE_LOG(LogTemp, Error, TEXT("[GameModeSelection] Tạo session thất bại"));
+		Log(TEXT("Tạo session thất bại"), ELogVerbosity::Error);
 		return;
 	}
-	UE_LOG(LogTemp, Log, TEXT("[GameModeSelection] CreateSession thành công, chuyển sang LobbyMap"));
+
+	// Đọc custom MapName (nếu cần hiển lên UI)
+	FString GameMapName;
+	if (const FNamedOnlineSession* NamedSession = SessionInterface->GetNamedSession(InSessionName))
+	{
+		const FOnlineSessionSettings& S = NamedSession->SessionSettings;
+		if (S.Get(MapNameSettingKey, GameMapName))
+		{
+			Log(FString::Printf(TEXT("Thông tin MapName lưu trong session: %s"), *GameMapName));
+			// Lưu vào biến cục bộ nếu cần
+		}
+	}
+
+	Log(TEXT("CreateSession thành công, chuyển sang LobbyMap (listen)"));
 	UGameplayStatics::OpenLevel(this, TEXT("LobbyMap"), true, TEXT("?listen"));
 }
 
@@ -206,7 +207,6 @@ void ULobbyWidget::OnStartSessionComplete(FName InSessionName, bool bWasSuccessf
 	}
 	Log(TEXT("StartSession succeeded (host), loading map"));
 
-	// Read out which map we set in the session settings
 	if (const FNamedOnlineSession* NamedSession = SessionInterface->GetNamedSession(InSessionName))
 	{
 		const FOnlineSessionSettings& Settings = NamedSession->SessionSettings;
@@ -234,7 +234,7 @@ void ULobbyWidget::OnJoinSessionComplete(FName InSessionName, EOnJoinSessionComp
 		return;
 	}
 
-	// Get the connect string (address) and have our player travel there
+	// ClientTravel đến connect string
 	FString ConnectString;
 	if (SessionInterface->GetResolvedConnectString(InSessionName, ConnectString) && !ConnectString.IsEmpty())
 	{
@@ -257,28 +257,24 @@ void ULobbyWidget::OnSessionInviteAccepted(bool bWasInvited, int32 LocalPlayerNu
 		return;
 	}
 
-	// If a friend invited us, join that session as a client
 	SessionInterface->JoinSession(LocalPlayerNum, SessionName, InviteResult);
 	Log(FString::Printf(TEXT("Client joining session invited by %s"), *UserId->ToString()));
 }
 
 void ULobbyWidget::HandleOnSlotInviteClicked(int32 SlotIndex)
 {
-	// Called when one of the empty slot’s “Invite” button is clicked
 	if (!LobbyFriendListPopupClass)
 	{
 		Log(TEXT("LobbyFriendListPopupClass not set"), ELogVerbosity::Error);
 		return;
 	}
 
-	// If there’s already a popup, remove it
 	if (CurrentFriendListPopup)
 	{
 		CurrentFriendListPopup->RemoveFromParent();
 		CurrentFriendListPopup = nullptr;
 	}
 
-	// Spawn a new friend list popup
 	CurrentFriendListPopup = CreateWidget<ULobbyFriendListPopup>(GetWorld(), LobbyFriendListPopupClass);
 	if (!CurrentFriendListPopup) return;
 
@@ -302,12 +298,9 @@ void ULobbyWidget::InviteFriendToSlot(const FUniqueNetIdRepl& FriendId, int32 Sl
 	bool bSent = SessionInterface->SendSessionInviteToFriend(0, SessionName, *FriendId);
 	if (bSent)
 	{
-		// Mark the slot as “invited” (but still bOccupied=false until they accept)
 		LobbySlots[SlotIndex].bOccupied = false;
 		LobbySlots[SlotIndex].PlayerId = FriendId;
 		LobbySlots[SlotIndex].DisplayName = TEXT("Invited...");
-
-		// Refresh that slot’s UI
 		UpdateSlotWidget(SlotIndex);
 
 		FString InviteeIdString = FriendId.IsValid() ? FriendId->ToDebugString() : TEXT("UnknownID");
@@ -318,7 +311,6 @@ void ULobbyWidget::InviteFriendToSlot(const FUniqueNetIdRepl& FriendId, int32 Sl
 		Log(TEXT("SendSessionInviteToFriend failed"), ELogVerbosity::Error);
 	}
 
-	// Close the friend‐list popup now that we’ve clicked
 	if (CurrentFriendListPopup)
 	{
 		CurrentFriendListPopup->RemoveFromParent();
@@ -340,9 +332,7 @@ void ULobbyWidget::UpdateSlotWidget(int32 SlotIndex)
 	}
 	else
 	{
-		// If we’re just “invited” but not yet joined, show Invite button disabled or “Invited...” text
 		SlotWdg->InitializeSlot(SlotIndex, false);
-		// You can expand this method if you want a special “Invited” look (e.g. disable the button).
 	}
 }
 

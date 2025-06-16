@@ -9,6 +9,7 @@
 #include "Components/Button.h"
 #include "Animation/WidgetAnimation.h"
 #include "Blueprint/WidgetTree.h"
+#include "GameFramework/PlayerController.h"
 
 void UMainMenu::NativeConstruct()
 {
@@ -17,7 +18,6 @@ void UMainMenu::NativeConstruct()
 	PlayButton->OnClicked.AddDynamic(this, &UMainMenu::OnPlayButtonClicked);
 	OptionsButton->OnClicked.AddDynamic(this, &UMainMenu::OnOptionsButtonClicked);
 	ExitButton->OnClicked.AddDynamic(this, &UMainMenu::OnExitButtonClicked);
-
 }
 
 void UMainMenu::OnPlayButtonClicked()

@@ -153,6 +153,7 @@ public:
 			Actors = nullptr;
 	}
 
+	void SetInventoryVisible(bool bVisible);
 	//------------------------------------------------PROPERTY--------------------------------------------------------//
 	//------------------------------------------------OTHER--------------------------------------------------------//
 	UPROPERTY()
@@ -232,12 +233,6 @@ public:
 
 	UPROPERTY(EditAnywhere, Category = "UI")
 	TSubclassOf<UInventoryBagWidget> InventoryBagWidgetClass;
-
-	UPROPERTY()
-	UCrossHairWidget* CrossHairWidget;
-
-	UPROPERTY(EditAnywhere, Category = "CrossHair")
-	TSubclassOf<UCrossHairWidget> CrossHairWidgetClass;
 	//------------------------------------------------BOOLEAN--------------------------------------------------------//
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Flashlight")
@@ -324,14 +319,24 @@ public:
 	UAnimMontage* DeathMontage;
 
 private:
-	//------------------------------------------------FUNCTION--------------------------------------------------------//
-
+	//-----------------------------------------------------------------------------//
+	// SETTINGS & UI
+	//-----------------------------------------------------------------------------//
 	void ToggleSettings();
 	void GetSettingClass();
+	void HandleInventoryWidget();
+	void HandleDeath();
+	void UseEquippedItem();
 
+	//-----------------------------------------------------------------------------//
+	// INTERACTION
+	//-----------------------------------------------------------------------------//
 	void Interact();
+	bool PerformInteractionLineTrace(FHitResult& OutHitResult) const;
 
-	//Handle Everything Object
+	//-----------------------------------------------------------------------------//
+	// GRAB & OBJECT MANAGEMENT
+	//-----------------------------------------------------------------------------//
 	void GrabObject();
 	void StopGrabObject();
 	void InteractWithGrabbedObject();
@@ -346,82 +351,78 @@ private:
 	void ToggleObject2();
 	void ToggleObject3();
 	void DropObject();
+	void PerformDrop(AActor* Actor, const FVector& DropLocation);
+	FVector ComputeDropLocation(float Distance = 200.f) const;
 	void HandleZoom(const FInputActionValue& Value);
 
-	void HandleInventoryWidget();
-
-	void Ticks(float DeltaTime);
-
-	//Handle Stamina and Sprint
-	void HandleStaminaSprint(float DeltaTime);
-	void EnableStaminaGain();
-	void DepletedAllStamina();
-	void Sprint();
-	void UnSprint();
-
-	// Handle Crouch
-	void ToggleCrouch();
-
-	UFUNCTION()
-	void HandleDeath();
-
-	void UseEquippedItem();
-
-	void UpdatePickupWidget();
-
-	bool PerformInteractionLineTrace(FHitResult& OutHitResult) const;
-
-	void InitializeHeadbob();
-
-	UFUNCTION()
-	void OnEscape(const FInputActionValue& Value, FKey PressedKey);
-
-	UFUNCTION()
-	void HandleDrainProgress(float Value);
-
-	void SetupSanityWidget();
-	void SetupSanityTimeline();
-
+	//-----------------------------------------------------------------------------//
+	// INVENTORY
+	//-----------------------------------------------------------------------------//
 	void ToggleInventoryBag();
 	void HideInventoryBag();
 	void ShowInventoryBag();
+
 	bool TryStackIntoExisting(TArray<AActor*>& Container, AItem* NewItem);
 	int32 CountValidSlots(const TArray<AActor*>& Container) const;
 	void HandlePickup(AItem* NewItem, TArray<AActor*>& Container, UUserWidget* InventoryUI, bool bCanGrow);
 	void RefreshUI(UUserWidget* InventoryUI, const TArray<AActor*>& Container);
 	void RemoveWidgetsOfClasses(std::initializer_list<TSubclassOf<UUserWidget>> WidgetClasses);
 
-	void ShowCrossHair();
+	//-----------------------------------------------------------------------------//
+	// CROUCH, SPRINT & STAMINA
+	//-----------------------------------------------------------------------------//
+	void ToggleCrouch();
+	void Sprint();
+	void UnSprint();
+	void HandleStaminaSprint(float DeltaTime);
+	void EnableStaminaGain();
+	void DepletedAllStamina();
 
-	void PerformDrop(AActor* Actor, const FVector& DropLocation);
-	//------------------------------------------------AVAIABLE--------------------------------------------------------//
-	//------------------------------------------------BOOLEAN--------------------------------------------------------//
+	//-----------------------------------------------------------------------------//
+	// SANITY & HEADBOB
+	//-----------------------------------------------------------------------------//
+	void InitializeHeadbob();
+	void SetupSanityWidget();
+	void SetupSanityTimeline();
+
+	//-----------------------------------------------------------------------------//
+	// INPUT CALLBACKS & TIMELINE
+	//-----------------------------------------------------------------------------//
+	UFUNCTION()
+	void OnEscape(const FInputActionValue& Value, FKey PressedKey);
+
+	UFUNCTION()
+	void HandleDrainProgress(float Value);
+
+	void Ticks(float DeltaTime);
+
+	//-----------------------------------------------------------------------------//
+	// PROPERTIES
+	//-----------------------------------------------------------------------------//
 	UPROPERTY(EditInstanceOnly, Category = "Crouch")
 	bool bIsCrouching;
-	
-	//------------------------------------------------VECTOR--------------------------------------------------------//
-	FVector ComputeDropLocation(float Distance = 200.f) const;
-
-	//------------------------------------------------UPROPERTIES--------------------------------------------------------//
-	UMenuSettingWidget* MenuSettingWidget;
 
 	FTimerHandle StaminaRechargeTimerHandle;
 
-	AItem* ItemRef = nullptr;
-
-	AItem* HighlightedItem;
-
-	AActor* Actors = nullptr;
+	UPROPERTY()
+	class UMenuSettingWidget* MenuSettingWidget;
 
 	UPROPERTY()
 	class UNoteWidget* NoteWidgetInstance = nullptr;
-
 	UPROPERTY()
-	ANoteActor* CurrentNote = nullptr;
+	class ANoteActor* CurrentNote = nullptr;
 
 	UPROPERTY(EditAnywhere, Category = "CrossHair")
 	UTexture2D* CrossHairIcon;
 
+	UPROPERTY()
+	class AItem* ItemRef = nullptr;
+	UPROPERTY()
+	class AItem* HighlightedItem;
+	UPROPERTY()
+	AActor* Actors = nullptr;
+
 	IInteract* CurrentInteract = nullptr;
+
 };
 

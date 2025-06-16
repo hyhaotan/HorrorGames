@@ -26,7 +26,7 @@ AInteractableActor::AInteractableActor()
 	SphereComponent->SetupAttachment(Mesh);
 
     ItemWidget = CreateDefaultSubobject<UWidgetComponent>(TEXT("ItemWidget"));
-    ItemWidget->SetupAttachment(Mesh);
+	ItemWidget->SetupAttachment(Mesh);
     ItemWidget->SetWidgetSpace(EWidgetSpace::Screen);
     ItemWidget->SetDrawSize(FVector2D(50, 85));
     ItemWidget->SetVisibility(false);

@@ -2,6 +2,8 @@
 #include "HorrorGame/HorrorGameCharacter.h"
 #include "HorrorGame/Widget/ElectronicLockWidget.h"
 #include "HorrorGame/Widget/Item/ItemWidget.h"
+#include "HorrorGame/GameMode/MainMenuMode.h"
+
 #include "Components/SphereComponent.h"
 #include "Components/StaticMeshComponent.h"
 #include "Components/WidgetComponent.h"
@@ -13,17 +15,20 @@
 
 AElectronicLockActor::AElectronicLockActor()
 {
-    PrimaryActorTick.bCanEverTick = true;
+    PrimaryActorTick.bCanEverTick = false;
 
     DoorFrame = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("DoorFrame"));
-    DoorFrame->SetupAttachment(RootComponent);
+	RootComponent = DoorFrame;
 
     Door = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("Door"));
     Door->SetupAttachment(DoorFrame);
 
     LockCamera = CreateDefaultSubobject<UCameraComponent>(TEXT("LockCamera"));
-    LockCamera->SetupAttachment(RootComponent);
+	LockCamera->SetupAttachment(Mesh);
     LockCamera->bAutoActivate = false;
+
+    Mesh->SetupAttachment(DoorFrame);
+    Mesh->SetRelativeScale3D(FVector(0.1f));
 
     DoorTimeline = CreateDefaultSubobject<UTimelineComponent>(TEXT("DoorTimeline"));
     bTimelineInitialized = false;

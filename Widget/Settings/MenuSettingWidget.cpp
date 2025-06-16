@@ -2,6 +2,7 @@
 
 
 #include "HorrorGame/Widget/Settings/MenuSettingWidget.h"
+#include "HorrorGame/GameMode/MainMenuMode.h"
 #include "kismet/GameplayStatics.h"
 #include "Components/Button.h"
 #include "MenuSettingSystemWidget.h"
@@ -41,6 +42,9 @@ void UMenuSettingWidget::DisplayMenuSetting()
 
 void UMenuSettingWidget::DisplayMenu()
 {
+	AMainMenuMode* MainMenuMode = Cast<AMainMenuMode>(UGameplayStatics::GetGameMode(this));
+	MainMenuMode->HideAllGameWidgets();
+
 	// Show menu
 	this->SetVisibility(ESlateVisibility::Visible);
 
@@ -84,5 +88,5 @@ void UMenuSettingWidget::ResumeGame()
 
 void UMenuSettingWidget::QuitGame()
 {
-	UGameplayStatics::OpenLevel(this, FName("ThirdPersonCharacter"));
+	UGameplayStatics::OpenLevel(this, FName("MainMenu"));
 }

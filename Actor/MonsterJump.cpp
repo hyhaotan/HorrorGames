@@ -1,12 +1,15 @@
 ﻿#include "MonsterJump.h"
 #include "HorrorGame/HorrorGameCharacter.h"
 #include "HorrorGame/Widget/Progress/ProgressBarWidget.h"
+#include "HorrorGame/AI/NPC_AIController.h"
 
 #include "Blueprint/WidgetBlueprintLibrary.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "Kismet/GameplayStatics.h"
 #include "TimerManager.h"
 #include "InputCoreTypes.h"
+#include "BehaviorTree/BlackboardComponent.h"
+#include "AIController.h" 
 
 
 AMonsterJump::AMonsterJump()
@@ -18,6 +21,9 @@ AMonsterJump::AMonsterJump()
     TriggerZone->SetCollisionProfileName(TEXT("Trigger"));
     TriggerZone->OnComponentBeginOverlap.AddDynamic(this, &AMonsterJump::OnOverlapBegin);
 
+    AutoPossessAI = EAutoPossessAI::PlacedInWorldOrSpawned;
+    AIControllerClass = ANPC_AIController::StaticClass();
+
     EscapeProgress = 0.f;
     bIsGrabbing = false;
     TotalHits = TotalMisses = 0;
@@ -27,6 +33,27 @@ AMonsterJump::AMonsterJump()
 void AMonsterJump::BeginPlay()
 {
     Super::BeginPlay();
+
+    if (BehaviorTreeAsset)
+    {
+        if (auto* MyAI = Cast<ANPC_AIController>(GetController()))
+        {
+            UBlackboardComponent* BBComp = nullptr;
+            MyAI->UseBlackboard(BehaviorTreeAsset->BlackboardAsset, BBComp);
+            MyAI->RunBehaviorTree(BehaviorTreeAsset);
+        }
+    }
+    else
+    {
+        // Ví dụ fallback: chase player
+        if (auto* MyAI = Cast<ANPC_AIController>(GetController()))
+        {
+            if (ACharacter* Player = UGameplayStatics::GetPlayerCharacter(GetWorld(), 0))
+            {
+                MyAI->MoveToActor(Player, /*AcceptanceRadius=*/100.f);
+            }
+        }
+    }
 }
 
 void AMonsterJump::Tick(float DeltaTime)
@@ -240,7 +267,7 @@ void AMonsterJump::ReleaseStun()
 
 void AMonsterJump::InitializeGrabbedPlayer(AHorrorGameCharacter* Player)
 {
-    AttachToComponent(Player->GetMesh(), FAttachmentTransformRules::SnapToTargetNotIncludingScale, TEXT("head"));
+    AttachToComponent(Player->GetMesh(), FAttachmentTransformRules::SnapToTargetIncludingScale, TEXT("head"));
     Player->EnableThirdPerson();
     Player->GetCharacterMovement()->DisableMovement();
     Player->SetGrabbingMonster(this);

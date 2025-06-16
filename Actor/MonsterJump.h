@@ -4,6 +4,7 @@
 #include "GameFramework/Character.h"
 #include "Components/BoxComponent.h"
 #include "Engine/DataTable.h"
+#include "BehaviorTree/BehaviorTree.h"
 #include "HorrorGame/Data/QTEIconRow.h"
 #include "MonsterJump.generated.h"
 
@@ -121,6 +122,9 @@ protected:
     /** Map phase → icon texture */
     UPROPERTY(EditAnywhere, Category = "QTE")
     TMap<EQTEPhase, TSoftObjectPtr<UTexture2D>> PhaseIcons;
+
+    UPROPERTY(EditAnywhere, Category = "AI")
+    UBehaviorTree* BehaviorTreeAsset;
 
 private:
     TArray<FKey> QTESequence;

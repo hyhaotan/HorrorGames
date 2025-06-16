@@ -33,4 +33,6 @@ public:
 
 private:
 	FTransform OriginalTransform;
+
+	void TogglePlayerHUD(bool bVisible);
 };

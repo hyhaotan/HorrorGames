@@ -132,8 +132,6 @@ void AHorrorGameCharacter::BeginPlay()
 
     Inventory.SetNum(MainInventoryCapacity);
     InventoryBag.SetNum(BagCapacity);
-    ShowCrossHair();
-
 }
 
 void AHorrorGameCharacter::Tick(float DeltaTime)
@@ -142,7 +140,6 @@ void AHorrorGameCharacter::Tick(float DeltaTime)
 	Ticks(DeltaTime);
 
 	HandleStaminaSprint(DeltaTime);
-	UpdatePickupWidget();
     InitializeHeadbob();
 
 }
@@ -455,16 +452,6 @@ void AHorrorGameCharacter::RemoveWidgetsOfClasses(std::initializer_list<TSubclas
     }
 }
 
-void AHorrorGameCharacter::ShowCrossHair()
-{
-	CrossHairWidget = CreateWidget<UCrossHairWidget>(GetWorld(), CrossHairWidgetClass);
-
-    if (CrossHairWidget)
-    {
-		CrossHairWidget->AddToViewport();
-    }
-}
-
 bool AHorrorGameCharacter::TryStackIntoExisting(TArray<AActor*>& Container, AItem* NewItem)
 {
     for (AActor* Actor : Container)
@@ -567,23 +554,6 @@ void AHorrorGameCharacter::SwapInventoryItems(bool SourceIsBag, int32 SourceInde
 
         if (InventoryWidget)    InventoryWidget->UpdateInventory(Inventory);
         if (InventoryBagWidget) InventoryBagWidget->UpdateBag(InventoryBag);
-    }
-}
-
-void AHorrorGameCharacter::UpdatePickupWidget()
-{
-    FHitResult HitResult;
-    bool bHit = PerformInteractionLineTrace(HitResult);
-    AItem* HitItem = bHit ? Cast<AItem>(HitResult.GetActor()) : nullptr;
-
-    // Nếu có item mới được hover
-    if (HitItem)
-    {
-        CrossHairWidget->SetCrossHairImage(CrossHairIcon);
-    }
-    else
-    {
-        CrossHairWidget->SetCrossHairImage(nullptr);
     }
 }
 
@@ -1031,6 +1001,23 @@ void AHorrorGameCharacter::DropInventoryItem(bool bFromBag, int32 Index)
 
     UE_LOG(LogTemp, Log, TEXT("Dropped inventory item from %s slot %d"),
         bFromBag ? TEXT("Bag") : TEXT("Main"), Index);
+}
+
+void AHorrorGameCharacter::SetInventoryVisible(bool bVisible)
+{
+	const ESlateVisibility Visibility = bVisible ? ESlateVisibility::Visible : ESlateVisibility::Collapsed;
+    if (InventoryWidget)
+    {
+        InventoryWidget->SetVisibility(Visibility);
+	}
+    if (InventorySlot)
+    {
+        InventoryWidget->SetVisibility(Visibility);
+    }
+    if (SanityWidget)
+    {
+        SanityWidget->SetVisibility(Visibility);
+    }
 }
 
 void AHorrorGameCharacter::HandleZoom(const FInputActionValue& Value)

@@ -1,6 +1,6 @@
 ﻿#include "HorrorGameGameMode.h"
-#include "HorrorGameCharacter.h"
-#include "Actor/EyeMonster.h"
+#include "HorrorGame/HorrorGameCharacter.h"
+#include "HorrorGame/Actor/EyeMonster.h"
 #include "TimerManager.h"
 #include "Engine/World.h"
 #include "Kismet/GameplayStatics.h"
