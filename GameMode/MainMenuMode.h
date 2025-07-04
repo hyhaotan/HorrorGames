@@ -16,7 +16,4 @@ public:
 
 	virtual void BeginPlay() override;
 
-	UFUNCTION(BlueprintCallable, Category = "UI")
-	void HideAllGameWidgets();
-
 };

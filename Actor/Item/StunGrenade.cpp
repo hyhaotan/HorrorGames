@@ -13,6 +13,7 @@ void AStunGrenade::UseItem()
     if (UBomComponent* BomComp = FindComponentByClass<UBomComponent>())
     {
         BomComp->HandleFlashExplosive();
+        this->DetachFromActor(FDetachmentTransformRules::KeepWorldTransform);
     }
     else
     {

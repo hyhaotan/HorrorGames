@@ -21,6 +21,7 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Note")
 	void SetupNote(UTexture2D* InNoteTexture);
 
+	UFUNCTION(BlueprintCallable)
 	void SetupNoteText(const FText& InNoteText);
 
 protected:

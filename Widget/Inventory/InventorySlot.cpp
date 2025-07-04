@@ -9,8 +9,39 @@
 #include "Components/SizeBox.h"
 #include "HorrorGame/Actor/Item.h"
 #include "HorrorGame/Widget/Inventory/QuantitySelectionWidget.h"
+#include "Components/Border.h"
+#include "HorrorGame/Widget/Inventory/InventoryItem.h"
+#include "Components/TextBlock.h"
 
 TWeakObjectPtr<UQuantitySelectionWidget> UInventorySlot::CurrentOpenQuantityDialog = nullptr;
+
+void UInventorySlot::NativeConstruct()
+{
+    if (AHorrorGameCharacter* Player = Cast<AHorrorGameCharacter>(GetOwningPlayerPawn()))
+    {
+        Player->OnItemQuantityChanged.AddDynamic(this, &UInventorySlot::HandleQuantityChanged);
+		Player->OnItemToggled.AddDynamic(this, &UInventorySlot::HandleItemToggled);
+    }
+}
+
+void UInventorySlot::HandleQuantityChanged(int32 SlotsIndex)
+{
+    if (SlotsIndex != this->SlotIndex || !ContainedItemWidget || !BoundItemActor)
+        return;
+
+    // Giờ mới an toàn gọi lên widget để cập nhật text
+    ContainedItemWidget->QuantityText->SetText(
+        FText::AsNumber(BoundItemActor->Quantity));
+}
+
+void UInventorySlot::HandleItemToggled(int32 SlotsIndex)
+{
+    if (SlotsIndex == this->SlotIndex)
+    {
+        // xóa widget item, hide slot…
+        ItemContainer->ClearChildren();
+    }
+}
 
 void UInventorySlot::SetSlotContent(UInventoryItem* InventoryItemWidget)
 {
@@ -18,6 +49,7 @@ void UInventorySlot::SetSlotContent(UInventoryItem* InventoryItemWidget)
     {
         ItemContainer->ClearChildren();
         ItemContainer->AddChild(InventoryItemWidget);
+        ContainedItemWidget = InventoryItemWidget;
     }
 }
 
@@ -29,7 +61,6 @@ void UInventorySlot::SetSlotSize(const FVector2D& NewSize)
         SlotSizeBox->SetHeightOverride(NewSize.Y);
     }
 }
-
 
 bool UInventorySlot::NativeOnDragOver(const FGeometry& InGeometry, const FDragDropEvent& InDragDropEvent, UDragDropOperation* InOperation)
 {
@@ -77,6 +108,20 @@ FReply UInventorySlot::NativeOnMouseButtonUp(const FGeometry& InGeometry, const 
     }
 
     return Super::NativeOnMouseButtonUp(InGeometry, InMouseEvent);
+}
+
+void UInventorySlot::SetHighlight(bool bOn)
+{
+    if (!SlotBorder) return;
+
+    SlotBorder->SetBrushColor(bOn
+        ? FLinearColor(1.f, 0.8f, 0.f, 1.f) 
+        : FLinearColor::White
+    );
+    SlotBorder->SetPadding(bOn
+        ? FMargin(4.f)
+        : FMargin(2.f)
+    );
 }
 
 void UInventorySlot::SetQuantitySelectionWidget(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent)

@@ -7,6 +7,29 @@
 #include "InventorySlot.h"
 #include "HorrorGame/HorrorGameCharacter.h"
 
+void UInventory::NativeConstruct()
+{
+    Super::NativeConstruct();
+
+    if (AHorrorGameCharacter* P = Cast<AHorrorGameCharacter>(GetOwningPlayerPawn()))
+    {
+        // Bind sự kiện mỗi khi equip/unequip
+        P->OnItemToggled.AddDynamic(this, &UInventory::HandleItemToggled);
+
+        // Lần đầu vẽ UI
+        UpdateInventory(P->Inventory);
+    }
+}
+
+void UInventory::HandleItemToggled(int32 NewEquippedIndex)
+{
+    CurrentEquippedIndex = NewEquippedIndex;
+    if (AHorrorGameCharacter* P = Cast<AHorrorGameCharacter>(GetOwningPlayerPawn()))
+    {
+        UpdateInventory(P->Inventory);
+    }
+}
+
 void UInventory::UpdateInventory(const TArray<AActor*>& InventoryItems)
 {
     if (!InventoryGrid || !InventorySlotClass || !InventoryItemClass) return;
@@ -24,6 +47,7 @@ void UInventory::UpdateInventory(const TArray<AActor*>& InventoryItems)
 
         // Thiết lập index / loại slot
         SlotWidget->SlotIndex = SlotIndex;
+        SlotWidget->SetHighlight(SlotIndex == CurrentEquippedIndex);
         SlotWidget->bIsBagSlot = false;
         ItemWidget->SetSlotNumber(SlotIndex + 1);
 

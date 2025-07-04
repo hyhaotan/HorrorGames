@@ -24,17 +24,15 @@ public:
     UFUNCTION(BlueprintImplementableEvent, Category = "Animation")
     void SetHideAnimation();
 
+	FText GetDisplayText() const 
+    {
+		return DisplayText;
+    }
+
 protected:
     // Text to display initially (designer can set in Blueprint)
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Text")
     FText DisplayText;
-
-    // History of texts (optional)
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Text")
-    TArray<FText> TextHistory;
-
-    // Internal index
-    int32 CurrentTextIndex = INDEX_NONE;
 
     // TextBlock widget reference
     UPROPERTY(meta = (BindWidget))

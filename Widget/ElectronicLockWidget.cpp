@@ -24,7 +24,6 @@ bool UElectronicLockWidget::Initialize()
     if (CancelButton) CancelButton->OnClicked.AddDynamic(this, &UElectronicLockWidget::OnCancelClicked);
     if (DecreseButton) DecreseButton->OnClicked.AddDynamic(this, &UElectronicLockWidget::OnDecreseClicked);
 
-    // Bind Clear and Enter
     if (ClearButton)
         ClearButton->OnClicked.AddDynamic(this, &UElectronicLockWidget::OnClearClicked);
     if (EnterButton)
@@ -36,11 +35,13 @@ bool UElectronicLockWidget::Initialize()
 void UElectronicLockWidget::BindLockActor(AElectronicLockActor* LockActor)
 {
     BoundLock = LockActor;
+
     if (CodeText)
     {
         CodeText->SetText(FText::GetEmpty());
-        CodeText->SetColorAndOpacity(FSlateColor(FLinearColor::White));
+		CodeText->SetColorAndOpacity(FSlateColor(FLinearColor::White));
     }
+
     if (BoundLock)
     {
         BoundLock->OnCodeUpdated.AddDynamic(this, &UElectronicLockWidget::UpdateCodeDisplay);
@@ -93,7 +94,7 @@ void UElectronicLockWidget::OnDecreseClicked()
 {
     if (BoundLock)
     {
-        BoundLock->DecreseCode();
+        BoundLock->DecreaseCode();
 		UpdateCodeDisplay(BoundLock->EnteredCode);
     }
 }

@@ -3,13 +3,6 @@
 #include "CoreMinimal.h"
 #include "SessionSettingsData.generated.h"
 
-/**
- * Struct này chứa toàn bộ thông tin do người chơi nhập khi tạo lobby:
- * - RoomName: Tên phòng
- * - Password: Mật khẩu (có thể rỗng nếu không cần)
- * - MaxPlayers: Số lượng người chơi tối đa (ví dụ 2, 4)
- * - MapName: Tên map gameplay (khi host start game, sẽ load map này)
- */
 USTRUCT(BlueprintType)
 struct FSessionSettingsData
 {

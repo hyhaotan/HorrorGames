@@ -55,7 +55,7 @@ void ABookCabinetActor::OnOverlapBegin(UPrimitiveComponent* OverlappedComp,
 void ABookCabinetActor::SpawnBooks()
 {
     FVector Forward = GetActorForwardVector();
-    FVector SpawnLocation = GetActorLocation() + Forward * 200.f + FVector(0.f, 0.f, 200.f);
+    FVector SpawnLocation = GetActorLocation() + Forward * 200.f + FVector(2000.f, 1250.f, 200.f);
     FRotator SpawnRotation = GetActorRotation();
 
     DrawDebugSphere(GetWorld(), SpawnLocation, 25.f, 12, FColor::Green, false, 5.f);
@@ -89,7 +89,9 @@ void ABookCabinetActor::SetTime()
         UTextScreenWidget* TextScreenWidget = CreateWidget<UTextScreenWidget>(GetWorld(), TextScreenClass);
         if (TextScreenWidget)
         {
+            FText TextToDisplay = TextScreenWidget->GetDisplayText();
             TextScreenWidget->SetShowAnimation();
+            TextScreenWidget->SetTextBlockText(TextToDisplay);
             GetWorld()->GetTimerManager().SetTimer(
                 WidgetTimerHandle,
                 FTimerDelegate::CreateLambda([TextScreenWidget]() {

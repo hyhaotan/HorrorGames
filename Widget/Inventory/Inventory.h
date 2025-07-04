@@ -23,4 +23,11 @@ protected:
 
     UPROPERTY(EditDefaultsOnly, Category = "Inventory")
     TSubclassOf<class UInventoryItem> InventoryItemClass;
+
+    int32 CurrentEquippedIndex = INDEX_NONE;
+
+    virtual void NativeConstruct() override;
+
+    UFUNCTION()
+    void HandleItemToggled(int32 NewEquippedIndex);
 };

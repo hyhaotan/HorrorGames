@@ -27,8 +27,22 @@ class UInventoryBagWidget;
 class UItemInfoWidget;
 class UQuantitySelectionWidget;
 class UCrossHairWidget;
+class UKnockOutWidget;
+class UNoteWidget;
+class UKeyNotificationWidget;
 
 DECLARE_LOG_CATEGORY_EXTERN(LogTemplateCharacter, Log, All);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnInventoryUpdated, const TArray<AActor*>&, NewInventory);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnItemQuantityChanged, int32, SlotIndex);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnItemToggled, int32, SlotIndex);
+
+UENUM(BlueprintType)
+enum class EPlayerState : uint8
+{
+	PS_Idle   UMETA(DisplayName = "Idle"),
+	PS_Run    UMETA(DisplayName = "Run"),
+	PS_Death  UMETA(DisplayName = "Death")
+};
 
 UCLASS(config=Game)
 class AHorrorGameCharacter : public ACharacter
@@ -122,6 +136,12 @@ public:
 	void EnableFirstPerson();
 	void EnableThirdPerson();
 
+	UNoteWidget* ShowNoteUI(UTexture2D* NoteImage, const FText& NoteText);
+
+	void CloseNoteUI();
+
+	void SetCurrentInteractItem(AActor* NewItem) { Actors = NewItem; }
+
 	void SetGrabbingMonster(AMonsterJump* Monster) { GrabbingMonster = Monster; }
 	void ClearGrabbingMonster()
 	{
@@ -134,11 +154,6 @@ public:
 	void PauseSanityDrain();
 	void ResumeSanityDrain();
 
-	void ShowNoteUI(UTexture2D* NoteImage, const FText& NoteText);
-
-	UFUNCTION()
-	void CloseNoteUI();
-
 	void SetCurrentNoteActor(ANoteActor* Note) { CurrentNote = Note; }
 
 	UFUNCTION()
@@ -146,7 +161,6 @@ public:
 
 	void DropInventoryItem(bool bFromBag, int32 Index);
 
-	void SetCurrentInteractItem(AActor* NewItem) { Actors = NewItem; }
 	void ClearCurrentInteractItem(AActor* ItemToClear)
 	{
 		if (Actors == ItemToClear)
@@ -154,8 +168,23 @@ public:
 	}
 
 	void SetInventoryVisible(bool bVisible);
+
+	void TheChacterDeath();
+
+	UFUNCTION(Server, Reliable, WithValidation)
+	void ServerInteractWithSwitch(class ALightSwitchActor* SwitchActor);
+
 	//------------------------------------------------PROPERTY--------------------------------------------------------//
 	//------------------------------------------------OTHER--------------------------------------------------------//
+	UPROPERTY(BlueprintAssignable, Category = "Inventory")
+	FOnItemToggled OnItemToggled;
+
+	UPROPERTY(BlueprintAssignable, Category = "Inventory")
+	FOnInventoryUpdated OnInventoryUpdated;
+
+	UPROPERTY(BlueprintAssignable)
+	FOnItemQuantityChanged OnItemQuantityChanged;
+
 	UPROPERTY()
 	AMonsterJump* GrabbingMonster;
 
@@ -176,6 +205,14 @@ public:
 	UPROPERTY()
 	UInventorySlot* InventorySlot;
 
+	/** Blueprint class của widget thông báo chìa khóa */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "UI")
+	TSubclassOf<UKeyNotificationWidget> KeyNotificationWidgetClass;
+
+	/** Instance widget để gọi show/update */
+	UPROPERTY()
+	UKeyNotificationWidget* KeyNotificationWidget;
+
 	UPROPERTY(EditAnywhere)
 	TSubclassOf<UInventory> InventoryWidgetClass;
 
@@ -187,6 +224,9 @@ public:
 
 	UPROPERTY()
 	AItem* EquippedItem;
+
+	UPROPERTY()
+	AActor* EquippedActor = nullptr;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "PostProcess")
 	class UPostProcessComponent* PostProcessComponent;
@@ -222,9 +262,6 @@ public:
 	UPROPERTY()
 	UTimelineComponent* SanityTimeline;
 
-	UPROPERTY(EditDefaultsOnly, Category = "UI")
-	TSubclassOf<UUserWidget> NoteWidgetClass;
-
 	UPROPERTY()
 	TArray<AActor*> InventoryBag;
 
@@ -233,6 +270,17 @@ public:
 
 	UPROPERTY(EditAnywhere, Category = "UI")
 	TSubclassOf<UInventoryBagWidget> InventoryBagWidgetClass;
+
+	UPROPERTY(EditAnywhere, Category = "UI")
+	TSubclassOf<UKnockOutWidget> KnockOutWidgetClass;
+
+	UPROPERTY(EditAnywhere, Category = "Animation")
+	TMap<EPlayerState, UAnimMontage*> AnimMontages;
+
+	EPlayerState PlayerState = EPlayerState::PS_Death;
+
+	UPROPERTY(EditDefaultsOnly, Category = "UI")
+	TSubclassOf<UUserWidget> NoteWidgetClass;
 	//------------------------------------------------BOOLEAN--------------------------------------------------------//
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Flashlight")
@@ -262,6 +310,9 @@ public:
 	bool bIsGrabbed = false;
 
 	bool bIsBagOpen = false;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Knocked")
+	bool bIsKnockedDown = false;
 	//------------------------------------------------VECTOR--------------------------------------------------------//	  
 	
 	//------------------------------------------------FLOAT--------------------------------------------------------//
@@ -302,6 +353,12 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Sanity")
 	float MaxSanity = 100.f;
 
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Knocked")
+	float KnockedDownProgress = 1.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Knocked")
+	float AmountKnockedDownProgress = 0.05f;
+
 	//------------------------------------------------INT--------------------------------------------------------//
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Grab")
 	int32 InteractLineTraceLength = 500;
@@ -314,6 +371,9 @@ public:
 	UPROPERTY(EditDefaultsOnly, Category = "Inventory")
 	int32 BagCapacity = 10;
 
+	UPROPERTY(BlueprintReadOnly, Category = "Inventory")
+	int32 EquippedIndex = INDEX_NONE;
+
 	//------------------------------------------------ANIMATION--------------------------------------------------------//
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Animation")
 	UAnimMontage* DeathMontage;
@@ -323,7 +383,7 @@ private:
 	// SETTINGS & UI
 	//-----------------------------------------------------------------------------//
 	void ToggleSettings();
-	void GetSettingClass();
+	void SetupWidgets();
 	void HandleInventoryWidget();
 	void HandleDeath();
 	void UseEquippedItem();
@@ -344,12 +404,13 @@ private:
 
 	void HandleAttachInteract(int32 Index);
 	void RetrieveObject(int32 Index);
-	void RetrieveObject1();
-	void RetrieveObject2();
-	void RetrieveObject3();
-	void ToggleObject1();
-	void ToggleObject2();
-	void ToggleObject3();
+	void RetrieveObject1() { RetrieveObject(0); };
+	void RetrieveObject2() { RetrieveObject(1); };
+	void RetrieveObject3() { RetrieveObject(2); };
+	void ToggleObject(int32 Index);
+	UFUNCTION() void ToggleObject1() { ToggleObject(0); }
+	UFUNCTION() void ToggleObject2() { ToggleObject(1); }
+	UFUNCTION() void ToggleObject3() { ToggleObject(2); }
 	void DropObject();
 	void PerformDrop(AActor* Actor, const FVector& DropLocation);
 	FVector ComputeDropLocation(float Distance = 200.f) const;
@@ -397,6 +458,13 @@ private:
 	void Ticks(float DeltaTime);
 
 	//-----------------------------------------------------------------------------//
+	// OtHER FUNCTIONS
+	//-----------------------------------------------------------------------------//
+
+	void StartKnockDown();
+	void StopKnockDown();
+
+	//-----------------------------------------------------------------------------//
 	// PROPERTIES
 	//-----------------------------------------------------------------------------//
 	UPROPERTY(EditInstanceOnly, Category = "Crouch")
@@ -411,6 +479,9 @@ private:
 	class UNoteWidget* NoteWidgetInstance = nullptr;
 	UPROPERTY()
 	class ANoteActor* CurrentNote = nullptr;
+
+	UPROPERTY()
+	UKnockOutWidget* KnockOutWidgetInstance = nullptr;
 
 	UPROPERTY(EditAnywhere, Category = "CrossHair")
 	UTexture2D* CrossHairIcon;

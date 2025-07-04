@@ -1,159 +1,138 @@
 ﻿#include "CreateSessionWidget.h"
+#include "OnlineSubsystem.h"
+#include "OnlineSubsystemUtils.h"
+#include "Interfaces/OnlineSessionInterface.h"
+#include "Kismet/GameplayStatics.h"
 #include "Components/EditableTextBox.h"
 #include "Components/ComboBoxString.h"
 #include "Components/Button.h"
 #include "Components/TextBlock.h"
-
-UCreateSessionWidget::UCreateSessionWidget(const FObjectInitializer& ObjInit)
-    : Super(ObjInit)
-{
-    // Trong constructor nếu muốn khởi tạo biến mặc định, nhưng phần này UUserWidget
-    // thường load các sub-widget sau khi NativeConstruct được gọi
-}
+#include "OnlineSessionSettings.h"
+#include "ServerBrowserWidget.h"
 
 void UCreateSessionWidget::NativeConstruct()
 {
     Super::NativeConstruct();
 
-    // ============ Khởi tạo dữ liệu cho ComboBox =============
     if (ComboBox_MaxPlayers)
     {
         ComboBox_MaxPlayers->ClearOptions();
-        // Giả sử bạn chỉ cho phép 2 hoặc 4 người chơi
         ComboBox_MaxPlayers->AddOption(TEXT("2"));
         ComboBox_MaxPlayers->AddOption(TEXT("4"));
         ComboBox_MaxPlayers->AddOption(TEXT("8"));
-        // Mặc định chọn 4
         ComboBox_MaxPlayers->SetSelectedOption(TEXT("4"));
     }
-
     if (ComboBox_MapSelection)
     {
         ComboBox_MapSelection->ClearOptions();
-        // Thêm vào danh sách các map bạn hỗ trợ. Ví dụ 2 map:
-        ComboBox_MapSelection->AddOption(TEXT("ArenaMap"));
+        ComboBox_MapSelection->AddOption(TEXT("L_horrorGame"));
         ComboBox_MapSelection->AddOption(TEXT("ForestMap"));
         ComboBox_MapSelection->AddOption(TEXT("DesertMap"));
-        // Mặc định chọn map đầu (ví dụ "ArenaMap")
-        ComboBox_MapSelection->SetSelectedOption(TEXT("ArenaMap"));
+        ComboBox_MapSelection->SetSelectedOption(TEXT("L_horrorGame"));
     }
 
-    // ============ Bind sự kiện các nút =============
-    Button_Create->OnClicked.AddDynamic(this, &UCreateSessionWidget::HandleOnCreateClicked);
-    Button_Cancel->OnClicked.AddDynamic(this, &UCreateSessionWidget::HandleOnCancelClicked);
-	Button_Back->OnClicked.AddDynamic(this, &UCreateSessionWidget::OnBackCreateSession);
+    if (Button_Create) Button_Create->OnClicked.AddDynamic(this, &UCreateSessionWidget::HandleCreateClicked);
+    if (Button_Cancel) Button_Cancel->OnClicked.AddDynamic(this, &UCreateSessionWidget::HandleCancelClicked);
 
-    Text_ErrorMessage->SetText(FText::FromString(TEXT("")));
-    Text_ErrorMessage->SetVisibility(ESlateVisibility::Collapsed);
+    if (Text_ErrorMessage)
+    {
+        Text_ErrorMessage->SetText(FText());
+        Text_ErrorMessage->SetVisibility(ESlateVisibility::Collapsed);
+    }
 }
 
 bool UCreateSessionWidget::ValidateInput(FSessionSettingsData& OutData)
 {
-    bool bValid = true;
-    FString ErrorMsg;
-
-    // 1) RoomName không được rỗng
-    if (!TextBox_RoomName)
+    if (!TextBox_RoomName || TextBox_RoomName->GetText().ToString().TrimStartAndEnd().IsEmpty())
     {
-        bValid = false;
-        ErrorMsg = TEXT("Error: TextBox_RoomName not bound!");
-    }
-    else if (TextBox_RoomName->GetText().ToString().TrimStartAndEnd().IsEmpty())
-    {
-        bValid = false;
-        ErrorMsg = TEXT("Room name cannot be empty.");
-    }
-    else
-    {
-        OutData.RoomName = TextBox_RoomName->GetText().ToString();
-    }
-
-    // 2) Password: có thể rỗng (nếu cần), nhưng ta không ép
-    if (TextBox_Password)
-    {
-        OutData.Password = TextBox_Password->GetText().ToString();
-    }
-
-    // 3) MaxPlayers phải được chọn từ ComboBox (2,4,8)
-    if (ComboBox_MaxPlayers)
-    {
-        FString Sel = ComboBox_MaxPlayers->GetSelectedOption();
-        int32 Num = ConvertComboBoxToInt(Sel);
-        if (Num <= 0)
+        if (Text_ErrorMessage)
         {
-            bValid = false;
-            ErrorMsg = TEXT("Invalid Max Players value.");
+            Text_ErrorMessage->SetText(FText::FromString(TEXT("Room name cannot be empty.")));
+            Text_ErrorMessage->SetVisibility(ESlateVisibility::Visible);
         }
-        else
-        {
-            OutData.MaxPlayers = Num;
-        }
+        return false;
     }
-    else
+    OutData.RoomName = TextBox_RoomName->GetText().ToString();
+    OutData.Password = TextBox_Password ? TextBox_Password->GetText().ToString() : TEXT("");
+    OutData.MaxPlayers = ConvertStringToInt(ComboBox_MaxPlayers->GetSelectedOption());
+    OutData.MapName = ComboBox_MapSelection->GetSelectedOption();
+    if (Text_ErrorMessage)
     {
-        bValid = false;
-        ErrorMsg = TEXT("Error: ComboBox_MaxPlayers not bound!");
-    }
-
-    // 4) MapSelection phải có giá trị
-    if (ComboBox_MapSelection)
-    {
-        FString SelMap = ComboBox_MapSelection->GetSelectedOption();
-        if (SelMap.IsEmpty())
-        {
-            bValid = false;
-            ErrorMsg = TEXT("Please select a map.");
-        }
-        else
-        {
-            OutData.MapName = SelMap;
-        }
-    }
-    else
-    {
-        bValid = false;
-        ErrorMsg = TEXT("Error: ComboBox_MapSelection not bound!");
-    }
-
-    // Hiện thông báo lỗi nếu có
-    if (!bValid && Text_ErrorMessage)
-    {
-        Text_ErrorMessage->SetText(FText::FromString(ErrorMsg));
-        Text_ErrorMessage->SetVisibility(ESlateVisibility::Visible);
-    }
-    else if (bValid && Text_ErrorMessage)
-    {
-        Text_ErrorMessage->SetText(FText::FromString(TEXT("")));
+        Text_ErrorMessage->SetText(FText());
         Text_ErrorMessage->SetVisibility(ESlateVisibility::Collapsed);
     }
-
-    return bValid;
+    return true;
 }
 
-int32 UCreateSessionWidget::ConvertComboBoxToInt(const FString& InString) const
-{
-    return FCString::Atoi(*InString);
-}
+int32 UCreateSessionWidget::ConvertStringToInt(const FString& In) const { return FCString::Atoi(*In); }
 
-void UCreateSessionWidget::HandleOnCreateClicked()
+void UCreateSessionWidget::HandleCreateClicked()
 {
     FSessionSettingsData Data;
-    if (!ValidateInput(Data))
+    if (!ValidateInput(Data)) return;
+    CreateHostSession(Data);
+}
+
+void UCreateSessionWidget::HandleCancelClicked()
+{
+    RemoveFromParent();
+}
+
+void UCreateSessionWidget::CreateHostSession(const FSessionSettingsData& Data)
+{
+    IOnlineSubsystem* OSS = IOnlineSubsystem::Get(FName("Steam"));
+    if (!OSS) return;
+    IOnlineSessionPtr Sessions = OSS->GetSessionInterface();
+    if (!Sessions.IsValid()) return;
+
+    Sessions->ClearOnCreateSessionCompleteDelegate_Handle(CreateSessionCompleteHandle);
+    CreateSessionCompleteHandle = Sessions->AddOnCreateSessionCompleteDelegate_Handle(
+        FOnCreateSessionCompleteDelegate::CreateUObject(this, &UCreateSessionWidget::OnCreateSessionComplete)
+    );
+
+    FOnlineSessionSettings Settings;
+    Settings.NumPublicConnections = Data.MaxPlayers;
+    Settings.bIsLANMatch = false;
+    Settings.bUsesPresence = true;
+    Settings.bAllowJoinInProgress = true;
+    Settings.bShouldAdvertise = true;
+    Settings.Set(FName(TEXT("ROOM_NAME")), Data.RoomName, EOnlineDataAdvertisementType::ViaOnlineService);
+    Settings.Set(FName(TEXT("PASSWORD")), Data.Password, EOnlineDataAdvertisementType::ViaOnlineService);
+    Settings.Set(FName(TEXT("MAP_NAME")), Data.MapName, EOnlineDataAdvertisementType::ViaOnlineService);
+
+    Sessions->CreateSession(0, UServerBrowserWidget::Name_GameSession, Settings);
+}
+
+void UCreateSessionWidget::OnCreateSessionComplete(FName InSessionName, bool bWasSuccessful)
+{
+    UE_LOG(LogTemp, Warning, TEXT("OnCreateSessionComplete: %s – Success=%d"),
+        *InSessionName.ToString(), bWasSuccessful);
+
+    // Xoá delegate ngay
+    IOnlineSubsystem* OSS = IOnlineSubsystem::Get();
+    auto Sessions = OSS->GetSessionInterface();
+    if (OSS)
     {
-        // Đã hiển thông báo lỗi trong ValidateInput()
+        if (Sessions.IsValid())
+            Sessions->ClearOnCreateSessionCompleteDelegate_Handle(CreateSessionCompleteHandle);
+    }
+
+    if (!bWasSuccessful)
+    {
+        if (Text_ErrorMessage)
+        {
+            Text_ErrorMessage->SetText(FText::FromString(TEXT("Failed to create session.")));
+            Text_ErrorMessage->SetVisibility(ESlateVisibility::Visible);
+        }
         return;
     }
 
-    // Đẩy delegate OnCreateSessionRequest để parent (UGameModeSelection) lắng nghe
-    OnCreateSessionRequest.Broadcast(Data);
+    // Nếu thành công, tiếp tục StartSession (tuỳ chọn) rồi OpenLevel
+    if (Sessions.IsValid())
+    {
+        Sessions->StartSession(InSessionName);
+        UE_LOG(LogTemp, Warning, TEXT("StartSession called on %s"), *InSessionName.ToString());
+    }
+    UGameplayStatics::OpenLevel(GetWorld(), TEXT("LobbyMap"), true, TEXT("?listen"));
 }
 
-void UCreateSessionWidget::HandleOnCancelClicked()
-{
-    this->RemoveFromParent();
-}
-
-void UCreateSessionWidget::OnBackCreateSession()
-{
-    this->RemoveFromParent();
-}

@@ -3,19 +3,16 @@
 #include "CoreMinimal.h"
 #include "Blueprint/UserWidget.h"
 #include "OnlineSessionSettings.h"
-#include "OnlineSubsystem.h"
+#include "HorrorGame/Data/SessionSettingsData.h"
 #include "Interfaces/OnlineSessionInterface.h"
 #include "ServerBrowserWidget.generated.h"
 
-class UButton;
 class UScrollBox;
-class UTextBlock;
-class USessionRowWidget;
-class UCreateSessionWidget;
 class UEditableTextBox;
+class UButton;
+class USessionRowWidget;
 class UGameModeSelection;
-
-DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnJoinSessionDelegate, int32, SessionIndex);
+class UCreateSessionWidget;
 
 UCLASS()
 class HORRORGAME_API UServerBrowserWidget : public UUserWidget
@@ -25,85 +22,45 @@ class HORRORGAME_API UServerBrowserWidget : public UUserWidget
 public:
     virtual void NativeConstruct() override;
 
-    /** Class của CreateSessionWidget (được truyền từ GameModeSelection) */
-    UPROPERTY(EditAnywhere, Category = "ServerBrowser")
-    TSubclassOf<UCreateSessionWidget> CreateSessionWidgetClass;
-
-    /** Class của SessionRowWidget để tạo từng row hiển thị kết quả */
-    UPROPERTY(EditAnywhere, Category = "ServerBrowser")
-    TSubclassOf<USessionRowWidget> SessionRowWidgetClass;
-  
-    UPROPERTY(EditAnywhere, Category = "ServerBrowser")
-    TSubclassOf<UGameModeSelection> GameModeSelectionClass;
+    // Constants
+    static const FName Name_GameSession;
+    static const FName RoomKey;
+    static const FName PasswordKey;
+    static const FName MapKey;
 
 protected:
-    UPROPERTY(meta = (BindWidget))
-    UButton* RefreshButton;
+    // UI Bindings
+    UPROPERTY(meta = (BindWidget)) UButton* RefreshButton;
+    UPROPERTY(meta = (BindWidget)) UButton* BackButton;
+    UPROPERTY(meta = (BindWidget)) UButton* CreateLobbyButton;
+    UPROPERTY(meta = (BindWidget)) UScrollBox* SessionListBox;
+    UPROPERTY(meta = (BindWidget)) UEditableTextBox* SearchBox;
 
-    UPROPERTY(meta = (BindWidget))
-    UButton* CreateLobbyButton;
+    // Session search
+    TSharedPtr<FOnlineSessionSearch> SearchSettings;
+    FDelegateHandle FindHandle;
+    FDelegateHandle JoinHandle;
 
-    UPROPERTY(meta = (BindWidget))
-    UButton* SearchButton;
+    // Session row class
+    UPROPERTY(EditAnywhere, Category = "Session") TSubclassOf<USessionRowWidget> SessionRowClass;
+    UPROPERTY(EditAnywhere, Category = "Session") TSubclassOf<UGameModeSelection> GameModeSelectionClass;
 
-    UPROPERTY(meta = (BindWidget))
-    UButton* BackButton;
+    UPROPERTY(EditAnywhere, Category = "Session") TSubclassOf<UCreateSessionWidget> CreateSessionWidgetClass;
 
-	UPROPERTY(meta = (BindWidget))
-	UEditableTextBox* FindSessionTextBox;
-
-    UPROPERTY(meta = (BindWidget))
-    UScrollBox* SessionListScrollBox;
-
-    /** Delegate và handle cho FindSessions */
-    FOnFindSessionsCompleteDelegate OnFindSessionsCompleteDelegate;
-    FDelegateHandle OnFindSessionsCompleteDelegateHandle;
-
-    /** Delegate và handle cho JoinSession */
-    FOnJoinSessionCompleteDelegate OnJoinSessionCompleteDelegate;
-    FDelegateHandle OnJoinSessionCompleteDelegateHandle;
-
-    /** Delegate và handle cho CreateSession (khi host) */
-    FOnCreateSessionCompleteDelegate OnCreateSessionCompleteDelegate;
-    FDelegateHandle OnCreateSessionCompleteDelegateHandle;
-
-    /** Search object */
-    TSharedPtr<FOnlineSessionSearch> SessionSearch;
-
-    /** Lấy interface của OnlineSession */
-    IOnlineSessionPtr GetSessionInterface() const;
-
-    /** Hàm gọi để tìm session */
-    UFUNCTION()
-    void FindSessions();
-
-    UFUNCTION()
+    // Handlers
+	UFUNCTION()
     void OnRefreshClicked();
 
     UFUNCTION()
-	void OnBackWidget();
+    void OnBackClicked();
 
-    /** Callback khi FindSessions hoàn thành */
-    void OnFindSessionsComplete(bool bWasSuccessful);
-
-    /** Hàm được gọi khi user nhấn join ở 1 row (được bind delegate từ row) */
-    UFUNCTION()
-    void JoinSessionByIndex(int32 Index);
-
-    /** Callback khi JoinSession hoàn thành */
-    void OnJoinSessionComplete(FName InSessionName, EOnJoinSessionCompleteResult::Type Result);
-
-    /** Khi user nhấn Create Lobby */
     UFUNCTION()
     void OnCreateLobbyClicked();
 
-    /** Callback khi CreateSession hoàn thành */
-    void OnCreateSessionComplete(FName InSessionName, bool bWasSuccessful);
+    void FindSessions(const FString& Filter = TEXT(""));
+    void OnFindSessionsComplete(bool bSuccess);
+    void JoinSession(int32 Index);
+    void OnJoinSessionComplete(FName InSessionName, EOnJoinSessionCompleteResult::Type Result);
 
-    /** Hàm thực sự tạo session (sao chép logic từ GameModeSelection::StartMultiplayer) */
-    void CreateNewSession(const FSessionSettingsData& SessionData);
-
-    /** Lắng nghe từ CreateSessionWidget */
-    UFUNCTION()
-    void OnCreateSessionRequest(const FSessionSettingsData& SessionData);
+    IOnlineSessionPtr GetSessionInterface() const;
 };

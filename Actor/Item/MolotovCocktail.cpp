@@ -13,6 +13,7 @@ void AMolotovCocktail::UseItem()
     if (UBomComponent* BomComp = FindComponentByClass<UBomComponent>())
     {
         BomComp->HandleMolotovCocktail();
+        this->DetachFromActor(FDetachmentTransformRules::KeepWorldTransform);
     }
     else
     {

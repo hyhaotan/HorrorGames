@@ -4,16 +4,16 @@
 
 #include "CoreMinimal.h"
 #include "HorrorGame/Actor/Item.h"
-#include "MolotovCocktail.generated.h"
+#include "Keys.generated.h"
 
 UCLASS()
-class HORRORGAME_API AMolotovCocktail : public AItem
+class HORRORGAME_API AKeys : public AItem
 {
 	GENERATED_BODY()
-
-public:
-	AMolotovCocktail();
-
-	virtual void UseItem() override;
 	
+public:
+	AKeys();
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Key")
+	FName KeyID;
 };

@@ -8,6 +8,8 @@
 #include "HorrorGame/Actor/InteractableActor.h"
 #include "NoteActor.generated.h"
 
+class AElectronicLockActor;
+
 UCLASS()
 class HORRORGAME_API ANoteActor : public AInteractableActor, public IInteract
 {
@@ -31,8 +33,30 @@ public:
 
 	void ReturnToOriginal();
 
+	UPROPERTY(EditAnywhere, Category = "Lock|Note")
+	UTexture2D* NoteTexture;
+
+	UPROPERTY(VisibleAnywhere, Category = "Lock")
+	FString CodeString;
+
+	UPROPERTY(VisibleAnywhere, Category = "Lock")
+	TArray<FString> DigitStrings;
+
+	/** Length of the code sequence */
+	UPROPERTY(EditAnywhere, Category = "Lock")
+	int32 CodeLength = 4;
+
+	bool bNoteShown = false;
+
+	UPROPERTY(BlueprintReadOnly,Category = "Lock")
+	AElectronicLockActor* ElectronicLockActor;
+
+	UPROPERTY(EditAnywhere,BlueprintReadOnly,Category = "Lock")
+	TSubclassOf<AElectronicLockActor> ElectronicLockActorClass;
+
 private:
 	FTransform OriginalTransform;
 
 	void TogglePlayerHUD(bool bVisible);
+
 };

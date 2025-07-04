@@ -42,9 +42,6 @@ void UMenuSettingWidget::DisplayMenuSetting()
 
 void UMenuSettingWidget::DisplayMenu()
 {
-	AMainMenuMode* MainMenuMode = Cast<AMainMenuMode>(UGameplayStatics::GetGameMode(this));
-	MainMenuMode->HideAllGameWidgets();
-
 	// Show menu
 	this->SetVisibility(ESlateVisibility::Visible);
 

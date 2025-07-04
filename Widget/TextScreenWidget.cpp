@@ -9,12 +9,6 @@ void UTextScreenWidget::NativeConstruct()
     if (!DisplayText.IsEmpty())
     {
         SetTextBlockText(DisplayText);
-        CurrentTextIndex = INDEX_NONE;
-    }
-    else if (TextHistory.Num() > 0)
-    {
-        CurrentTextIndex = 0;
-        SetTextBlockText(TextHistory[0]);
     }
 }
 
@@ -24,6 +18,7 @@ void UTextScreenWidget::SetTextBlockText(const FText& NewText)
 
     TextBlock->SetText(NewText);
     TextBlock->SetVisibility(ESlateVisibility::Visible);
+	SetShowAnimation();
 
     if (GetWorld())
     {
@@ -37,8 +32,6 @@ void UTextScreenWidget::SetTextBlockText(const FText& NewText)
             false
         );
     }
-
-    SetHideAnimation();
 }
 
 void UTextScreenWidget::HideTextBlock()
@@ -47,4 +40,5 @@ void UTextScreenWidget::HideTextBlock()
     {
         TextBlock->SetVisibility(ESlateVisibility::Hidden);
     }
+    SetHideAnimation();
 }

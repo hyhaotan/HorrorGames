@@ -30,6 +30,8 @@ public:
     /** Gán item data */
     void SetBoundItem(AItem* InItem);
 
+    UPROPERTY(meta = (BindWidget))
+    UTextBlock* QuantityText;
 protected:
     /** Bind widget trong UMG nếu có (ở đây giả sử bạn có blueprint slot chứa Image + TextBlock) */
     UPROPERTY(meta = (BindWidget))
@@ -37,9 +39,6 @@ protected:
 
     UPROPERTY(meta = (BindWidget))
     UTextBlock* SlotNumberText;
-
-    UPROPERTY(meta = (BindWidget))
-    UTextBlock* QuantityText;
 
     /** Item logic */
     UPROPERTY()
