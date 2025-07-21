@@ -37,13 +37,13 @@ protected:
 
 public:
 
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Item Data")
+    UPROPERTY(EditAnywhere, Replicated, BlueprintReadWrite, Category = "Item Data")
     FDataTableRowHandle ItemRowHandle;
 
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Item Data")
+    UPROPERTY(EditDefaultsOnly, Replicated, BlueprintReadOnly, Category = "Item Data")
     UItemBase* ItemData;
 
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Item Data")
+    UPROPERTY(EditDefaultsOnly, Replicated, BlueprintReadOnly, Category = "Item Data")
 	FItemData ItemDataRow;
 
 	//============FUNCTION==================//
@@ -64,15 +64,18 @@ public:
 
     void InitializeFrom(const AItem* Source, int32 InQuantity);
 
+    UFUNCTION(NetMulticast, Reliable)
+    void MulticastOnPickedUp();
+
     FItemData* GetItemData() const;
     //============AVAIABLE=================//
-    UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Stack")
+    UPROPERTY(EditDefaultsOnly, Replicated, BlueprintReadWrite, Category = "Stack")
     bool bIsStackable = false;
 
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Stack", meta = (EditCondition = "bIsStackable"))
+    UPROPERTY(EditAnywhere, Replicated,BlueprintReadWrite, Category = "Stack", meta = (EditCondition = "bIsStackable"))
     int32 Quantity = 1;
 
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Stack", meta = (EditCondition = "bIsStackable"))
+    UPROPERTY(EditAnywhere, Replicated, BlueprintReadWrite, Category = "Stack", meta = (EditCondition = "bIsStackable"))
     int32 MaxStackSize = 1;
 
 private:
@@ -84,4 +87,6 @@ private:
     virtual void OnConstruction(const FTransform& Transform) override;
 
 	bool bIsItemData;
+
+	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 };

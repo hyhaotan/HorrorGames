@@ -1,7 +1,7 @@
 ﻿// Copyright Epic Games, Inc. All Rights Reserved.
 
 #include "HorrorGameCharacter.h"
-#include "HorrorGame/Actor/Door.h"
+#include "HorrorGame/Actor/Door/Door.h"
 #include "HorrorGame/Interface/Interact.h"
 #include "HorrorGame/Widget/Settings/MenuSettingWidget.h"
 #include "HorrorGame/Actor/Item.h"
@@ -19,9 +19,11 @@
 #include "HorrorGame/Widget/Inventory/QuantitySelectionWidget.h"
 #include "HorrorGame/Widget/CrossHairWidget.h"
 #include "HorrorGame/Widget/Progress/KnockOutWidget.h"
-#include "HorrorGame/Actor/ElectronicLockActor.h"
+#include "HorrorGame/Actor/Door/ElectronicLockActor.h"
 #include "HorrorGame/Actor/LightSwitchActor.h"
 #include "HorrorGame/Widget/KeyNotificationWidget.h"
+#include "HorrorGame/Actor/Door/LockedDoorActor.h"
+#include "HorrorGame/Actor/Door/HospitalDoorActor.h"
 
 // Engine
 #include "Engine/LocalPlayer.h"
@@ -51,6 +53,10 @@ DEFINE_LOG_CATEGORY(LogTemplateCharacter);
 
 AHorrorGameCharacter::AHorrorGameCharacter()
 {
+    PrimaryActorTick.bCanEverTick = true;
+
+    bReplicates = true;
+
     // Set size for collision capsule
     GetCapsuleComponent()->InitCapsuleSize(42.f, 96.0f);
 
@@ -108,7 +114,7 @@ AHorrorGameCharacter::AHorrorGameCharacter()
     DelayForStaminaRecharge = 2.f;
 
     // Crouch state
-    bIsCrouching = false;
+    bIsCrouched = false;
 
     // Post-process
     PostProcessComponent = CreateDefaultSubobject<UPostProcessComponent>(TEXT("PostProcessComponent"));
@@ -381,17 +387,7 @@ void AHorrorGameCharacter::InteractWithGrabbedObject()
 
     if (AItem* Item = Cast<AItem>(Hit.GetActor()))
     {
-        // Count valid slots in main inventory
-        int32 MainCount = CountValidSlots(Inventory);
-
-        if (MainCount < MainInventoryCapacity)
-        {
-            HandlePickup(Item, Inventory, InventoryWidget, /*bCanGrow=*/ true);
-        }
-        else
-        {
-            HandlePickup(Item, InventoryBag, InventoryBagWidget, /*bCanGrow=*/ false);
-        }
+        ServerPickupItem(Item);
     }
 }
 
@@ -409,10 +405,7 @@ int32 AHorrorGameCharacter::CountValidSlots(const TArray<AActor*>& Container) co
 
 void AHorrorGameCharacter::HandlePickup(AItem* NewItem,TArray<AActor*>& Container,UUserWidget* InventoryUI,bool bCanGrow)
 {
-    if (!ensure(NewItem))
-        return;
-
-    NewItem->OnPickup();
+    if (!ensure(NewItem)) return;
 
     // Attempt stacking if allowed
     if (NewItem->bIsStackable)
@@ -424,12 +417,8 @@ void AHorrorGameCharacter::HandlePickup(AItem* NewItem,TArray<AActor*>& Containe
         }
     }
 
-    // Find empty slot
-    int32 EmptyIndex = Container.IndexOfByPredicate([](AActor* Actor)
-        {
-            return Actor == nullptr;
-        });
-
+    //Find slot empty
+    int32 EmptyIndex = Container.IndexOfByPredicate([](AActor* Actor) { return Actor == nullptr; });
     if (EmptyIndex != INDEX_NONE)
     {
         Container[EmptyIndex] = NewItem;
@@ -440,8 +429,7 @@ void AHorrorGameCharacter::HandlePickup(AItem* NewItem,TArray<AActor*>& Containe
     }
     else
     {
-        UE_LOG(LogTemp, Warning, TEXT("Inventory full, cannot pick up %s"), *NewItem->GetName());
-        return;
+        UE_LOG(LogTemp, Warning, TEXT("Inventory full, cannot hold %s"), *NewItem->GetName());
     }
 
     RefreshUI(InventoryUI, Container);
@@ -776,6 +764,7 @@ void AHorrorGameCharacter::HandleAttachInteract(int32 Index)
         Item->AttachToCharacter(GetMesh(), FName("Object"));
         EquippedItem = Item;
         EquippedActor = Item;
+        bIsHoldingItem = true;
     }
     else
     {
@@ -788,6 +777,7 @@ void AHorrorGameCharacter::HandleAttachInteract(int32 Index)
         }
         ActorToAttach->AttachToComponent(GetMesh(), FAttachmentTransformRules::SnapToTargetNotIncludingScale, FName("Object"));
         EquippedActor = ActorToAttach;
+        bIsHoldingItem = true;
     }
 
     // Keep track of slot
@@ -845,13 +835,19 @@ void AHorrorGameCharacter::StoreCurrentHeldObject()
     EquippedActor = nullptr;
     EquippedItem = nullptr;
     EquippedIndex = INDEX_NONE;
+    bIsHoldingItem = false;
 
     // UI updates
     if (InventoryWidget)
     {
         InventoryWidget->UpdateInventory(Inventory);
     }
-    OnInventoryUpdated.Broadcast(Inventory);
+
+    if (OnInventoryUpdated.IsBound())
+    {
+        OnInventoryUpdated.Broadcast(Inventory);
+    }
+
     OnItemToggled.Broadcast(EquippedIndex);
 }
 
@@ -906,7 +902,6 @@ void AHorrorGameCharacter::RetrieveObject(int32 Index)
     HandleAttachInteract(Index);
 }
 
-// Hàm trợ giúp dùng chung để tăng giá trị của một thuộc tính
 void AHorrorGameCharacter::IncreaseStat(float& CurrentValue, float MaxValue, float Amount, const FString& StatName)
 {
     if (CurrentValue >= MaxValue)
@@ -925,7 +920,6 @@ void AHorrorGameCharacter::IncreaseStat(float& CurrentValue, float MaxValue, flo
     }
 }
 
-// Hàm tăng máu sử dụng IncreaseStat
 void AHorrorGameCharacter::IncreaseHealth(float Amount)
 {
     IncreaseStat(Health, 100.f, Amount, FString("Health"));
@@ -976,28 +970,72 @@ void AHorrorGameCharacter::PerformDrop(AActor* Actor, const FVector& DropLocatio
 void AHorrorGameCharacter::DropObject()
 {
     AActor* HeldObject = GetHeldObject();
-    if (!HeldObject)
+    if (!HeldObject || EquippedIndex == INDEX_NONE)
         return;
 
-    const int32 SlotIndex = Inventory.Find(HeldObject);
-    if (SlotIndex == INDEX_NONE)
-        return;
-
-    // Detach and drop in front of camera
+    // Detach và drop
     const FVector DropLoc = ComputeDropLocation();
     PerformDrop(HeldObject, DropLoc);
 
-    // Clear inventory slot
-    Inventory[SlotIndex] = nullptr;
+    // Clear inventory slot dựa vào EquippedIndex
+    Inventory[EquippedIndex] = nullptr;
+
+    // Reset equipped
+    EquippedActor = nullptr;
     EquippedItem = nullptr;
+    const int32 ClearedSlot = EquippedIndex;
+    EquippedIndex = INDEX_NONE;
+
+    // Update UI
+    if (InventoryWidget)
+    {
+        InventoryWidget->UpdateInventory(Inventory);
+    }
+    OnInventoryUpdated.Broadcast(Inventory);
+
+    UE_LOG(LogTemp, Warning, TEXT("Dropped object from Inventory slot %d"), ClearedSlot);
+}
+
+void AHorrorGameCharacter::DropAllInventory()
+{
+    FVector DropBaseLocation = GetActorLocation() - FVector(0, 0, 50.0f); // Dưới chân nhân vật
+
+    for (int32 i = 0; i < Inventory.Num(); ++i)
+    {
+        AActor* Item = Inventory[i];
+        if (!Item) continue;
+
+        FActorSpawnParameters SpawnParams;
+        SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AdjustIfPossibleButAlwaysSpawn;
+
+        FVector Offset = FVector(FMath::FRandRange(-30.f, 30.f), FMath::FRandRange(-30.f, 30.f), 0);
+        FVector SpawnLocation = DropBaseLocation + Offset;
+        FRotator SpawnRotation = FRotator::ZeroRotator;
+
+        AActor* DroppedItem = GetWorld()->SpawnActor<AActor>(Item->GetClass(), SpawnLocation, SpawnRotation, SpawnParams);
+
+        if (DroppedItem)
+        {
+            if (UPrimitiveComponent* Prim = Cast<UPrimitiveComponent>(DroppedItem->GetComponentByClass(UPrimitiveComponent::StaticClass())))
+            {
+                Prim->SetSimulatePhysics(true);
+                Prim->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
+            }
+        }
+    }
+
+    EquippedActor = nullptr;
+    EquippedItem = nullptr;
+    EquippedIndex = INDEX_NONE;
 
     if (InventoryWidget)
     {
         InventoryWidget->UpdateInventory(Inventory);
     }
 
-    UE_LOG(LogTemp, Warning, TEXT("Dropped object from Inventory slot %d"), SlotIndex);
+    OnInventoryUpdated.Broadcast(Inventory);
 }
+
 
 void AHorrorGameCharacter::DropInventoryItem(bool bFromBag, int32 Index)
 {
@@ -1107,7 +1145,7 @@ void AHorrorGameCharacter::Ticks(float DeltaTime)
 void AHorrorGameCharacter::HandleStaminaSprint(float DeltaTime)
 {
     // Nếu đang crouch thì không tiêu hao stamina ngay cả khi bIsSprint == true
-    if (bIsCrouching)
+    if (bIsCrouched)
     {
         return;
     }
@@ -1152,14 +1190,13 @@ void AHorrorGameCharacter::Sprint()
         return;
     }
 
-    if (bIsCrouching)
+    if (bIsCrouched)
     {
         return;
     }
 
     if (GetVelocity().SizeSquared() <= 0.0f)
     {
-        UE_LOG(LogTemp, Warning, TEXT("Không thể chạy khi đứng yên."));
         return;
     }
 
@@ -1176,7 +1213,6 @@ void AHorrorGameCharacter::Sprint()
     }
     GetCharacterMovement()->MaxWalkSpeed = SprintSpeed;
 
-    // Ngăn việc hồi phục stamina trong lúc sprint
     CanStaminaRecharge = false;
     GetWorld()->GetTimerManager().ClearTimer(StaminaRechargeTimerHandle);
 }
@@ -1185,7 +1221,6 @@ void AHorrorGameCharacter::UnSprint()
 {
     if (bIsSprint)
     {
-        UE_LOG(LogTemp, Warning, TEXT("We have stopped running."));
         bIsSprint = false;
         GetCharacterMovement()->MaxWalkSpeed = 200.f;
 
@@ -1198,15 +1233,15 @@ void AHorrorGameCharacter::ToggleCrouch()
 {
     if (bIsKnockedDown) return;
 
-	if (bIsCrouching)
+	if (bIsCrouched)
 	{
 		UnCrouch();
-        bIsCrouching = false;
+        bIsCrouched = false;
 	}
 	else
 	{
 		Crouch();
-        bIsCrouching = true;
+        bIsCrouched = true;
 	}
 }
 
@@ -1235,6 +1270,7 @@ void AHorrorGameCharacter::StartKnockDown()
 
     EnableThirdPerson();
     SetInventoryVisible(false);
+    DropAllInventory();
 
     if (GetCharacterMovement())
     {
@@ -1246,6 +1282,8 @@ void AHorrorGameCharacter::StartKnockDown()
         KnockOutWidgetInstance->SetVisibility(ESlateVisibility::Visible);
         KnockOutWidgetInstance->NativeConstruct();
     }
+
+	Inventory.Empty();
 }
 
 void AHorrorGameCharacter::StopKnockDown()
@@ -1357,17 +1395,71 @@ void AHorrorGameCharacter::CloseNoteUI()
     }
 }
 
-bool AHorrorGameCharacter::ServerInteractWithSwitch_Validate(ALightSwitchActor* SwitchActor)
+bool AHorrorGameCharacter::ServerInteract_Validate(AInteractableActor* Target)
 {
-    // Thêm kiểm tra nếu cần (khoảng cách, null, v.v)
-    return true;
+    return Target != nullptr;
 }
 
-void AHorrorGameCharacter::ServerInteractWithSwitch_Implementation(ALightSwitchActor* SwitchActor)
+void AHorrorGameCharacter::ServerInteract_Implementation(AInteractableActor* Target)
 {
-    if (!SwitchActor) return;
+    if (!Target) return;
 
-    // Trên server, gọi multicast trên Actor để mọi client đồng bộ
-    SwitchActor->MulticastToggleLightSwitch();
+    if (auto Switch = Cast<ALightSwitchActor>(Target))
+    {
+        Switch->MulticastToggleLightSwitch();
+    }
+
+    if (auto Door = Cast<ALockedDoorActor>(Target))
+    {
+        Door->ServerInteract(this);
+    }
+    
+    if (auto HospitalDoor = Cast<AHospitalDoorActor>(Target))
+    {
+        HospitalDoor->ServerInteract(this);
+    }
 }
 
+bool AHorrorGameCharacter::ServerPickupItem_Validate(AItem* Item)
+{
+    return Item != nullptr;
+}
+
+void AHorrorGameCharacter::ServerPickupItem_Implementation(AItem* Item)
+{
+    if (!Item || !Item->HasAuthority()) return;
+
+    // 1) Ẩn / destroy trên server
+    Item->OnPickup();
+
+    // 2) Multicast để client ẩn
+    Item->MulticastOnPickedUp();
+
+    // 3) Add vào inventory server‑side
+    int32 MainCount = 0;
+    for (auto* I : Inventory) if (I) ++MainCount;
+
+    if (MainCount < MainInventoryCapacity)
+    {
+        HandlePickup(Item, Inventory, InventoryWidget, /*bCanGrow=*/ true);
+        RefreshUI(InventoryWidget, Inventory);
+    }
+    else
+    {
+        HandlePickup(Item, InventoryBag, InventoryBagWidget, /*bCanGrow=*/ false);
+        RefreshUI(InventoryBagWidget, InventoryBag);
+    }
+}
+
+void AHorrorGameCharacter::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
+{
+	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
+	DOREPLIFETIME(AHorrorGameCharacter, Inventory);
+	DOREPLIFETIME(AHorrorGameCharacter, InventoryBag);
+	DOREPLIFETIME(AHorrorGameCharacter, EquippedActor);
+	DOREPLIFETIME(AHorrorGameCharacter, EquippedItem);
+	DOREPLIFETIME(AHorrorGameCharacter, Health);
+	DOREPLIFETIME(AHorrorGameCharacter, CurrentStamina);
+	DOREPLIFETIME(AHorrorGameCharacter, bIsSprint);
+	DOREPLIFETIME(AHorrorGameCharacter, bIsFlashlightEnabled);
+}

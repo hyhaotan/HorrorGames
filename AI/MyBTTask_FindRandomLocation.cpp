@@ -18,7 +18,7 @@ EBTNodeResult::Type UMyBTTask_FindRandomLocation::ExecuteTask(UBehaviorTreeCompo
 	//get controller of AI and NPC
 	if (auto* const cont = Cast<ANPC_AIController>(OwnerComp.GetAIOwner()))
 	{
-		if (auto* const npc = cont->GetPawn())
+		if (auto const npc = cont->GetPawn())
 		{
 			//Get location npc ?? use to do origin
 			auto const Origin = npc->GetActorLocation();

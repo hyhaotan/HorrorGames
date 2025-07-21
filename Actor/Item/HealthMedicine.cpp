@@ -2,7 +2,7 @@
 
 
 #include "HorrorGame/Actor/Item/HealthMedicine.h"
-#include "HorrorGame/HorrorGameCharacter.h"
+#include "HorrorGame/Character/HorrorGameCharacter.h"
 
 AHealthMedicine::AHealthMedicine()
 {

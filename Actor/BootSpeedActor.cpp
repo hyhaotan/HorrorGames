@@ -2,7 +2,7 @@
 
 
 #include "BootSpeedActor.h"
-#include "HorrorGame/HorrorGameCharacter.h"
+#include "HorrorGame/Character/HorrorGameCharacter.h"
 
 #include "Components/SphereComponent.h"
 #include "Components/StaticMeshComponent.h"

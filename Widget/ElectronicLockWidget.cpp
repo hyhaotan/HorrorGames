@@ -1,7 +1,7 @@
 ﻿#include "HorrorGame/Widget/ElectronicLockWidget.h"
 #include "Components/Button.h"
 #include "Components/TextBlock.h"
-#include "HorrorGame/Actor/ElectronicLockActor.h"
+#include "HorrorGame/Actor/Door/ElectronicLockActor.h"
 #include "HorrorGame/HorrorGameCharacter.h"
 #include "TimerManager.h"
 

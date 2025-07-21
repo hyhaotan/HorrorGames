@@ -5,6 +5,7 @@
 #include "Engine/World.h"
 #include "DrawDebugHelpers.h"
 #include "HorrorGame/Actor/EyeMonster.h"
+#include "Kismet/GameplayStatics.h"
 
 UFlashLightComponent::UFlashLightComponent()
 {
@@ -28,8 +29,10 @@ void UFlashLightComponent::BeginPlay()
 
 void UFlashLightComponent::ToggleFlashlight()
 {
+    const bool bIsOnLight = !bIsOn;
     bIsOn = !bIsOn;
     SpotLight->SetVisibility(bIsOn);
+	UGameplayStatics::PlaySoundAtLocation(this, bIsOnLight? FlashLightOnSound : FlashLightOffSound, this->GetSocketLocation("SpotLight"));
     SetComponentTickEnabled(bIsOn);
 }
 

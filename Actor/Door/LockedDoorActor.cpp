@@ -1,21 +1,23 @@
-﻿// LockedDoorActor.cpp
-
-#include "LockedDoorActor.h"
-#include "Components/StaticMeshComponent.h"
-#include "Components/SceneComponent.h"
-#include "HorrorGame/HorrorGameCharacter.h"
+﻿#include "LockedDoorActor.h"
+#include "HorrorGame/Character/HorrorGameCharacter.h"
 #include "HorrorGame/Actor/Item/Keys.h"
 #include "HorrorGame/Widget/KeyNotificationWidget.h"
+#include "HorrorGame/Widget/Inventory/Inventory.h"
+
 #include "Kismet/GameplayStatics.h"
 #include "UObject/ConstructorHelpers.h"
+#include "Net/UnrealNetwork.h"
+#include "Components/StaticMeshComponent.h"
+#include "Components/SceneComponent.h"
 
 ALockedDoorActor::ALockedDoorActor()
 {
     PrimaryActorTick.bCanEverTick = true;
+    bReplicates = true;
 
     // Root pivot for hinge
     DoorPivot = CreateDefaultSubobject<USceneComponent>(TEXT("DoorPivot"));
-    RootComponent = DoorPivot;
+    DoorPivot->SetupAttachment(RootComponent);
 
     // Door mesh
     DoorMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("DoorMesh"));
@@ -50,7 +52,6 @@ void ALockedDoorActor::BeginPlay()
 {
     Super::BeginPlay();
 
-    // Lấy closed rotation
     ClosedRotation = DoorPivot->GetRelativeRotation();
     OpenRotation = ClosedRotation + FRotator(0.f, 90.f, 0.f);
 
@@ -84,67 +85,83 @@ void ALockedDoorActor::HandleDoorProgress(float Value)
 
 void ALockedDoorActor::Interact(AHorrorGameCharacter* Player)
 {
-    if (!Player)
-        return;
+    if (HasAuthority())
+    {
+        ServerInteract_Implementation(Player);
+    }
+    else
+    {
+        ServerInteract(Player);
+    }
+}
+
+bool ALockedDoorActor::ServerInteract_Validate(AHorrorGameCharacter* Player)
+{
+    return true;
+}
+
+void ALockedDoorActor::ServerInteract_Implementation(AHorrorGameCharacter* Player)
+{
+    if (!Player) return;
 
     if (bIsLocked)
     {
-        // Chưa mở khóa: check chìa
-        for (AActor* Item : Player->Inventory)
+        if (Player->bIsHoldingItem && Player->EquippedItem)
         {
-            if (AKeys* Key = Cast<AKeys>(Item))
+            if (AKeys* Key = Cast<AKeys>(Player->EquippedItem))
             {
-                if (Key->KeyID == RequiredKeyID)
-                {
-                    UnlockDoor(Player);
-                    return;
-                }
+                UnlockDoor(Player);
+                LockMesh->SetVisibility(false, true);
+                bIsLocked = false;
+                OnRep_IsLocked();
             }
         }
 
-        // Không có chìa báo UI
         if (Player->KeyNotificationWidget)
         {
             Player->KeyNotificationWidget->UpdateKeyNotification(RequiredKeyID.ToString());
         }
+        return;
     }
-    else
+    
+    if (!bHasOpened)
     {
-        // Đã mở khóa, nhưng chưa mở cửa
-        if (!bHasOpened)
-        {
-            PlayOpenDoorAnim();
-            bHasOpened = true;
-        }
-        // Nếu muốn hỗ trợ đóng/chuyển trạng thái => thêm logic ở đây
+        bHasOpened = true;
+        Multicast_PlayOpenDoor();
     }
 }
 
 void ALockedDoorActor::UnlockDoor(AHorrorGameCharacter* Player)
 {
-    // Gỡ chìa ra khỏi inventory
-    for (int32 i = Player->Inventory.Num() - 1; i >= 0; --i)
+    if (Player->EquippedItem)
     {
-        if (AKeys* Key = Cast<AKeys>(Player->Inventory[i]))
+        if (AKeys* Key = Cast<AKeys>(Player->EquippedItem))
         {
             if (Key->KeyID == RequiredKeyID)
             {
+                Player->StoreCurrentHeldObject();
+
                 Key->Destroy();
-                Player->Inventory.RemoveAt(i);
-                break;
+
+                Player->Inventory.Remove(Key);
+
+                if (Player->InventoryWidget)
+                    Player->InventoryWidget->UpdateInventory(Player->Inventory);
+
+                Player->OnInventoryUpdated.Broadcast(Player->Inventory);
             }
         }
     }
 
-    // Unlock và ẩn ổ khóa
-    bIsLocked = false;
-    LockMesh->SetVisibility(false);
-
-    // Thông báo mở khóa thành công
     if (Player->KeyNotificationWidget)
     {
         Player->KeyNotificationWidget->UpdateKeyNotification(TEXT("Mở khóa thành công!"));
     }
+}
+
+void ALockedDoorActor::Multicast_PlayOpenDoor_Implementation()
+{
+    PlayOpenDoorAnim();
 }
 
 void ALockedDoorActor::PlayOpenDoorAnim()
@@ -160,4 +177,25 @@ void ALockedDoorActor::PlayOpenDoorAnim()
             DoorTimeline ? TEXT("has Timeline") : TEXT("no Timeline"),
             DoorOpenCurve ? TEXT("") : TEXT("no Curve"));
     }
+}
+
+void ALockedDoorActor::OnRep_IsLocked()
+{
+    LockMesh->SetVisibility(bIsLocked);
+}
+
+void ALockedDoorActor::OnRep_HasOpened()
+{
+    if (bHasOpened)
+    {
+        PlayOpenDoorAnim();
+    }
+}
+
+void ALockedDoorActor::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
+{
+    Super::GetLifetimeReplicatedProps(OutLifetimeProps);
+
+    DOREPLIFETIME(ALockedDoorActor, bIsLocked);
+    DOREPLIFETIME(ALockedDoorActor, bHasOpened);
 }

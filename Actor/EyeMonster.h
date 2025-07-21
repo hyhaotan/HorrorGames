@@ -173,4 +173,6 @@ private:
     void HandleSelfDestruct();
 
     void FinishBlink();
+
+    void DrawSpawnDebug() const;
 };

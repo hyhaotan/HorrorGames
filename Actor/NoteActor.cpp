@@ -1,9 +1,9 @@
 ﻿#include "HorrorGame/Actor/NoteActor.h"
-#include "HorrorGame/HorrorGameCharacter.h"
+#include "HorrorGame/Character/HorrorGameCharacter.h"
 #include "HorrorGame/Widget/Item/ItemWidget.h"
 #include "HorrorGame/HUD/PlayerHUDWidget.h"
 #include "HorrorGame/Widget/MainHUDWidget.h"
-#include "HorrorGame/Actor/ElectronicLockActor.h"
+#include "HorrorGame/Actor/Door/ElectronicLockActor.h"
 #include "HorrorGame/Widget/Item/NoteWidget.h"
 
 #include "Components/SphereComponent.h"

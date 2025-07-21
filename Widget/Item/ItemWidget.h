@@ -18,7 +18,6 @@ public:
     UPROPERTY(meta = (BindWidgetAnim), Transient)
     UWidgetAnimation* HideAnim;
 
-    // (Tuỳ chọn) wrapper để play dễ hơn
     UFUNCTION(BlueprintCallable)
     void PlayShow() { if (ShowAnim) PlayAnimation(ShowAnim); }
 

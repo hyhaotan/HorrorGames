@@ -1,5 +1,5 @@
 ﻿#include "LightSwitchActor.h"
-#include "HorrorGame/HorrorGameCharacter.h"
+#include "HorrorGame/Character/HorrorGameCharacter.h"
 #include "Components/StaticMeshComponent.h"
 #include "Components/PointLightComponent.h"
 #include "Kismet/GameplayStatics.h"
@@ -35,7 +35,7 @@ void ALightSwitchActor::Interact(AHorrorGameCharacter* Interactor)
 
     Interactor->SetCurrentInteractItem(this);
 
-    Interactor->ServerInteractWithSwitch(this);
+    Interactor->ServerInteract(this);
 }
 
 void ALightSwitchActor::MulticastToggleLightSwitch_Implementation()

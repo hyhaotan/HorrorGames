@@ -1,6 +1,6 @@
-﻿#include "HorrorGame/Actor/Door.h"
+﻿#include "Door.h"
 #include "HorrorGame/Widget/Item/ItemWidget.h"
-#include "HorrorGame/HorrorGameCharacter.h"
+#include "HorrorGame/Character/HorrorGameCharacter.h"
 
 #include "Components/StaticMeshComponent.h"
 #include "Kismet/GameplayStatics.h"

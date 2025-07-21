@@ -7,7 +7,7 @@ void UKeyNotificationWidget::UpdateKeyNotification(const FString& KeyName)
         return;
 
     // Ví dụ: "Bạn cần chìa khóa BedRoomKey để mở cửa này"
-    FString Message = FString::Printf(TEXT("Bạn cần chìa khóa %s để mở cửa này"), *KeyName);
+    FString Message = FString::Printf(TEXT("Bạn cần %s để mở cửa này"), *KeyName);
     KeyNotificationText->SetText(FText::FromString(Message));
 
     // Show widget

@@ -19,7 +19,6 @@ void AFlashLight::UseItem()
         return;
     }
 
-    // Lần đầu, attach spotlight vào socket "SpotLight" trên mesh
     if (!bFlashAttached)
     {
         FlashLightComp->SpotLight->AttachToComponent(

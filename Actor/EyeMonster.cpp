@@ -4,7 +4,7 @@
 #include "Kismet/GameplayStatics.h"
 #include "GameFramework/PlayerController.h"
 #include "Engine/World.h"
-#include "HorrorGame/HorrorGameCharacter.h"
+#include "HorrorGame/Character/HorrorGameCharacter.h"
 #include "Components/SkeletalMeshComponent.h"
 #include "Particles/ParticleSystemComponent.h"
 #include "Components/BoxComponent.h"
@@ -47,15 +47,11 @@ void AEyeMonster::BeginPlay()
 {
 	Super::BeginPlay();
 
-	// Cache original spawn bounds and detach to preserve world-space
 	InitialSpawnCenter = SpawnVolume->GetComponentLocation();
 	InitialSpawnExtent = SpawnVolume->GetScaledBoxExtent();
 	SpawnVolume->DetachFromComponent(FDetachmentTransformRules::KeepWorldTransform);
 
-	// Optional: visualize spawn area for debugging
-	DrawDebugBox(GetWorld(), InitialSpawnCenter, InitialSpawnExtent, FColor::Red, true, 10.f, 0, 5.f);
-
-	// Place monster and schedule destruction
+	DrawSpawnDebug();
 	RespawnAndDestroy();
 }
 
@@ -65,6 +61,13 @@ void AEyeMonster::Tick(float DeltaTime)
 	ApplyLookDamage(DeltaTime);
 	FacePlayer(DeltaTime);
 
+}
+
+void AEyeMonster::DrawSpawnDebug() const
+{
+#if WITH_EDITOR
+	DrawDebugBox(GetWorld(), InitialSpawnCenter, InitialSpawnExtent, FColor::Red, true, 10.f);
+#endif
 }
 
 void AEyeMonster::RespawnAndDestroy()
@@ -78,26 +81,28 @@ void AEyeMonster::RespawnAndDestroy()
 
 void AEyeMonster::HandleSelfDestruct()
 {
-	// Cache parameters
+	TWeakObjectPtr<AEyeMonster> WeakThis(this);
 	UClass* MonsterClass = GetClass();
 	const float SavedYawOffset = YawOffset;
 	const FVector Center = InitialSpawnCenter;
 	const FVector Extent = InitialSpawnExtent;
 
 	FTimerDelegate RespawnDelegate = FTimerDelegate::CreateLambda(
-		[this, MonsterClass, SavedYawOffset, Center, Extent]()
+		[WeakThis, MonsterClass, SavedYawOffset, Center, Extent]()
 		{
+			if (!WeakThis.IsValid()) return;
+			UWorld* World = WeakThis->GetWorld();
+			if (!World) return;
+
 			FTransform SpawnTransform;
 			SpawnTransform.SetLocation(Center);
 
-			AEyeMonster* NewMonster = GetWorld()->SpawnActorDeferred<AEyeMonster>(
+			AEyeMonster* NewMonster = World->SpawnActorDeferred<AEyeMonster>(
 				MonsterClass,
 				SpawnTransform
 			);
-			if (!NewMonster)
-				return;
+			if (!NewMonster) return;
 
-			// Thiết lập lại các giá trị
 			NewMonster->InitialSpawnCenter = Center;
 			NewMonster->InitialSpawnExtent = Extent;
 			NewMonster->YawOffset = SavedYawOffset;
@@ -108,30 +113,49 @@ void AEyeMonster::HandleSelfDestruct()
 	);
 
 	RemoveBloodOverlay();
-
 	GetWorldTimerManager().SetTimer(RespawnTimerHandle, RespawnDelegate, 15.f, false);
 	Destroy();
 }
+
 
 
 void AEyeMonster::SpawnAtRandomLocation()
 {
 	const FVector Center = InitialSpawnCenter;
 	const FVector Extent = InitialSpawnExtent;
-	const float X = FMath::FRandRange(Center.X - Extent.X, Center.X + Extent.X);
-	const float Y = FMath::FRandRange(Center.Y - Extent.Y, Center.Y + Extent.Y);
+	const int32 MaxAttempts = 10;
 
-	FVector TargetLocation;
-	if (GetGroundSpawnLocation(FVector2D(X, Y), TargetLocation))
+	for (int32 i = 0; i < MaxAttempts; ++i)
 	{
-		SetActorLocation(TargetLocation);
-	}
-	else
-	{
-		SetActorLocation(FVector(X, Y, Center.Z - Extent.Z));
+		const float X = FMath::FRandRange(Center.X - Extent.X, Center.X + Extent.X);
+		const float Y = FMath::FRandRange(Center.Y - Extent.Y, Center.Y + Extent.Y);
+
+		FVector TargetLocation;
+		if (GetGroundSpawnLocation(FVector2D(X, Y), TargetLocation))
+		{
+			// Additional check: line trace to player
+			ACharacter* PlayerChar = UGameplayStatics::GetPlayerCharacter(this, 0);
+			if (PlayerChar)
+			{
+				FVector PlayerViewLoc = PlayerChar->GetActorLocation();
+				FHitResult Hit;
+				FCollisionQueryParams Params;
+				Params.AddIgnoredActor(this);
+
+				// Ensure no major obstacle between monster and player (optional)
+				if (!GetWorld()->LineTraceSingleByChannel(Hit, TargetLocation + FVector(0, 0, 50), PlayerViewLoc, ECC_Visibility, Params)
+					|| Hit.GetActor() == PlayerChar)
+				{
+					SetActorLocation(TargetLocation);
+					FacePlayer(0.f);
+					return;
+				}
+			}
+		}
 	}
 
-	// Immediately face the player
+	// Fallback: use center-bottom if all fails
+	SetActorLocation(Center - FVector(0, 0, Extent.Z));
 	FacePlayer(0.f);
 }
 
@@ -143,13 +167,22 @@ bool AEyeMonster::GetGroundSpawnLocation(const FVector2D& XY, FVector& OutLocati
 	FCollisionQueryParams Params;
 	Params.AddIgnoredActor(this);
 
-	if (GetWorld()->LineTraceSingleByChannel(Hit, Start, End, ECC_WorldStatic, Params))
+	bool bHit = GetWorld()->LineTraceSingleByChannel(Hit, Start, End, ECC_Visibility, Params);
+
+	if (bHit)
 	{
-		OutLocation = Hit.ImpactPoint;
-		return true;
+		OutLocation = Hit.ImpactPoint + FVector(0, 0, 5.0f); // slight offset to avoid z-fighting
+
+		// Optional: Check surface angle not too steep
+		const float SurfaceAngle = FMath::RadiansToDegrees(FMath::Acos(FVector::DotProduct(Hit.ImpactNormal, FVector::UpVector)));
+		if (SurfaceAngle < 30.f)
+		{
+			return true;
+		}
 	}
 	return false;
 }
+
 
 void AEyeMonster::ApplyLookDamage(float DeltaTime)
 {

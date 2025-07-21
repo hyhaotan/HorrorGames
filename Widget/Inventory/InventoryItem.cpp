@@ -8,7 +8,7 @@
 #include "HorrorGame/Widget/ItemDragDropOperation.h"
 #include "HorrorGame/Widget/Inventory/InventorySlot.h"
 #include "Components/CanvasPanel.h"
-#include "HorrorGame/HorrorGameCharacter.h"
+#include "HorrorGame/Character/HorrorGameCharacter.h"
 #include "HorrorGame/Actor/Item.h"
 #include "HorrorGame/Item/ItemBase.h"
 #include "HorrorGame/Widget/Inventory/ItemInfoWidget.h"
@@ -141,6 +141,7 @@ void UInventoryItem::SetItemImage(UTexture2D* ItemIcon)
 
 void UInventoryItem::SetBoundItem(AItem* InItem)
 {
+    if (!InItem) return;
     BoundItem = InItem;
     SetItemImage(InItem ? InItem->ItemData->ItemTextData.Icon : nullptr);
     SetItemQuantity();

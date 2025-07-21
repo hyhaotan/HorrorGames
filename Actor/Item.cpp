@@ -3,7 +3,7 @@
 #include "HorrorGame/Actor/Item.h"
 #include "HorrorGame/Widget/Item/ItemWidget.h"
 #include "HorrorGame/Item/ItemBase.h"
-#include "HorrorGame/HorrorGameCharacter.h"
+#include "HorrorGame/Character/HorrorGameCharacter.h"
 #include "HorrorGame/Actor/FireZone.h"
 #include "HorrorGame/Actor/GrenadeProjectile.h"
 
@@ -21,12 +21,15 @@
 #include "NiagaraFunctionLibrary.h"
 #include "GameFramework/ProjectileMovementComponent.h"
 #include "Animation/WidgetAnimation.h"
+#include "Net/UnrealNetwork.h"
 
 
 // Sets default values
 AItem::AItem()
 {
     PrimaryActorTick.bCanEverTick = false;
+
+	bReplicates = true;
 }
 
 void AItem::BeginPlay()
@@ -49,6 +52,11 @@ void AItem::OnPickup()
     {
         Mesh->SetSimulatePhysics(false);
     }
+}
+
+void AItem::MulticastOnPickedUp_Implementation()
+{
+    OnPickup();
 }
 
 void AItem::OnDrop(const FVector& DropLocation)
@@ -74,6 +82,17 @@ void AItem::OnConstruction(const FTransform& Transform)
         Quantity = 1;
         MaxStackSize = 1;
     }
+}
+
+void AItem::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
+{
+    Super::GetLifetimeReplicatedProps(OutLifetimeProps);
+    DOREPLIFETIME(AItem, Quantity);
+    DOREPLIFETIME(AItem, bIsStackable);
+    DOREPLIFETIME(AItem, MaxStackSize);
+    DOREPLIFETIME(AItem, ItemDataRow);
+    DOREPLIFETIME(AItem, ItemRowHandle);
+    DOREPLIFETIME(AItem, ItemData);
 }
 
 void AItem::AttachToCharacter(USkeletalMeshComponent* CharacterMesh, FName SocketName)

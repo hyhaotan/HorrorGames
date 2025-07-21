@@ -1,5 +1,5 @@
 ﻿#include "BomComponent.h"
-#include "HorrorGame/HorrorGameCharacter.h"
+#include "HorrorGame/Character/HorrorGameCharacter.h"
 #include "HorrorGame/Actor/Item.h"
 #include "GameFramework/Actor.h"
 #include "Kismet/GameplayStatics.h"

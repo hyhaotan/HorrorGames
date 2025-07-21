@@ -1,5 +1,5 @@
 ﻿#include "MonsterJump.h"
-#include "HorrorGame/HorrorGameCharacter.h"
+#include "HorrorGame/Character/HorrorGameCharacter.h"
 #include "HorrorGame/Widget/Progress/ProgressBarWidget.h"
 #include "HorrorGame/AI/NPC_AIController.h"
 

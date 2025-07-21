@@ -29,6 +29,8 @@ public class HorrorGame : ModuleRules
             "OnlineSubsystemUtils",
             "OnlineSubsystemSteam",
             "PhysicsCore",
+            "LevelSequence",
+            "MovieScene",
             "AdvancedSessions",});
         AddEngineThirdPartyPrivateStaticDependencies(Target, "Steamworks");
     }

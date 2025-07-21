@@ -9,6 +9,7 @@
 class UItemWidget;
 class UWidgetComponent;
 class USphereComponent;
+class UItemRequirementWidget;
 
 UCLASS()
 class HORRORGAME_API AInteractableActor : public AActor
@@ -45,9 +46,7 @@ public:
 	void OnOverlapEnd(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor,
 		UPrimitiveComponent* OtherComponent, int32 OtherBodyIndex);
 
-	UPROPERTY()
-	UItemWidget* PickupWidget;
-
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Item|UI")
-	TSubclassOf<UItemWidget> PickupWidgetClass;
+private:
+	void ShowWidget(UWidgetComponent* WidgetComp);
+	void HideWidget(UWidgetComponent* WidgetComp);
 };

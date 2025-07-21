@@ -1,5 +1,5 @@
 ﻿#include "HorrorGame/Actor/FireZone.h"
-#include "HorrorGame/HorrorGameCharacter.h"
+#include "HorrorGame/Character/HorrorGameCharacter.h"
 
 #include "Components/BoxComponent.h"
 #include "Kismet/GameplayStatics.h"

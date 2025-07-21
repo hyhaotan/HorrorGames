@@ -1,5 +1,5 @@
-﻿#include "HorrorGame/Actor/ElectronicLockActor.h"
-#include "HorrorGame/HorrorGameCharacter.h"
+﻿#include "ElectronicLockActor.h"
+#include "HorrorGame/Character/HorrorGameCharacter.h"
 #include "HorrorGame/Widget/ElectronicLockWidget.h"
 #include "HorrorGame/Widget/Item/ItemWidget.h"
 #include "HorrorGame/GameMode/MainMenuMode.h"
