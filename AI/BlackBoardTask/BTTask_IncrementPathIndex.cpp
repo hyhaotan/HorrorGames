@@ -1,9 +1,9 @@
 // Fill out your copyright notice in the Description page of Project Settings.
 
 
-#include "HorrorGame/AI/BTTask_IncrementPathIndex.h"
-#include "NPC_AIController.h"
-#include "NPC.h"
+#include "BTTask_IncrementPathIndex.h"
+#include "HorrorGame/AI/NPC_AIController.h"
+#include "HorrorGame/AI/NPC.h"
 #include "BehaviorTree/BlackboardComponent.h"
 #include "BehaviorTree/BehaviorTree.h"
 

@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 #include "CoreMinimal.h"
 #include "GameFramework/Actor.h"
@@ -10,65 +10,85 @@ class UStaticMeshComponent;
 class UTimelineComponent;
 class UCurveFloat;
 class AHorrorGameCharacter;
+class ULevelSequence;
 
 UCLASS()
 class HORRORGAME_API AHospitalDoorActor : public AInteractableActor, public IInteract
 {
-	GENERATED_BODY()
+    GENERATED_BODY()
 
 public:
-	AHospitalDoorActor();
+    AHospitalDoorActor();
 
-	virtual void Tick(float DeltaTime) override;
-	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
+    virtual void Tick(float DeltaTime) override;
+    virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 
-	UFUNCTION(Server, Reliable, WithValidation)
-	void ServerInteract(AHorrorGameCharacter* Player);
-	bool ServerInteract_Validate(AHorrorGameCharacter* Player);
-	void ServerInteract_Implementation(AHorrorGameCharacter* Player);
+    UFUNCTION(Server, Reliable, WithValidation)
+    void ServerInteract(AHorrorGameCharacter* Player);
+    bool ServerInteract_Validate(AHorrorGameCharacter* Player) { return true; }
+    void ServerInteract_Implementation(AHorrorGameCharacter* Player);
 
 protected:
-	virtual void BeginPlay() override;
+    virtual void BeginPlay() override;
 
-	UFUNCTION(NetMulticast, Reliable)
-	void Multicast_PlayOpenDoor();
+    /** Play the door open animation (Timeline) */
+    void PlayOpenDoorAnim();
 
-	void UnlockDoor(AHorrorGameCharacter* Player);
-	void HandleOpenCloseDoor(float Value);
+    /** Timeline float handler */
+    void HandleOpenCloseDoor(float Value);
 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Level")
-	class ULevelSequence* UnlockDoorSequence;
+    /** Unlock with bolt cutter */
+    void UnlockDoor(AHorrorGameCharacter* Player);
+
+    /** RepNotify for locked */
+    UFUNCTION()
+    void OnRep_IsLocked();
+
+    /** RepNotify for open sequence trigger */
+    UFUNCTION()
+    void OnRep_HasOpened();
+
+    /** Curve for open animation */
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Timeline", meta = (AllowPrivateAccess = "true"))
+    UCurveFloat* OpenCloseCurve;
+
+    /** Sequence to play when unlocking (optional) */
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Level", meta = (AllowPrivateAccess = "true"))
+    ULevelSequence* UnlockDoorSequence;
 
 private:
-	virtual void Interact(AHorrorGameCharacter* Player) override;
+    virtual void Interact(AHorrorGameCharacter* Player) override;
 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Door", meta = (AllowPrivateAccess = "true"))
-	UStaticMeshComponent* LeftDoorMesh;
+    /** Left and right door meshes */
+    UPROPERTY(EditAnywhere, Category = "Door", meta = (AllowPrivateAccess = "true"))
+    UStaticMeshComponent* LeftDoorMesh;
 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Door", meta = (AllowPrivateAccess = "true"))
-	UStaticMeshComponent* RightDoorMesh;
+    UPROPERTY(EditAnywhere, Category = "Door", meta = (AllowPrivateAccess = "true"))
+    UStaticMeshComponent* RightDoorMesh;
 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Door", meta = (AllowPrivateAccess = "true"))
-	UStaticMeshComponent* ChainDoorMesh;
+    /** Chain mesh that blocks the door */
+    UPROPERTY(EditAnywhere, Category = "Door", meta = (AllowPrivateAccess = "true"))
+    UStaticMeshComponent* ChainDoorMesh;
 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Timeline", meta = (AllowPrivateAccess = "true"))
-	UTimelineComponent* OpenCloseTimeline;
+    /** Timeline component for opening */
+    UPROPERTY(EditAnywhere, Category = "Timeline", meta = (AllowPrivateAccess = "true"))
+    UTimelineComponent* OpenCloseTimeline;
 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Timeline", meta = (AllowPrivateAccess = "true"))
-	UCurveFloat* OpenCloseCurve;
+    /** Initial rotations */
+    FRotator InitialLeftDoorRotation;
+    FRotator InitialRightDoorRotation;
 
-	FRotator InitialLeftDoorRotation;
-	FRotator InitialRightDoorRotation;
+    /** Door state flags */
+    UPROPERTY(ReplicatedUsing = OnRep_IsOpen)
+    bool bIsOpen;
 
-	UPROPERTY(ReplicatedUsing = OnRep_IsOpen)
-	bool bIsOpen;
+    UPROPERTY(ReplicatedUsing = OnRep_IsLocked)
+    bool bIsLocked;
 
-	UFUNCTION()
-	void OnRep_IsOpen();
+    UPROPERTY(ReplicatedUsing = OnRep_HasOpened)
+    bool bHasOpened;
 
-	UPROPERTY(ReplicatedUsing = OnRep_IsLocked)
-	bool bIsLocked;
-
-	UFUNCTION()
-	void OnRep_IsLocked();
+    /** RepNotify for visual opening (optional) */
+    UFUNCTION()
+    void OnRep_IsOpen();
 };

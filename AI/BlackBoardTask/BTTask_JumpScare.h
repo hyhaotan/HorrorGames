@@ -35,7 +35,7 @@ protected:
 
     // Thời gian chờ jump scare (sau khi hết thời gian này sẽ chuyển lại camera về người chơi)
     UPROPERTY(EditAnywhere, Category = "JumpScare")
-    float JumpScareDuration = 3.0f;
+    float JumpScareDuration = 2.0f;
 
     // Thời gian blend khi chuyển camera (chuyển sang và quay lại)
     UPROPERTY(EditAnywhere, Category = "JumpScare")

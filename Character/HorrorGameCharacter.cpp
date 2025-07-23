@@ -56,6 +56,7 @@ AHorrorGameCharacter::AHorrorGameCharacter()
     PrimaryActorTick.bCanEverTick = true;
 
     bReplicates = true;
+    SetReplicateMovement(true);
 
     // Set size for collision capsule
     GetCapsuleComponent()->InitCapsuleSize(42.f, 96.0f);
@@ -136,6 +137,7 @@ AHorrorGameCharacter::AHorrorGameCharacter()
 void AHorrorGameCharacter::BeginPlay()
 {
 	Super::BeginPlay();
+
     SetupWidgets();
 
     HandleInventoryWidget();
@@ -1302,6 +1304,7 @@ void AHorrorGameCharacter::StopKnockDown()
     {
         KnockOutWidgetInstance->SetVisibility(ESlateVisibility::Hidden);
     }
+
 }
 
 void AHorrorGameCharacter::TheChacterDeath()
@@ -1449,6 +1452,11 @@ void AHorrorGameCharacter::ServerPickupItem_Implementation(AItem* Item)
         HandlePickup(Item, InventoryBag, InventoryBagWidget, /*bCanGrow=*/ false);
         RefreshUI(InventoryBagWidget, InventoryBag);
     }
+}
+
+void AHorrorGameCharacter::OnRep_Inventory()
+{
+    OnInventoryUpdated.Broadcast(Inventory);
 }
 
 void AHorrorGameCharacter::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const

@@ -1,8 +1,8 @@
-// Fill out your copyright notice in the Description page of Project Settings.
+﻿// Fill out your copyright notice in the Description page of Project Settings.
 
 
-#include "HorrorGame/AI/BTTask_ChasePlayer.h"
-#include "NPC_AIController.h"
+#include "BTTask_ChasePlayer.h"
+#include "HorrorGame/AI/NPC_AIController.h"
 #include "BehaviorTree/BlackboardComponent.h"
 #include "Blueprint/AIBlueprintHelperLibrary.h"
 

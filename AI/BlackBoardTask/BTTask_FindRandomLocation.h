@@ -4,18 +4,18 @@
 
 #include "CoreMinimal.h"
 #include "BehaviorTree/Tasks/BTTask_BlackboardBase.h"
-#include "MyBTTask_FindRandomLocation.generated.h"
+#include "BTTask_FindRandomLocation.generated.h"
 
 /**
  * 
  */
 UCLASS()
-class HORRORGAME_API UMyBTTask_FindRandomLocation : public UBTTask_BlackboardBase
+class HORRORGAME_API UBTTask_FindRandomLocation : public UBTTask_BlackboardBase
 {
 	GENERATED_BODY()
 	
 public:
-	explicit UMyBTTask_FindRandomLocation(FObjectInitializer const& ObjectInitializer);
+	explicit UBTTask_FindRandomLocation(FObjectInitializer const& ObjectInitializer);
 	virtual EBTNodeResult::Type ExecuteTask(UBehaviorTreeComponent& OwnerComp, uint8* NodeMemory) override;
 
 private:

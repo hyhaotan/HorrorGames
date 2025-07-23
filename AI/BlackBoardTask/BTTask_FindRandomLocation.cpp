@@ -1,19 +1,19 @@
 // Fill out your copyright notice in the Description page of Project Settings.
 
 
-#include "HorrorGame/AI/MyBTTask_FindRandomLocation.h"
+#include "BTTask_FindRandomLocation.h"
 #include "NavigationSystem.h"
-#include "NPC_AIController.h"
+#include "HorrorGame/AI/NPC_AIController.h"
 #include "BehaviorTree/BlackboardComponent.h"
 
 
 
-UMyBTTask_FindRandomLocation::UMyBTTask_FindRandomLocation(FObjectInitializer const& ObjectInitializer) : UBTTask_BlackboardBase{ ObjectInitializer }
+UBTTask_FindRandomLocation::UBTTask_FindRandomLocation(FObjectInitializer const& ObjectInitializer) : UBTTask_BlackboardBase{ ObjectInitializer }
 {
 	NodeName = "Find Random Location In NavMesh";
 }
 
-EBTNodeResult::Type UMyBTTask_FindRandomLocation::ExecuteTask(UBehaviorTreeComponent& OwnerComp, uint8* NodeMemory)
+EBTNodeResult::Type UBTTask_FindRandomLocation::ExecuteTask(UBehaviorTreeComponent& OwnerComp, uint8* NodeMemory)
 {
 	//get controller of AI and NPC
 	if (auto* const cont = Cast<ANPC_AIController>(OwnerComp.GetAIOwner()))

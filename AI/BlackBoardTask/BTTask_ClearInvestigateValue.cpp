@@ -1,10 +1,10 @@
 ﻿// Fill out your copyright notice in the Description page of Project Settings.
 
 
-#include "HorrorGame/AI/BTTask_ClearInvestigateValue.h"
+#include "BTTask_ClearInvestigateValue.h"
 #include "BehaviorTree/BlackboardComponent.h"
-#include "NPC.h"
-#include "NPC_AIController.h"
+#include "HorrorGame/AI/NPC.h"
+#include "HorrorGame/AI/NPC_AIController.h"
 
 UBTTask_ClearInvestigateValue::UBTTask_ClearInvestigateValue(FObjectInitializer const& ObjectInitializer)
 {

@@ -7,7 +7,7 @@
 #include "Components/BoxComponent.h"
 #include "HealthBarWidget.h"
 #include "HorrorGame/AI/NPC.h"
-#include "HorrorGame/HorrorGameCharacter.h"
+#include "HorrorGame/Character/HorrorGameCharacter.h"
 #include "Components/TextRenderComponent.h"
 #include <Kismet/GameplayStatics.h>
 

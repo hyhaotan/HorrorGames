@@ -1,5 +1,5 @@
-﻿#include "HorrorGame/AI/BTTask_MeleeAttack.h"
-#include "Combat_Interface.h"
+﻿#include "BTTask_MeleeAttack.h"
+#include "HorrorGame/AI/Combat_Interface.h"
 #include "AIController.h"
 #include "Kismet/KismetSystemLibrary.h"
 #include "Kismet/GameplayStatics.h"
@@ -9,7 +9,7 @@
 #include "Animation/AnimMontage.h"
 #include "Animation/AnimInstance.h"
 #include "HorrorGame/HorrorGameCharacter.h" 
-#include "NPC.h"
+#include "HorrorGame/AI/NPC.h"
 
 UBTTask_MeleeAttack::UBTTask_MeleeAttack()
 {

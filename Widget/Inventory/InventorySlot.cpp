@@ -5,7 +5,7 @@
 #include "Components/Overlay.h"
 #include "InventoryItem.h"
 #include "HorrorGame/Widget/ItemDragDropOperation.h"
-#include "HorrorGame/HorrorGameCharacter.h"
+#include "HorrorGame/Character/HorrorGameCharacter.h"
 #include "Components/SizeBox.h"
 #include "HorrorGame/Actor/Item.h"
 #include "HorrorGame/Widget/Inventory/QuantitySelectionWidget.h"

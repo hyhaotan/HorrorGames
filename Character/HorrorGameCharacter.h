@@ -180,6 +180,10 @@ public:
 	void ServerPickupItem(AItem* Item);
 
 	void StoreCurrentHeldObject();
+
+	void StartKnockDown();
+	void StopKnockDown();
+	bool IsKnockedDown() const { return bIsKnockedDown; }
 	//------------------------------------------------PROPERTY--------------------------------------------------------//
 	//------------------------------------------------OTHER--------------------------------------------------------//
 	UPROPERTY(BlueprintAssignable, Category = "Inventory")
@@ -202,7 +206,7 @@ public:
 	UPROPERTY(EditAnywhere,BlueprintReadOnly,Category="SettingWidget")
 	TSubclassOf<UMenuSettingWidget> MenuSettingWidgetClass;
 
-	UPROPERTY(VisibleAnywhere, Replicated, BlueprintReadOnly, Category = "Inventory")
+	UPROPERTY(VisibleAnywhere, ReplicatedUsing = OnRep_Inventory, Replicated, BlueprintReadOnly, Category = "Inventory")
 	TArray<AActor*> Inventory;
 
 	UPROPERTY()
@@ -470,9 +474,6 @@ private:
 	// OtHER FUNCTIONS
 	//-----------------------------------------------------------------------------//
 
-	void StartKnockDown();
-	void StopKnockDown();
-
 	//-----------------------------------------------------------------------------//
 	// PROPERTIES
 	//-----------------------------------------------------------------------------//
@@ -503,5 +504,8 @@ private:
 	IInteract* CurrentInteract = nullptr;
 
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
+
+	UFUNCTION()
+	void OnRep_Inventory();
 };
 

@@ -1,9 +1,9 @@
 // Fill out your copyright notice in the Description page of Project Settings.
 
 
-#include "HorrorGame/AI/BTService_IsPlayerInMeleeRange.h"
-#include "NPC_AIController.h"
-#include "NPC.h"
+#include "BTService_IsPlayerInMeleeRange.h"
+#include "HorrorGame/AI/NPC_AIController.h"
+#include "HorrorGame/AI/NPC.h"
 #include "Runtime/Engine/Classes/Kismet/GameplayStatics.h"
 #include "GameFramework/Character.h"
 #include "Runtime/Engine/Classes/Engine/World.h"

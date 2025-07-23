@@ -1,8 +1,8 @@
 // Fill out your copyright notice in the Description page of Project Settings.
 
 
-#include "HorrorGame/AI/BTService_ChangeSpeed.h"
-#include "NPC.h"
+#include "BTService_ChangeSpeed.h"
+#include "HorrorGame/AI/NPC.h"
 #include "AIController.h"
 #include "GameFramework/CharacterMovementComponent.h"
 

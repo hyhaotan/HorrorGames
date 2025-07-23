@@ -30,4 +30,7 @@ protected:
 
     UFUNCTION()
     void HandleItemToggled(int32 NewEquippedIndex);
+
+    UFUNCTION()
+    void HandleInventoryChanged(const TArray<AActor*>& NewInventory);
 };
