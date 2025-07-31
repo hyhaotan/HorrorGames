@@ -1,17 +1,24 @@
 ﻿#pragma once
 
 #include "CoreMinimal.h"
-#include "HorrorGame/AI/AICharacterBase.h"
 #include "Camera/CameraComponent.h"
 #include "PaTrolPath.h"
 #include "GameFramework/Character.h"
-#include "Combat_Interface.h"
 #include "Animation/AnimMontage.h"
 #include "BehaviorTree/BehaviorTree.h"
 #include "NPC.generated.h"
 
+UENUM(BlueprintType)
+enum class ESearchPatternType : uint8
+{
+    Random      UMETA(DisplayName = "Random Search"),
+    Spiral      UMETA(DisplayName = "Spiral Search"),
+    Grid        UMETA(DisplayName = "Grid Search"),
+    LastKnown   UMETA(DisplayName = "Last Known Position")
+};
+
 UCLASS()
-class HORRORGAME_API ANPC : public AAICharacterBase, public ICombat_Interface
+class HORRORGAME_API ANPC : public ACharacter
 {
     GENERATED_BODY()
 
@@ -30,26 +37,48 @@ public:
     APaTrolPath* GetPatrolPath() const;
     UAnimMontage* GetMontage() const;
 
-    // Combat_Interface implementation
-    int MeleeAttack_Implementation() override;
-
     /** Custom function to toggle visibility */
     UFUNCTION(BlueprintCallable, Category = "AI")
     void ToggleInvestigationWidgetVisibility();
 
-    /**
-     * Camera component được sử dụng cho góc nhìn jump scare.
-     * Thay vì dùng ACameraActor, ta gắn một UCameraComponent thẳng vào NPC.
-     */
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "JumpScare")
     UCameraComponent* JumpScareCamera;
 
-    /**
-     * Cờ để bật/tắt việc sử dụng camera jump scare
-     * (khi NPC được SetViewTarget, ta sẽ kiểm tra cờ này để trả về góc nhìn JumpScareCamera)
-     */
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "JumpScare")
+    UPROPERTY(EditAnywhere, Replicated, BlueprintReadWrite, Category = "JumpScare")
     bool bUseJumpScareCamera = false;
+
+    // Search Pattern Implementation Variables
+    FVector SearchCenter;
+    TArray<FVector> SearchPoints;
+    int32 CurrentSearchIndex;
+    float CurrentSpiralAngle;
+    float CurrentSpiralRadius;
+    bool bIsSearching;
+
+    UPROPERTY(BlueprintReadWrite, Category = "AI|Search")
+    FVector LastKnownPlayerLocation;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "AI|Search")
+    int32 MaxSearchPoints = 8;
+
+    // Search Pattern Functions
+    UFUNCTION(BlueprintCallable, Category = "AI|Search")
+    FVector GetNextSearchLocation();
+
+    UFUNCTION(BlueprintCallable, Category = "AI|Search")
+    void StartSearchPattern(const FVector& CenterLocation);
+
+    UFUNCTION(BlueprintCallable, Category = "AI|Search")
+    void StopSearchPattern();
+
+    UFUNCTION(BlueprintCallable, Category = "AI|Search")
+    void SetIsSearching(bool bSearching);
+
+    UFUNCTION(BlueprintCallable, Category = "AI|Search")
+    bool IsSearching() const;
+
+    UPROPERTY(BlueprintReadWrite, Replicated)
+    class AHorrorGameCharacter* JumpScareTargetPlayer;
 
 protected:
     // Called when the game starts or when spawned
@@ -58,6 +87,25 @@ protected:
     // Override để cho phép NPC trả về góc nhìn từ JumpScareCamera
     virtual void CalcCamera(float DeltaTime, FMinimalViewInfo& OutResult) override;
 
+    // Search Pattern Properties
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "AI|Search")
+    ESearchPatternType SearchPattern;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "AI|Search")
+    float SearchRadius = 1000.0f;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "AI|Search")
+    float GridCellSize = 200.0f;
+
+    bool bIsWidgetVisible;
+
+    FTimerHandle JumpScareTimerHandle;
+
+    // Cache values for cleanup
+    float CachedBlendTime;
+
+    UPROPERTY(EditInstanceOnly, BlueprintReadOnly, Replicated, Category = "JumpScare", meta = (AllowPrivateAccess))
+    bool bIsPerformingJumpScare = false;
 private:
     // Behavior Tree gán trong Editor
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "AI", meta = (AllowPrivateAccess = "true"))
@@ -75,5 +123,15 @@ private:
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "UI", meta = (AllowPrivateAccess = "true"))
     UUserWidget* InvestigateWidget;
 
-    bool bIsWidgetVisible;
+
+    // Helper functions for search patterns
+    void GenerateRandomSearchPoints();
+    void GenerateSpiralSearchPoints();
+    void GenerateGridSearchPoints();
+    FVector GetNextRandomPoint() const;
+    FVector GetNextSpiralPoint();
+    FVector GetNextGridPoint() const;
+
+	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
+    virtual void GetActorEyesViewPoint(FVector& OutLocation, FRotator& OutRotation) const override;
 };

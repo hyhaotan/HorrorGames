@@ -3,8 +3,7 @@
 #include "CoreMinimal.h"
 #include "GameFramework/Actor.h"
 #include "Components/TimelineComponent.h"
-#include "HorrorGame/Interface/Interact.h"
-#include "HorrorGame/Actor/InteractableActor.h"
+#include "HorrorGame/Actor/Door/DoorRootActor.h"
 #include "Door.generated.h"
 
 class UStaticMeshComponent;
@@ -16,7 +15,7 @@ class UWidgetComponent;
 class USphereComponent;
 
 UCLASS()
-class HORRORGAME_API ADoor : public AInteractableActor,public IInteract
+class HORRORGAME_API ADoor : public ADoorRootActor
 {
     GENERATED_BODY()
 

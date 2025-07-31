@@ -7,10 +7,9 @@
 
 class UQuantitySelectionWidget;
 
-DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(
     FOnSplitRequested,
-    int32, SlotIndex,
-    int32, Amount
+    int32, SlotIndex
 );
 
 UCLASS()
@@ -40,11 +39,11 @@ public:
     UPROPERTY(meta = (BindWidget))
     class UBorder* SlotBorder;
 
-    UPROPERTY(BlueprintReadOnly)
-    bool bIsBagSlot;
-
     UPROPERTY(BlueprintAssignable, Category = "Inventory")
     FOnSplitRequested OnSplitRequested;
+
+    UPROPERTY(BlueprintReadOnly)
+    bool bIsBagSlot;
 
     UPROPERTY()
     class AItem* BoundItemActor = nullptr;
@@ -53,22 +52,7 @@ public:
     UInventoryItem* ContainedItemWidget = nullptr;
 
 	virtual void NativeConstruct() override;
-    virtual bool NativeOnDragOver( const FGeometry& InGeometry,const FDragDropEvent& InDragDropEvent,UDragDropOperation* InOperation) override;
-    virtual bool NativeOnDrop(const FGeometry& InGeometry,const FDragDropEvent& InDragDropEvent,UDragDropOperation* InOperation) override;
-    virtual FReply NativeOnMouseButtonUp(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent) override;
 
 private:
-    UPROPERTY()
-    UQuantitySelectionWidget* QuantityDialogWidget = nullptr;
-
-    UFUNCTION()
-    void SetQuantitySelectionWidget(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent);
-
-    void HandleQuantityChanged(int32 SlotsIndex);
-    void HandleItemToggled(int32 SlotsIndex);
-
     static TWeakObjectPtr<UQuantitySelectionWidget> CurrentOpenQuantityDialog;
-
-    UPROPERTY(EditAnywhere, Category = "UI")
-    TSubclassOf<UQuantitySelectionWidget> QuantitySelectionClass;
 };

@@ -1,24 +1,10 @@
-﻿#pragma once
+#pragma once
 
 #include "CoreMinimal.h"
 #include "Blueprint/UserWidget.h"
+#include "OnlineSessionSettings.h"
 #include "Interfaces/OnlineSessionInterface.h"
-#include "OnlineSubsystem.h"
 #include "LobbyWidget.generated.h"
-
-class UPanelWidget;
-class ULobbySlotWidget;
-class ULobbyFriendListPopup;
-class UButton;
-
-USTRUCT()
-struct FLobbySlotData
-{
-    GENERATED_BODY()
-    bool bOccupied = false;
-    FString DisplayName;
-    FUniqueNetIdRepl PlayerId;
-};
 
 UCLASS()
 class HORRORGAME_API ULobbyWidget : public UUserWidget
@@ -27,30 +13,36 @@ class HORRORGAME_API ULobbyWidget : public UUserWidget
 
 public:
     virtual void NativeConstruct() override;
-
-    IOnlineFriendsPtr FriendsInterface;
+    void UpdatePlayerSlots(const TArray<FUniqueNetIdRepl>& PlayerIds);
 
 protected:
-    UPROPERTY(meta = (BindWidget)) UPanelWidget* SlotsContainer;
-    UPROPERTY(meta = (BindWidget)) UButton* Button_StartGame;
+    UPROPERTY(meta = (BindWidget))
+    class UVerticalBox* PlayerSlotsContainer;
 
-    UPROPERTY(EditAnywhere, Category = "Lobby") TSubclassOf<ULobbySlotWidget> LobbySlotWidgetClass;
-    UPROPERTY(EditAnywhere, Category = "Lobby") TSubclassOf<ULobbyFriendListPopup> LobbyFriendListPopupClass;
+    UPROPERTY(meta = (BindWidget))
+    class UButton* StartGameButton;
+
+    UPROPERTY(meta = (BindWidget))
+    class UButton* InviteFriendsButton;
+
+    UPROPERTY(meta = (BindWidget))
+    class UButton* LeaveButton;
+
+    UPROPERTY(EditDefaultsOnly, Category = "Lobby")
+    TSubclassOf<class ULobbyPlayerSlot> PlayerSlotClass;
+
+    UFUNCTION()
+    void OnStartGameClicked();
+
+    UFUNCTION()
+    void OnInviteFriendsClicked();
+
+    UFUNCTION()
+    void OnLeaveClicked();
 
 private:
     IOnlineSessionPtr SessionInterface;
-    IOnlineIdentityPtr IdentityInterface;
+    TArray<class ULobbyPlayerSlot*> PlayerSlots;
 
-    TArray<FLobbySlotData> SlotDatas;
-    TArray<ULobbySlotWidget*> SlotWidgets;
-    ULobbyFriendListPopup* CurrentPopup = nullptr;
-
-    void PopulateSlots();
-    UFUNCTION() void OnStartClicked();
-    UFUNCTION() void HandleSlotInviteClicked(int32 SlotIndex);
-    void UpdateSlot(int32 SlotIndex);
-
-public:
-    // Called by popup
-    void InviteFriendToSlot(const FUniqueNetIdRepl& FriendId, int32 SlotIndex);
+    void InitializeSessionInterface();
 };

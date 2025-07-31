@@ -72,24 +72,9 @@ void AItem::OnDrop(const FVector& DropLocation)
     SetActorLocation(DropLocation);
 }
 
-void AItem::OnConstruction(const FTransform& Transform)
-{
-    Super::OnConstruction(Transform);
-
-    // If non-stackable, enforce single quantity
-    if (!bIsStackable)
-    {
-        Quantity = 1;
-        MaxStackSize = 1;
-    }
-}
-
 void AItem::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
 {
     Super::GetLifetimeReplicatedProps(OutLifetimeProps);
-    DOREPLIFETIME(AItem, Quantity);
-    DOREPLIFETIME(AItem, bIsStackable);
-    DOREPLIFETIME(AItem, MaxStackSize);
     DOREPLIFETIME(AItem, ItemDataRow);
     DOREPLIFETIME(AItem, ItemRowHandle);
     DOREPLIFETIME(AItem, ItemData);
@@ -144,18 +129,7 @@ void AItem::InitializeItemData()
     {
         ConfigureItemBase(*DataRow);
         ConfigureMesh(*DataRow);
-        InitializeStackProperties(*DataRow);
     }
-}
-
-void AItem::InitializeFrom(const AItem* Source, int32 InQuantity)
-{
-    bIsStackable = Source->bIsStackable;
-    Quantity = InQuantity;
-    MaxStackSize = Source->MaxStackSize;
-    ItemRowHandle = Source->ItemRowHandle;
-    ItemDataRow = Source->ItemDataRow;
-    ItemData = Source->ItemData;
 }
 
 void AItem::ConfigureItemBase(const FItemData& DataRow)
@@ -176,15 +150,6 @@ void AItem::ConfigureMesh(const FItemData& DataRow)
     {
         Mesh->SetVisibility(false);
     }
-}
-
-void AItem::InitializeStackProperties(const FItemData& DataRow)
-{
-    bIsStackable = DataRow.bIsStack;
-
-    Quantity = 1;
-
-    MaxStackSize = bIsStackable? DataRow.MaxStackSize: 1;
 }
 
 void AItem::UseItem()

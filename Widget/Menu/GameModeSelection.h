@@ -2,6 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "Blueprint/UserWidget.h"
+#include "Interfaces/OnlineSessionInterface.h"
 #include "GameModeSelection.generated.h"
 
 // Forward declarations
@@ -9,6 +10,16 @@ class UButton;
 class UWidgetAnimation;
 class UMainMenu;
 class UServerBrowserWidget;
+class ULobbyWidget;
+
+UENUM()
+enum class ETransitionState : uint8
+{
+    None,
+    Single,
+    Multiplayer,
+    Back
+};
 
 UCLASS()
 class HORRORGAME_API UGameModeSelection : public UUserWidget
@@ -20,6 +31,7 @@ public:
 
     UFUNCTION() void OnShownimationFinished();
     UFUNCTION() void OnHideAnimationFinished();
+    UFUNCTION() void OnCreateSessionComplete(FName SessionName, bool bWasSuccessful);
 
 protected:
     /** UI Elements */
@@ -30,8 +42,8 @@ protected:
     UPROPERTY(meta = (BindWidgetAnim), Transient) UWidgetAnimation* HideAnim;
 
     /** Widget classes for navigation */
-    UPROPERTY(EditAnywhere, Category = "Widgets") TSubclassOf<UMainMenu> MainMenuClass;
-    UPROPERTY(EditAnywhere, Category = "Widgets") TSubclassOf<UServerBrowserWidget> ServerBrowserWidgetClass;
+    UPROPERTY(EditDefaultsOnly, Category = "UI") TSubclassOf<UMainMenu> MainMenuClass;
+    UPROPERTY(EditDefaultsOnly, Category = "UI") TSubclassOf<ULobbyWidget> LobbyWidgetClass;
 
 private:
     /** Button callbacks */
@@ -40,6 +52,8 @@ private:
     UFUNCTION() void OnBackClicked();
 
     /** State enumeration for animation flow */
-    enum class ETransitionState : uint8 { None, Single, Multiplayer, Back };
-    ETransitionState PendingState = ETransitionState::None;
+    ETransitionState PendingState;
+    IOnlineSessionPtr SessionInterface;
+
+    void CreateLobbySession();
 };

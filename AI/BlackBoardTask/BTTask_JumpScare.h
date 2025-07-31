@@ -1,53 +1,62 @@
-﻿// Fill out your copyright notice in the Description page of Project Settings.
-
-#pragma once
+﻿#pragma once
 
 #include "CoreMinimal.h"
-#include "BehaviorTree/Tasks/BTTask_BlackboardBase.h"
+#include "BehaviorTree/BTTaskNode.h"
+#include "Engine/TimerHandle.h"
+#include "Sound/SoundCue.h"
+#include "Animation/AnimMontage.h"
 #include "BTTask_JumpScare.generated.h"
 
-/**
- * 
- */
 UCLASS()
-class HORRORGAME_API UBTTask_JumpScare : public UBTTask_BlackboardBase
+class HORRORGAME_API UBTTask_JumpScare : public UBTTaskNode
 {
-	GENERATED_BODY()
-	
+    GENERATED_BODY()
+
 public:
     UBTTask_JumpScare();
 
-    // Override hàm ExecuteTask để thực hiện logic task
     virtual EBTNodeResult::Type ExecuteTask(UBehaviorTreeComponent& OwnerComp, uint8* NodeMemory) override;
-
-    // Override hàm OnTaskFinished để dọn dẹp timer nếu cần
     virtual void OnTaskFinished(UBehaviorTreeComponent& OwnerComp, uint8* NodeMemory, EBTNodeResult::Type Result) override;
 
 protected:
-    // Callback được gọi khi JumpScareDuration kết thúc
-    void OnJumpScareComplete();
+    // Animation Montage cho jump scare
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "JumpScare")
+    UAnimMontage* JumpScareMontage;
 
-    // Timer handle để quản lý delay của jump scare
-    FTimerHandle TimerHandle_JumpScare;
+    // Sound effect cho jump scare
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "JumpScare")
+    USoundCue* JumpscareSound;
 
-    // Cached pointer để gọi FinishLatentTask khi task hoàn thành
-    UBehaviorTreeComponent* CachedOwnerComp;
+    // Thời gian jump scare kéo dài
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "JumpScare", meta = (ClampMin = "0.1", ClampMax = "10.0"))
+    float JumpScareDuration = 3.0f;
 
-    // Thời gian chờ jump scare (sau khi hết thời gian này sẽ chuyển lại camera về người chơi)
-    UPROPERTY(EditAnywhere, Category = "JumpScare")
-    float JumpScareDuration = 2.0f;
-
-    // Thời gian blend khi chuyển camera (chuyển sang và quay lại)
-    UPROPERTY(EditAnywhere, Category = "JumpScare")
+    // Thời gian blend camera
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "JumpScare", meta = (ClampMin = "0.1", ClampMax = "5.0"))
     float BlendTime = 0.5f;
 
-    UPROPERTY(EditAnywhere,Category="Jumpscare Sound")
-    class USoundBase* JumpscareSound;
+    // Khoảng cách tối đa để jumpscare có hiệu lực
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "JumpScare", meta = (ClampMin = "100.0", ClampMax = "2000.0"))
+    float MaxJumpscareDistance = 1000.0f;
 
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "JumpScare")
+private:
+    // Timer handle
+    FTimerHandle TimerHandle_JumpScare;
+
+    // Cached references
+    UPROPERTY()
+    UBehaviorTreeComponent* CachedOwnerComp;
+
+    // Flag để tránh play sound nhiều lần
     bool bHasPlayedJumpScareSound = false;
 
-    // Animation Montage được phát trên NPC khi jump scare diễn ra
-    UPROPERTY(EditAnywhere, Category = "JumpScare")
-    UAnimMontage* JumpScareMontage;
+    // Callback functions
+    void OnJumpScareComplete();
+
+    // Helper functions
+    void ResetBlackboardKeys();
+    void RestartAILogic();
+
+    // Multiplayer helper - tìm tất cả players trong khu vực
+    TArray<class AHorrorGameCharacter*> GetNearbyPlayers(const FVector& NPCLocation) const;
 };

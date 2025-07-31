@@ -53,7 +53,7 @@ private:
 	class UTimelineComponent* DoorTimeline;
 
 	UPROPERTY(EditAnywhere, Category = "Components")
-	UBoxComponent* TriggerBox;
+	class UBoxComponent* TriggerBox;
 
 	UPROPERTY(EditAnywhere, Category = "Door Settings")
 	float OpenDistance = 100.0f;

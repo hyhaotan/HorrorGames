@@ -1,4 +1,4 @@
-#include "HorrorGame/Actor/Door/AutomationDoorActor.h"
+#include "AutomationDoorActor.h"
 #include "HorrorGame/Character/HorrorGameCharacter.h"
 #include "Components/BoxComponent.h"
 #include "Components/StaticMeshComponent.h"

@@ -2,7 +2,7 @@
 
 
 #include "NoteWidget.h"
-#include "HorrorGame/HorrorGameCharacter.h"
+#include "HorrorGame/Character/HorrorGameCharacter.h"
 
 #include "Components/Image.h"
 #include "Components/Button.h"

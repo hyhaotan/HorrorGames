@@ -16,8 +16,5 @@ class HORRORGAME_API AHealthMedicine : public AItem
 public:
     AHealthMedicine();
 
-    virtual void UseItem() override;
-
 private:
-    float CalculateHealAmount(EMedicineSize Size) const;
 };

@@ -14,12 +14,6 @@ struct FItemTextData
 	FText Name;
 
 	UPROPERTY(EditAnywhere)
-	FText Description;
-
-	UPROPERTY(EditAnywhere)
-	int32 price;
-
-	UPROPERTY(EditAnywhere)
 	UTexture2D* Icon;
 };
 
@@ -35,16 +29,6 @@ struct FItem3DMeshData
 	USkeletalMesh* SkeletalMesh;
 };
 
-
-USTRUCT(BlueprintType)
-struct FItemQuantityData
-{
-	GENERATED_USTRUCT_BODY()
-
-	UPROPERTY(EditAnywhere)
-	int32 Weight;
-};
-
 UENUM()
 enum class EItemTypeData : uint8
 {
@@ -56,14 +40,6 @@ enum class EItemTypeData : uint8
 	None UMETA(DisplayName = "None")
 };
 
-UENUM(BlueprintType)
-enum class EMedicineSize : uint8
-{
-	Small   UMETA(DisplayName = "Small"),
-	Medium  UMETA(DisplayName = "Medium"),
-	Large   UMETA(DisplayName = "Large"),
-};
-
 USTRUCT(BlueprintType)
 struct FItemData : public FTableRowBase
 {
@@ -73,25 +49,10 @@ struct FItemData : public FTableRowBase
 	FName ID;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Item Data")
-	bool bIsStack = false;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Item Data", meta = (EditCondition = "bIsStack"))
-	int32 MaxStackSize = 1;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Item Data")
 	FItemTextData ItemTextData;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Item Data")
 	EItemTypeData ItemTypeData;
-
-	UPROPERTY(EditAnywhere, Transient, Category = "Item Data")
-	bool bIsMedicineType = false;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Item Data", meta = (EditCondition = "bIsMedicineType", EditConditionHides))
-	EMedicineSize MedicineSize;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Item Data")
-	FItemQuantityData ItemQuantityData;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Item Data")
 	FItem3DMeshData Item3DMeshData;

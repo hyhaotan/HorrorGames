@@ -1,8 +1,8 @@
 ﻿#pragma once
 
 #include "CoreMinimal.h"
-#include "HorrorGame/Actor/InteractableActor.h"
 #include "HorrorGame/Interface/Interact.h"
+#include "horrorGame/Actor/Light/LightActor.h"
 #include "LightSwitchActor.generated.h"
 
 class UStaticMeshComponent;
@@ -10,7 +10,7 @@ class UPointLightComponent;
 class USoundBase;
 
 UCLASS()
-class HORRORGAME_API ALightSwitchActor : public AInteractableActor, public IInteract
+class HORRORGAME_API ALightSwitchActor :  public ALightActor, public IInteract
 {
     GENERATED_BODY()
 
@@ -28,13 +28,6 @@ public:
     void MulticastToggleLightSwitch();
 
 protected:
-    // Component & state
-    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Light Switch", meta = (AllowPrivateAccess))
-    UStaticMeshComponent* LightMesh;
-
-    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Light Switch", meta = (AllowPrivateAccess))
-    UPointLightComponent* PointLight;
-
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Light Switch", meta = (AllowPrivateAccess))
     UStaticMeshComponent* SwitchMesh;
 

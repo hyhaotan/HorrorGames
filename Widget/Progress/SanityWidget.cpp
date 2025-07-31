@@ -1,6 +1,6 @@
 ﻿#include "SanityWidget.h"
 #include "Components/ProgressBar.h"
-#include "HorrorGame/HorrorGameCharacter.h"
+#include "HorrorGame/Character/HorrorGameCharacter.h"
 
 void USanityWidget::NativeConstruct()
 {

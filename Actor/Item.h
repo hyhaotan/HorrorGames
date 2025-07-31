@@ -62,29 +62,16 @@ public:
 
     void InitializeItemData();
 
-    void InitializeFrom(const AItem* Source, int32 InQuantity);
-
     UFUNCTION(NetMulticast, Reliable)
     void MulticastOnPickedUp();
 
     FItemData* GetItemData() const;
     //============AVAIABLE=================//
-    UPROPERTY(EditDefaultsOnly, Replicated, BlueprintReadWrite, Category = "Stack")
-    bool bIsStackable = false;
-
-    UPROPERTY(EditAnywhere, Replicated,BlueprintReadWrite, Category = "Stack", meta = (EditCondition = "bIsStackable"))
-    int32 Quantity = 1;
-
-    UPROPERTY(EditAnywhere, Replicated, BlueprintReadWrite, Category = "Stack", meta = (EditCondition = "bIsStackable"))
-    int32 MaxStackSize = 1;
 
 private:
 
     void ConfigureItemBase(const FItemData& DataRow);
     void ConfigureMesh(const FItemData& DataRow);
-    void InitializeStackProperties(const FItemData& DataRow);
-
-    virtual void OnConstruction(const FTransform& Transform) override;
 
 	bool bIsItemData;
 

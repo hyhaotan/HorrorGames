@@ -1,8 +1,14 @@
 ﻿#include "GameModeSelection.h"
 #include "HorrorGame/Widget/Menu/MainMenu.h"
-#include "HorrorGame/Widget/SessionBrowser/ServerBrowserWidget.h"
+#include "HorrorGame/Widget/Lobby/LobbyWidget.h"
+#include "HorrorGame/Widget/Lobby/LobbyGameMode.h"
 #include "Kismet/GameplayStatics.h"
 #include "Components/Button.h"
+#include "OnlineSubsystem.h"
+#include "OnlineSessionSettings.h"
+#include <Online/OnlineSessionNames.h>
+
+static const FName SESSION_GAME_TYPE = TEXT("LobbyMap");
 
 void UGameModeSelection::NativeConstruct()
 {
@@ -32,6 +38,10 @@ void UGameModeSelection::NativeConstruct()
         AnimationFinished.BindDynamic(this, &UGameModeSelection::OnHideAnimationFinished);
         BindToAnimationFinished(HideAnim, AnimationFinished);
     }
+
+    // Initialize Online Subsystem
+    IOnlineSubsystem* OSS = IOnlineSubsystem::Get(TEXT("Steam"));
+    SessionInterface = OSS ? OSS->GetSessionInterface() : nullptr;
 }
 
 void UGameModeSelection::OnSinglePlayerClicked()
@@ -54,11 +64,40 @@ void UGameModeSelection::OnMultiplayerClicked()
     {
         PlayAnimation(HideAnim);
     }
-    else if (ServerBrowserWidgetClass)
+    else if (LobbyWidgetClass)
     {
-        RemoveFromParent();
-        UServerBrowserWidget* Browser = CreateWidget<UServerBrowserWidget>(GetWorld(), ServerBrowserWidgetClass);
-        Browser->AddToViewport();
+        CreateLobbySession();
+    }
+}
+
+void UGameModeSelection::CreateLobbySession()
+{
+    if (!SessionInterface.IsValid()) return;
+
+    FOnlineSessionSettings SessionSettings;
+    SessionSettings.bIsLANMatch = false;
+    SessionSettings.bUsesPresence = true;
+    SessionSettings.NumPublicConnections = 4;
+    SessionSettings.bAllowJoinInProgress = true;
+    SessionSettings.bAllowJoinViaPresence = true;
+    SessionSettings.bShouldAdvertise = true;
+    SessionSettings.bAllowInvites = true;
+    SessionSettings.Set(SESSION_GAME_TYPE, FString("true"), EOnlineDataAdvertisementType::ViaOnlineService);
+    
+    // Add the game mode class to session settings
+    SessionSettings.Set(SETTING_GAMEMODE, ALobbyGameMode::StaticClass()->GetPathName(), 
+        EOnlineDataAdvertisementType::ViaOnlineService);
+
+    SessionInterface->CreateSession(0, NAME_GameSession, SessionSettings);
+    SessionInterface->OnCreateSessionCompleteDelegates.AddUObject(this, &UGameModeSelection::OnCreateSessionComplete);
+}
+
+void UGameModeSelection::OnCreateSessionComplete(FName SessionName, bool bWasSuccessful)
+{
+    if (bWasSuccessful)
+    {
+        // Load the lobby map after successful session creation
+        UGameplayStatics::OpenLevel(this, TEXT("LobbyMap"), true, "listen");
     }
 }
 
@@ -85,10 +124,9 @@ void UGameModeSelection::OnHideAnimationFinished()
         UGameplayStatics::OpenLevel(this, TEXT("L_horrorGame"));
         break;
     case ETransitionState::Multiplayer:
-        if (ServerBrowserWidgetClass)
+        if (LobbyWidgetClass)
         {
-            UServerBrowserWidget* Browser = CreateWidget<UServerBrowserWidget>(GetWorld(), ServerBrowserWidgetClass);
-            Browser->AddToViewport();
+            CreateLobbySession();
         }
         break;
     case ETransitionState::Back:
@@ -106,5 +144,5 @@ void UGameModeSelection::OnHideAnimationFinished()
 
 void UGameModeSelection::OnShownimationFinished()
 {
-	PlayAnimation(ShowAnim);
+    PlayAnimation(ShowAnim);
 }

@@ -23,9 +23,6 @@ class USanityWidget;
 class UTimelineComponent;
 class UCurveFloat;
 class ANoteActor;
-class UInventoryBagWidget;
-class UItemInfoWidget;
-class UQuantitySelectionWidget;
 class UCrossHairWidget;
 class UKnockOutWidget;
 class UNoteWidget;
@@ -33,7 +30,6 @@ class UKeyNotificationWidget;
 
 DECLARE_LOG_CATEGORY_EXTERN(LogTemplateCharacter, Log, All);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnInventoryUpdated, const TArray<AActor*>&, NewInventory);
-DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnItemQuantityChanged, int32, SlotIndex);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnItemToggled, int32, SlotIndex);
 
 UENUM(BlueprintType)
@@ -117,21 +113,11 @@ protected:
 public:
 
 	//------------------------------------------------FUNCTION--------------------------------------------------------//
-	UFUNCTION()
-	float GetHealth()
-	{
-		return Health;
-	};
-
-	UFUNCTION()
-	void IncreaseHealth(float Amount);
 
 	UFUNCTION()
 	void IncreaseStat(float& CurrentValue, float MaxValue, float Amount, const FString& StatName);
 
 	AActor* GetHeldObject() const;
-
-	virtual float TakeDamage(float DamageAmount, const FDamageEvent& DamageEvent, AController* EventInstigator, AActor* DamageCauser) override;
 
 	void EnableFirstPerson();
 	void EnableThirdPerson();
@@ -156,9 +142,6 @@ public:
 
 	void SetCurrentNoteActor(ANoteActor* Note) { CurrentNote = Note; }
 
-	UFUNCTION()
-	void SwapInventoryItems(bool SourceIsBag, int32 SourceIndex, bool TargetIsBag, int32 TargetIndex);
-
 	void DropInventoryItem(bool bFromBag, int32 Index);
 
 	void ClearCurrentInteractItem(AActor* ItemToClear)
@@ -178,12 +161,36 @@ public:
 
 	UFUNCTION(Server, Reliable, WithValidation)
 	void ServerPickupItem(AItem* Item);
+	bool ServerPickupItem_Validate(AItem* Item);
+	void ServerPickupItem_Implementation(AItem* Item);
 
 	void StoreCurrentHeldObject();
 
+	// Multiplayer jumpscare functions
+	UFUNCTION(Client, Reliable)
+	void ClientStartJumpScare(class ANPC* JumpscareNPC, float BlendTime, float Duration);
+
+	UFUNCTION(Client, Reliable)
+	void ClientEndJumpScare(float BlendTime);
+
+	UFUNCTION(Server, Reliable)
+	void ServerStartKnockDown();
+
+	UFUNCTION(Server, Reliable)
+	void ServerStopKnockDown();
+
+	// Knockdown functions (updated for multiplayer)
+	UFUNCTION(BlueprintCallable)
 	void StartKnockDown();
+
+	UFUNCTION(BlueprintCallable)
 	void StopKnockDown();
-	bool IsKnockedDown() const { return bIsKnockedDown; }
+
+	UFUNCTION()
+	bool IsKnockedDown() const { return bIsKnockedDown; };
+
+	UFUNCTION()
+	void OnRep_IsKnockedDown();
 	//------------------------------------------------PROPERTY--------------------------------------------------------//
 	//------------------------------------------------OTHER--------------------------------------------------------//
 	UPROPERTY(BlueprintAssignable, Category = "Inventory")
@@ -191,9 +198,6 @@ public:
 
 	UPROPERTY(BlueprintAssignable, Category = "Inventory")
 	FOnInventoryUpdated OnInventoryUpdated;
-
-	UPROPERTY(BlueprintAssignable)
-	FOnItemQuantityChanged OnItemQuantityChanged;
 
 	UPROPERTY()
 	AMonsterJump* GrabbingMonster;
@@ -272,15 +276,6 @@ public:
 	UPROPERTY()
 	UTimelineComponent* SanityTimeline;
 
-	UPROPERTY(Replicated)
-	TArray<AActor*> InventoryBag;
-
-	UPROPERTY()
-	UInventoryBagWidget* InventoryBagWidget;
-
-	UPROPERTY(EditAnywhere, Category = "UI")
-	TSubclassOf<UInventoryBagWidget> InventoryBagWidgetClass;
-
 	UPROPERTY(EditAnywhere, Category = "UI")
 	TSubclassOf<UKnockOutWidget> KnockOutWidgetClass;
 
@@ -311,7 +306,7 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Stamina")
 	bool CanStaminaRecharge;
 
-	UPROPERTY(EditAnywhere,Replicated, BlueprintReadWrite, Category = "Sprint")
+	UPROPERTY(EditAnywhere, ReplicatedUsing = OnRep_SprintChanged, BlueprintReadWrite, Category = "Sprint")
 	bool bIsSprint;
 
 	bool bIsPlayingPanicShake = false;
@@ -321,7 +316,7 @@ public:
 
 	bool bIsBagOpen = false;
 
-	UPROPERTY(EditAnywhere, Replicated, BlueprintReadWrite, Category = "Knocked")
+	UPROPERTY(ReplicatedUsing = OnRep_IsKnockedDown, BlueprintReadOnly)
 	bool bIsKnockedDown = false;
 
 	UPROPERTY(VisibleDefaultsOnly, BlueprintReadOnly, Category = "Hold Item")
@@ -338,9 +333,6 @@ public:
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Grab")
 	float MaxGrabDistance = 500.0f;
-
-	UPROPERTY(EditInstanceOnly, Replicated, BlueprintReadWrite, Category = "Heath", meta = (EditCondition = "Health >= 100"))
-	float Health = 100;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Stamina")
 	float DelayForStaminaRecharge;
@@ -372,6 +364,17 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Knocked")
 	float AmountKnockedDownProgress = 0.05f;
 
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Knockdown")
+	float KnockDownDuration = 3.0f;
+
+	/** Max walk speed when not sprinting */
+	UPROPERTY(EditDefaultsOnly, Category = "Movement")
+	float WalkSpeed = 200.f;
+
+	/** Max walk speed when full stamina sprinting */
+	UPROPERTY(EditDefaultsOnly, Category = "Movement")
+	float MaxSprintSpeed = 600.f;
+
 	//------------------------------------------------INT--------------------------------------------------------//
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Grab")
 	int32 InteractLineTraceLength = 500;
@@ -381,15 +384,15 @@ public:
 	UPROPERTY(EditDefaultsOnly, Category = "Inventory")
 	int32 MainInventoryCapacity = 3;
 
-	UPROPERTY(EditDefaultsOnly, Category = "Inventory")
-	int32 BagCapacity = 10;
-
 	UPROPERTY(BlueprintReadOnly, Category = "Inventory")
 	int32 EquippedIndex = INDEX_NONE;
 
 	//------------------------------------------------ANIMATION--------------------------------------------------------//
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Animation")
 	UAnimMontage* DeathMontage;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Knockdown")
+	UAnimMontage* KnockDownMontage;
 
 private:
 	//-----------------------------------------------------------------------------//
@@ -432,11 +435,7 @@ private:
 	//-----------------------------------------------------------------------------//
 	// INVENTORY
 	//-----------------------------------------------------------------------------//
-	void ToggleInventoryBag();
-	void HideInventoryBag();
-	void ShowInventoryBag();
 
-	bool TryStackIntoExisting(TArray<AActor*>& Container, AItem* NewItem);
 	int32 CountValidSlots(const TArray<AActor*>& Container) const;
 	void HandlePickup(AItem* NewItem, TArray<AActor*>& Container, UUserWidget* InventoryUI, bool bCanGrow);
 	void RefreshUI(UUserWidget* InventoryUI, const TArray<AActor*>& Container);
@@ -448,6 +447,24 @@ private:
 	void ToggleCrouch();
 	void Sprint();
 	void UnSprint();
+	float CalculateSprintSpeed() const;
+	/** Called on clients when bIsSprint is updated */
+	UFUNCTION()
+	void OnRep_SprintChanged();
+
+	/** Apply MaxWalkSpeed based on sprint state and stamina */
+	void UpdateSprintSpeed();
+
+	/** Server RPCs to start/stop sprint */
+	UFUNCTION(Server, Reliable, WithValidation)
+	void Server_StartSprint();
+	bool Server_StartSprint_Validate() { return true; }
+	void Server_StartSprint_Implementation();
+
+	UFUNCTION(Server, Reliable, WithValidation)
+	void Server_StopSprint();
+	bool Server_StopSprint_Validate() { return true; }
+	void Server_StopSprint_Implementation();
 	void HandleStaminaSprint(float DeltaTime);
 	void EnableStaminaGain();
 	void DepletedAllStamina();
@@ -503,7 +520,15 @@ private:
 
 	IInteract* CurrentInteract = nullptr;
 
+	FTimerHandle KnockDownTimerHandle;
+	FTimerHandle JumpscareTimerHandle;
+
+	UPROPERTY()
+	AActor* OriginalViewTarget;
+
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
+
+	void OnJumpscareCameraComplete();
 
 	UFUNCTION()
 	void OnRep_Inventory();

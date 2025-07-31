@@ -1,7 +1,7 @@
 ﻿#include "LightSwitchActor.h"
 #include "HorrorGame/Character/HorrorGameCharacter.h"
 #include "Components/StaticMeshComponent.h"
-#include "Components/PointLightComponent.h"
+#include "Components/SpotLightComponent.h"
 #include "Kismet/GameplayStatics.h"
 #include "Net/UnrealNetwork.h"
 
@@ -9,15 +9,7 @@ ALightSwitchActor::ALightSwitchActor()
 {
     PrimaryActorTick.bCanEverTick = true;
 
-    SetReplicates(true);
-    SetReplicateMovement(true);
-
-    LightMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("LightMesh"));
-    RootComponent = LightMesh;
-
-    PointLight = CreateDefaultSubobject<UPointLightComponent>(TEXT("PointLight"));
-    PointLight->SetupAttachment(LightMesh);
-    PointLight->SetVisibility(false);
+	SpotLight->SetVisibility(false);
 
     SwitchMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("SwitchMesh"));
     SwitchMesh->SetupAttachment(LightMesh);
@@ -25,7 +17,6 @@ ALightSwitchActor::ALightSwitchActor()
 
 void ALightSwitchActor::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
 {
-    Super::GetLifetimeReplicatedProps(OutLifetimeProps);
     DOREPLIFETIME(ALightSwitchActor, bIsOn);
 }
 
@@ -45,7 +36,7 @@ void ALightSwitchActor::MulticastToggleLightSwitch_Implementation()
 
 void ALightSwitchActor::OnRep_IsOn()
 {
-    PointLight->SetVisibility(bIsOn);
+    SpotLight->SetVisibility(bIsOn);
     SwitchMesh->SetRelativeRotation(bIsOn
         ? FRotator(-10.f, 0, 0)
         : FRotator::ZeroRotator);
@@ -54,7 +45,7 @@ void ALightSwitchActor::OnRep_IsOn()
 void ALightSwitchActor::DoToggle()
 {
     const bool bNew = !bIsOn;
-    PointLight->SetVisibility(bNew);
+    SpotLight->SetVisibility(bNew);
 
     UGameplayStatics::PlaySoundAtLocation(
         this,

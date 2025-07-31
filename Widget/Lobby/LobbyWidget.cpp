@@ -1,96 +1,107 @@
-﻿#include "LobbyWidget.h"
-#include "LobbySlotWidget.h"
-#include "LobbyFriendListPopup.h"
-#include "Components/PanelWidget.h"
+#include "LobbyWidget.h"
+#include "Components/VerticalBox.h"
 #include "Components/Button.h"
-#include "OnlineSessionSettings.h"
+#include "LobbyPlayerSlot.h"
 #include "OnlineSubsystem.h"
-#include "OnlineSubsystemUtils.h"
+#include "Interfaces/OnlineExternalUIInterface.h"
+#include "OnlineSessionSettings.h"
 #include "Kismet/GameplayStatics.h"
 
 void ULobbyWidget::NativeConstruct()
 {
     Super::NativeConstruct();
 
-    IOnlineSubsystem* OSS = IOnlineSubsystem::Get(TEXT("Steam"));
-    SessionInterface = OSS ? OSS->GetSessionInterface() : nullptr;
-    FriendsInterface = OSS ? OSS->GetFriendsInterface() : nullptr;
-    IdentityInterface = OSS ? OSS->GetIdentityInterface() : nullptr;
+    // Initialize session interface
+    InitializeSessionInterface();
 
-    if (Button_StartGame)
+    // Bind button clicks
+    if (StartGameButton)
     {
-        Button_StartGame->OnClicked.AddDynamic(this, &ULobbyWidget::OnStartClicked);
-        // Only host sees
-        FNamedOnlineSession* Named = SessionInterface ? SessionInterface->GetNamedSession(NAME_GameSession) : nullptr;
-        Button_StartGame->SetVisibility(Named ? ESlateVisibility::Visible : ESlateVisibility::Collapsed);
+        StartGameButton->OnClicked.AddDynamic(this, &ULobbyWidget::OnStartGameClicked);
     }
 
-    PopulateSlots();
+    if (InviteFriendsButton)
+    {
+        InviteFriendsButton->OnClicked.AddDynamic(this, &ULobbyWidget::OnInviteFriendsClicked);
+    }
+
+    if (LeaveButton)
+    {
+        LeaveButton->OnClicked.AddDynamic(this, &ULobbyWidget::OnLeaveClicked);
+    }
+
+    // Initialize player slots
+    if (PlayerSlotsContainer && PlayerSlotClass)
+    {
+        ULobbyPlayerSlot* PlayerSlotWidgetPtr = nullptr;
+        for (int32 i = 0; i < 4; i++)
+        {
+            PlayerSlotWidgetPtr = CreateWidget<ULobbyPlayerSlot>(this, PlayerSlotClass);
+            if (PlayerSlotWidgetPtr)
+            {
+                PlayerSlotsContainer->AddChild(PlayerSlotWidgetPtr);
+                PlayerSlots.Add(PlayerSlotWidgetPtr);
+                PlayerSlotWidgetPtr->SetEmpty();
+            }
+        }
+    }
 }
 
-void ULobbyWidget::PopulateSlots()
+void ULobbyWidget::InitializeSessionInterface()
 {
-    int32 MaxPlayers = 4;
+    IOnlineSubsystem* OnlineSubsystem = IOnlineSubsystem::Get(TEXT("Steam"));
+    if (OnlineSubsystem)
+    {
+        SessionInterface = OnlineSubsystem->GetSessionInterface();
+    }
+}
+
+void ULobbyWidget::OnStartGameClicked()
+{
     if (SessionInterface.IsValid())
     {
-        FNamedOnlineSession* Named = SessionInterface->GetNamedSession(NAME_GameSession);
-        MaxPlayers = Named ? Named->SessionSettings.NumPublicConnections : MaxPlayers;
+        // Start the game only if we're the host
+        if (SessionInterface->GetNamedSession(NAME_GameSession))
+        {
+            UGameplayStatics::OpenLevel(this, TEXT("L_horrorGame"), true, TEXT("listen"));
+        }
     }
-    SlotDatas.SetNum(MaxPlayers);
-    SlotWidgets.SetNum(MaxPlayers);
+}
 
-    FLobbySlotData& Local = SlotDatas[0];
-    Local.bOccupied = true;
-    if (IdentityInterface.IsValid())
+void ULobbyWidget::OnInviteFriendsClicked()
+{
+    IOnlineSubsystem* OnlineSubsystem = IOnlineSubsystem::Get(TEXT("Steam"));
+    if (OnlineSubsystem)
     {
-        auto Id = IdentityInterface->GetUniquePlayerId(0);
-        Local.PlayerId = FUniqueNetIdRepl(Id.ToSharedRef());
-        Local.DisplayName = IdentityInterface->GetPlayerNickname(0);
+        IOnlineExternalUIPtr ExternalUI = OnlineSubsystem->GetExternalUIInterface();
+        if (ExternalUI.IsValid())
+        {
+            ExternalUI->ShowFriendsUI(0);
+        }
     }
-    else Local.DisplayName = TEXT("Player");
+}
 
-    SlotsContainer->ClearChildren();
-    for (int32 i = 0; i < SlotDatas.Num(); ++i)
+void ULobbyWidget::OnLeaveClicked()
+{
+    if (SessionInterface.IsValid())
     {
-        FLobbySlotData& D = SlotDatas[i];
-        ULobbySlotWidget* W = CreateWidget<ULobbySlotWidget>(GetWorld(), LobbySlotWidgetClass);
-        W->InitializeSlot(i, D.bOccupied, D.DisplayName, D.PlayerId);
-        W->OnInviteClicked.AddDynamic(this, &ULobbyWidget::HandleSlotInviteClicked);
-        SlotWidgets[i] = W;
-        SlotsContainer->AddChild(W);
+        SessionInterface->DestroySession(NAME_GameSession);
+        UGameplayStatics::OpenLevel(this, TEXT("MainMenu"), true);
     }
 }
 
-void ULobbyWidget::OnStartClicked()
+void ULobbyWidget::UpdatePlayerSlots(const TArray<FUniqueNetIdRepl>& PlayerIds)
 {
-    if (!SessionInterface.IsValid()) return;
-    SessionInterface->StartSession(NAME_GameSession);
-    UGameplayStatics::OpenLevel(this, TEXT("GameplayMap"), true);
-}
-
-void ULobbyWidget::HandleSlotInviteClicked(int32 SlotIndex)
-{
-    if (CurrentPopup) CurrentPopup->RemoveFromParent();
-    CurrentPopup = CreateWidget<ULobbyFriendListPopup>(GetWorld(), LobbyFriendListPopupClass);
-    CurrentPopup->InitializePopup(this, SlotIndex);
-    CurrentPopup->AddToViewport();
-}
-
-void ULobbyWidget::InviteFriendToSlot(const FUniqueNetIdRepl& FriendId, int32 SlotIndex)
-{
-    if (!SessionInterface.IsValid() || !SlotDatas.IsValidIndex(SlotIndex)) return;
-    SessionInterface->SendSessionInviteToFriend(0, NAME_GameSession, *FriendId);
-    FLobbySlotData& D = SlotDatas[SlotIndex];
-    D.bOccupied = true;
-    D.PlayerId = FriendId;
-    D.DisplayName = TEXT("Invited");
-    UpdateSlot(SlotIndex);
-    if (CurrentPopup) CurrentPopup->RemoveFromParent();
-}
-
-void ULobbyWidget::UpdateSlot(int32 SlotIndex)
-{
-    if (!SlotWidgets.IsValidIndex(SlotIndex)) return;
-    FLobbySlotData& D = SlotDatas[SlotIndex];
-    SlotWidgets[SlotIndex]->InitializeSlot(SlotIndex, D.bOccupied, D.DisplayName, D.PlayerId);
+    for (int32 i = 0; i < PlayerSlots.Num(); i++)
+    {
+        if (i < PlayerIds.Num())
+        {
+            bool bIsHost = (i == 0); // First player is always the host
+            PlayerSlots[i]->SetPlayerInfo(PlayerIds[i]->ToString(), bIsHost);
+        }
+        else
+        {
+            PlayerSlots[i]->SetEmpty();
+        }
+    }
 }
