@@ -286,6 +286,9 @@ public:
 
 	UPROPERTY(EditDefaultsOnly, Category = "UI")
 	TSubclassOf<UUserWidget> NoteWidgetClass;
+
+	UPROPERTY(EditInstanceOnly, BlueprintReadWrite, Category = "Component | Sprint", meta = (AllowPrivateAccess))
+	class USprintComponent* SprintComponent;
 	//------------------------------------------------BOOLEAN--------------------------------------------------------//
 
 	UPROPERTY(EditAnywhere, Replicated,BlueprintReadOnly, Category = "Flashlight")
@@ -302,12 +305,6 @@ public:
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Toggle Object 3")
 	bool bIsToggleObject3;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Stamina")
-	bool CanStaminaRecharge;
-
-	UPROPERTY(EditAnywhere, ReplicatedUsing = OnRep_SprintChanged, BlueprintReadWrite, Category = "Sprint")
-	bool bIsSprint;
 
 	bool bIsPlayingPanicShake = false;
 
@@ -334,24 +331,6 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Grab")
 	float MaxGrabDistance = 500.0f;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Stamina")
-	float DelayForStaminaRecharge;
-
-	UPROPERTY(EditAnywhere,Replicated, BlueprintReadWrite, Category = "Stamina")
-	float CurrentStamina;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Stamina")
-	float MaxStamina;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Stamina")
-	float StaminaSpringUsageRate;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Stamina")
-	float StaminaRechargeRate;
-
-	UPROPERTY(EditDefaultsOnly, Category = "HeadBob")
-	float SprintSpeedThreshold = 300.f;
-
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Sanity")
 	float Sanity = 0.f;
 
@@ -366,14 +345,6 @@ public:
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Knockdown")
 	float KnockDownDuration = 3.0f;
-
-	/** Max walk speed when not sprinting */
-	UPROPERTY(EditDefaultsOnly, Category = "Movement")
-	float WalkSpeed = 200.f;
-
-	/** Max walk speed when full stamina sprinting */
-	UPROPERTY(EditDefaultsOnly, Category = "Movement")
-	float MaxSprintSpeed = 600.f;
 
 	//------------------------------------------------INT--------------------------------------------------------//
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Grab")
@@ -445,30 +416,9 @@ private:
 	// CROUCH, SPRINT & STAMINA
 	//-----------------------------------------------------------------------------//
 	void ToggleCrouch();
-	void Sprint();
-	void UnSprint();
-	float CalculateSprintSpeed() const;
-	/** Called on clients when bIsSprint is updated */
-	UFUNCTION()
-	void OnRep_SprintChanged();
 
-	/** Apply MaxWalkSpeed based on sprint state and stamina */
-	void UpdateSprintSpeed();
-
-	/** Server RPCs to start/stop sprint */
-	UFUNCTION(Server, Reliable, WithValidation)
-	void Server_StartSprint();
-	bool Server_StartSprint_Validate() { return true; }
-	void Server_StartSprint_Implementation();
-
-	UFUNCTION(Server, Reliable, WithValidation)
-	void Server_StopSprint();
-	bool Server_StopSprint_Validate() { return true; }
-	void Server_StopSprint_Implementation();
-	void HandleStaminaSprint(float DeltaTime);
-	void EnableStaminaGain();
-	void DepletedAllStamina();
-
+	void StartSprint();
+	void StopSprint();
 	//-----------------------------------------------------------------------------//
 	// SANITY & HEADBOB
 	//-----------------------------------------------------------------------------//
@@ -494,8 +444,6 @@ private:
 	//-----------------------------------------------------------------------------//
 	// PROPERTIES
 	//-----------------------------------------------------------------------------//
-
-	FTimerHandle StaminaRechargeTimerHandle;
 
 	UPROPERTY()
 	class UMenuSettingWidget* MenuSettingWidget;

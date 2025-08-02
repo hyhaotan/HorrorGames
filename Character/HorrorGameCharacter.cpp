@@ -22,6 +22,7 @@
 #include "HorrorGame/Actor/Door/LockedDoorActor.h"
 #include "HorrorGame/Actor/Door/HospitalDoorActor.h"
 #include "HorrorGame/AI/NPC.h"
+#include "HorrorGame/Actor/Component/SprintComponent.h"
 
 // Engine
 #include "Engine/LocalPlayer.h"
@@ -106,16 +107,6 @@ AHorrorGameCharacter::AHorrorGameCharacter()
     bIsFlashlightEnabled = false;
     isGrabbingObject = false;
 
-    // Stamina
-    CurrentStamina = MaxStamina = 1.f;
-    StaminaSpringUsageRate = 0.1f;
-    StaminaRechargeRate = 0.1f;
-    CanStaminaRecharge = true;
-    DelayForStaminaRecharge = 2.f;
-
-    WalkSpeed = 200.f;
-    MaxSprintSpeed = 600.f;
-
     // Crouch state
     bIsCrouched = false;
 
@@ -134,6 +125,13 @@ AHorrorGameCharacter::AHorrorGameCharacter()
     PPComponent->BlendWeight = 0.f;
 
     AnimMontages.Add(EPlayerState::PS_Death, DeathMontage);
+
+	SprintComponent = CreateDefaultSubobject<USprintComponent>(TEXT("SprintComponent"));
+
+    GetCharacterMovement()->NetworkSimulatedSmoothLocationTime = 0.100f;
+    GetCharacterMovement()->NetworkSimulatedSmoothRotationTime = 0.050f;
+    GetCharacterMovement()->ListenServerNetworkSimulatedSmoothLocationTime = 0.040f;
+    GetCharacterMovement()->ListenServerNetworkSimulatedSmoothRotationTime = 0.033f;
 }
 
 void AHorrorGameCharacter::BeginPlay()
@@ -154,10 +152,7 @@ void AHorrorGameCharacter::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
 	Ticks(DeltaTime);
-
-	HandleStaminaSprint(DeltaTime);
     InitializeHeadbob();
-
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -202,8 +197,8 @@ void AHorrorGameCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInpu
         EnhancedInputComponent->BindAction(ZoomObjectAction, ETriggerEvent::Triggered, this, &AHorrorGameCharacter::HandleZoom);
 
         //Sprint
-        EnhancedInputComponent->BindAction(SprintAction, ETriggerEvent::Triggered, this, &AHorrorGameCharacter::Sprint);
-        EnhancedInputComponent->BindAction(SprintAction, ETriggerEvent::Completed, this, &AHorrorGameCharacter::UnSprint);
+        EnhancedInputComponent->BindAction(SprintAction, ETriggerEvent::Triggered, this, &AHorrorGameCharacter::StartSprint);
+        EnhancedInputComponent->BindAction(SprintAction, ETriggerEvent::Completed, this, &AHorrorGameCharacter::StopSprint);
 
         //Crouch
         EnhancedInputComponent->BindAction(CrouchAction, ETriggerEvent::Completed, this, &AHorrorGameCharacter::ToggleCrouch);
@@ -392,7 +387,7 @@ void AHorrorGameCharacter::InitializeHeadbob()
 
     if (Speed > 0.f && CanJump())
     {
-        if (Speed < SprintSpeedThreshold)
+        if (Speed < SprintComponent->SprintSpeedThreshold)
         {
             PC->ClientStartCameraShake(WalkCameraShakeClass, 1.0f);
         }
@@ -1038,122 +1033,6 @@ void AHorrorGameCharacter::Ticks(float DeltaTime)
 
 }
 
-void AHorrorGameCharacter::HandleStaminaSprint(float DeltaTime)
-{
-    // Nếu đang crouch thì không tiêu hao stamina ngay cả khi bIsSprint == true
-    if (bIsCrouched)
-    {
-        return;
-    }
-
-    if (bIsSprint)
-    {
-        // Tiêu hao stamina theo thời gian chạy
-        CurrentStamina = FMath::Clamp(CurrentStamina - (StaminaSpringUsageRate * DeltaTime), 0, MaxStamina);
-
-        if (CurrentStamina <= 0)
-        {
-            DepletedAllStamina();
-        }
-    }
-    else
-    {
-        // Hồi phục stamina khi không chạy
-        if (CurrentStamina < MaxStamina)
-        {
-            if (CanStaminaRecharge)
-            {
-                CurrentStamina = FMath::Clamp(CurrentStamina + (StaminaRechargeRate * DeltaTime), 0, MaxStamina);
-            }
-        }
-    }
-}
-
-void AHorrorGameCharacter::DepletedAllStamina()
-{
-    UnSprint();
-}
-
-void AHorrorGameCharacter::OnRep_SprintChanged()
-{
-    UpdateSprintSpeed();
-}
-
-void AHorrorGameCharacter::UpdateSprintSpeed()
-{
-    float DesiredSpeed = bIsSprint ? CalculateSprintSpeed() : WalkSpeed;
-    GetCharacterMovement()->MaxWalkSpeed = DesiredSpeed;
-}
-
-float AHorrorGameCharacter::CalculateSprintSpeed() const
-{
-    if (CurrentStamina >= 0.4f)
-    {
-        return MaxSprintSpeed;
-    }
-    return FMath::Lerp(WalkSpeed, MaxSprintSpeed, CurrentStamina / 0.4f);
-}
-
-void AHorrorGameCharacter::EnableStaminaGain()
-{
-    CanStaminaRecharge = true;
-}
-
-void AHorrorGameCharacter::Server_StartSprint_Implementation()
-{
-    if (bIsKnockedDown || bIsCrouched || GetVelocity().IsNearlyZero())
-    {
-        return;
-    }
-
-    bIsSprint = true;
-    UpdateSprintSpeed();
-
-    CanStaminaRecharge = false;
-    GetWorld()->GetTimerManager().ClearTimer(StaminaRechargeTimerHandle);
-}
-
-void AHorrorGameCharacter::Server_StopSprint_Implementation()
-{
-    if (!bIsSprint) return;
-
-    bIsSprint = false;
-    UpdateSprintSpeed();
-
-    // Start timer to enable stamina recharge
-    GetWorld()->GetTimerManager().SetTimer(
-        StaminaRechargeTimerHandle,
-        this,
-        &AHorrorGameCharacter::EnableStaminaGain,
-        DelayForStaminaRecharge,
-        false
-    );
-}
-
-void AHorrorGameCharacter::Sprint()
-{
-    if (HasAuthority())
-    {
-        Server_StartSprint();
-    }
-    else
-    {
-        Server_StartSprint();
-    }
-}
-
-void AHorrorGameCharacter::UnSprint()
-{
-    if (HasAuthority())
-    {
-        Server_StopSprint();
-    }
-    else
-    {
-        Server_StopSprint();
-    }
-}
-
 void AHorrorGameCharacter::ToggleCrouch()
 {
     if (bIsKnockedDown) return;
@@ -1168,6 +1047,16 @@ void AHorrorGameCharacter::ToggleCrouch()
 		Crouch();
         bIsCrouched = true;
 	}
+}
+
+void AHorrorGameCharacter::StartSprint()
+{
+    SprintComponent->Sprint();
+}
+
+void AHorrorGameCharacter::StopSprint()
+{
+    SprintComponent->UnSprint();
 }
 
 void AHorrorGameCharacter::ClientStartJumpScare_Implementation(ANPC* JumpscareNPC, float BlendTime, float Duration)
@@ -1503,8 +1392,6 @@ void AHorrorGameCharacter::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>&
 	DOREPLIFETIME(AHorrorGameCharacter, Inventory);
 	DOREPLIFETIME(AHorrorGameCharacter, EquippedActor);
 	DOREPLIFETIME(AHorrorGameCharacter, EquippedItem);
-	DOREPLIFETIME(AHorrorGameCharacter, CurrentStamina);
-	DOREPLIFETIME(AHorrorGameCharacter, bIsSprint);
 	DOREPLIFETIME(AHorrorGameCharacter, bIsFlashlightEnabled);
 	DOREPLIFETIME(AHorrorGameCharacter, bIsKnockedDown);
 }
