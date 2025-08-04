@@ -2,8 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/Actor.h"
-#include "HorrorGame/Actor/InteractableActor.h"
-#include "HorrorGame/Interface/Interact.h"
+#include "HorrorGame/Actor/Door/DoorRootActor.h"
 #include "HospitalDoorActor.generated.h"
 
 class UStaticMeshComponent;
@@ -13,7 +12,7 @@ class AHorrorGameCharacter;
 class ULevelSequence;
 
 UCLASS()
-class HORRORGAME_API AHospitalDoorActor : public AInteractableActor, public IInteract
+class HORRORGAME_API AHospitalDoorActor : public ADoorRootActor
 {
     GENERATED_BODY()
 
@@ -22,11 +21,6 @@ public:
 
     virtual void Tick(float DeltaTime) override;
     virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
-
-    UFUNCTION(Server, Reliable, WithValidation)
-    void ServerInteract(AHorrorGameCharacter* Player);
-    bool ServerInteract_Validate(AHorrorGameCharacter* Player) { return true; }
-    void ServerInteract_Implementation(AHorrorGameCharacter* Player);
 
 protected:
     virtual void BeginPlay() override;
@@ -44,10 +38,6 @@ protected:
     UFUNCTION()
     void OnRep_IsLocked();
 
-    /** RepNotify for open sequence trigger */
-    UFUNCTION()
-    void OnRep_HasOpened();
-
     /** Curve for open animation */
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Timeline", meta = (AllowPrivateAccess = "true"))
     UCurveFloat* OpenCloseCurve;
@@ -57,7 +47,6 @@ protected:
     ULevelSequence* UnlockDoorSequence;
 
 private:
-    virtual void Interact(AHorrorGameCharacter* Player) override;
 
     /** Left and right door meshes */
     UPROPERTY(EditAnywhere, Category = "Door", meta = (AllowPrivateAccess = "true"))
@@ -82,13 +71,14 @@ private:
     UPROPERTY(ReplicatedUsing = OnRep_IsOpen)
     bool bIsOpen;
 
+    bool bHasOpened;
+
     UPROPERTY(ReplicatedUsing = OnRep_IsLocked)
     bool bIsLocked;
-
-    UPROPERTY(ReplicatedUsing = OnRep_HasOpened)
-    bool bHasOpened;
 
     /** RepNotify for visual opening (optional) */
     UFUNCTION()
     void OnRep_IsOpen();
+
+    virtual bool CanOpenDoor_Implementation(AHorrorGameCharacter* Player) override;
 };

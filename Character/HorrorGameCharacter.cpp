@@ -1342,20 +1342,30 @@ void AHorrorGameCharacter::ServerInteract_Implementation(AInteractableActor* Tar
 {
     if (!Target) return;
 
+    // Handle light switches
     if (auto Switch = Cast<ALightSwitchActor>(Target))
     {
         Switch->MulticastToggleLightSwitch();
     }
 
-    if (auto Door = Cast<ALockedDoorActor>(Target))
+    // Handle all door types using the base DoorRootActor
+    if (auto Door = Cast<ADoorRootActor>(Target))
     {
-        Door->ServerInteract(this);
+        Door->ServerDoorInteract(this);
     }
-    
+
+    // Legacy specific door handling (can be removed if using DoorRootActor base)
+    /*
+    if (auto LockedDoor = Cast<ALockedDoorActor>(Target))
+    {
+        LockedDoor->ServerInteract(this);
+    }
+
     if (auto HospitalDoor = Cast<AHospitalDoorActor>(Target))
     {
         HospitalDoor->ServerInteract(this);
     }
+     */
 }
 
 bool AHorrorGameCharacter::ServerPickupItem_Validate(AItem* Item)

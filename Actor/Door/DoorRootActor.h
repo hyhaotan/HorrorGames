@@ -1,80 +1,123 @@
-// Fill out your copyright notice in the Description page of Project Settings.
-
-#pragma once
+﻿#pragma once
 
 #include "CoreMinimal.h"
 #include "GameFramework/Actor.h"
 #include "HorrorGame/Interface/Interact.h"
 #include "HorrorGame/Actor/InteractableActor.h"
 #include "Components/TimelineComponent.h"
+#include "Engine/Engine.h"
 #include "DoorRootActor.generated.h"
 
 class UStaticMeshComponent;
 class UCurveFloat;
 class AHorrorGameCharacter;
 
-UCLASS()
+UCLASS(BlueprintType, Blueprintable)
 class HORRORGAME_API ADoorRootActor : public AInteractableActor, public IInteract
 {
     GENERATED_BODY()
-    
-public:    
-    // Sets default values for this actor's properties
+
+public:
     ADoorRootActor();
 
-    /** Server RPC to handle Interact */
+    /** Server RPC to handle door interaction */
     UFUNCTION(Server, Reliable, WithValidation)
-    void ServerInteract(AHorrorGameCharacter* Player);
-    bool ServerInteract_Validate(AHorrorGameCharacter* Player);
-    void ServerInteract_Implementation(AHorrorGameCharacter* Player);
+    void ServerDoorInteract(AHorrorGameCharacter* Player);
+    bool ServerDoorInteract_Validate(AHorrorGameCharacter* Player);
+    void ServerDoorInteract_Implementation(AHorrorGameCharacter* Player);
+
+    /** RepNotify for door state changes */
+    UFUNCTION()
+    void OnRep_DoorStateChanged();
 
 protected:
-    // Called when the game starts or when spawned
     virtual void BeginPlay() override;
-    
-    // Called every frame
     virtual void Tick(float DeltaTime) override;
 
     /** Door pivot (hinge) component */
-    UPROPERTY(EditAnywhere, Category = "Door")
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Door")
     USceneComponent* DoorPivot;
 
     /** Door mesh component */
-    UPROPERTY(EditAnywhere, Category = "Door")
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Door")
     UStaticMeshComponent* DoorMesh;
+
+    /** Door frame component (optional) */
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Door")
+    UStaticMeshComponent* DoorFrame;
 
     /** Timeline for door animation */
     UPROPERTY()
     UTimelineComponent* DoorTimeline;
 
-    /** Curve driving the open animation (0->1) */
+    /** Custom timeline for advanced door behavior */
+    UPROPERTY()
+    FTimeline CustomDoorTimeline;
+
+    /** Curve driving the door animation (0->1) */
     UPROPERTY(EditAnywhere, Category = "Door|Animation")
     UCurveFloat* DoorOpenCurve;
 
-    /** Door angles for closed and open states */
+    /** Door rotation settings */
+    UPROPERTY(EditAnywhere, Category = "Door|Animation")
+    float DoorRotateAngle = 90.0f;
+
+    /** Door rotations for closed and open states */
     UPROPERTY(EditAnywhere, Category = "Door|Animation")
     FRotator ClosedRotation;
 
     UPROPERTY(EditAnywhere, Category = "Door|Animation")
     FRotator OpenRotation;
 
-    /** Handle timeline progress */
+    /** Door states - replicated */
+    UPROPERTY(ReplicatedUsing = OnRep_DoorStateChanged)
+    bool bIsDoorClosed = true;
+
+    UPROPERTY(Replicated)
+    bool bIsAnimating = false;
+
+    UPROPERTY(Replicated)
+    bool bDoorOnSameSide = false;
+
+    /** Current player interacting with door */
+    UPROPERTY()
+    AHorrorGameCharacter* CurrentPlayer = nullptr;
+
+    /** Timeline progress handler */
     UFUNCTION()
     void HandleDoorProgress(float Value);
 
-    /** Play door open animation */
-    virtual void PlayOpenDoorAnim();
+    /** Timeline finished handler */
+    UFUNCTION()
+    void OnDoorAnimationFinished();
 
-    /** Virtual function to check if door can be opened */
+    /** Virtual functions that can be overridden by child classes */
+
+    /** Check if door can be opened/closed */
     UFUNCTION(BlueprintNativeEvent, Category = "Door")
     bool CanOpenDoor(AHorrorGameCharacter* Player);
     virtual bool CanOpenDoor_Implementation(AHorrorGameCharacter* Player);
 
-    /** Door opened state */
-    UPROPERTY(Replicated)
-    bool bHasOpened;  // true when door open animation has played
+    /** Called when door interaction occurs - override this for custom behavior */
+    UFUNCTION(BlueprintNativeEvent, Category = "Door")
+    void OnDoorInteraction(AHorrorGameCharacter* Player);
+    virtual void OnDoorInteraction_Implementation(AHorrorGameCharacter* Player);
 
-    virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const;
+    /** Play door animation - can be overridden */
+    UFUNCTION(BlueprintNativeEvent, Category = "Door")
+    void PlayDoorAnimation();
+    virtual void PlayDoorAnimation_Implementation();
+
+    /** Set door side based on player position */
+    virtual void SetDoorSameSide();
+
+    /** Calculate door rotation based on side and animation value */
+    virtual FRotator CalculateDoorRotation(float AnimationValue);
+
+    /** Setup timeline bindings */
+    virtual void SetupTimeline();
+
+    virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 
 private:
     /** Interact interface implementation */

@@ -5,16 +5,11 @@
 #include "GameFramework/CharacterMovementComponent.h"
 #include "TimerManager.h"
 #include "Kismet/GameplayStatics.h"
+#include "Net/UnrealNetwork.h"
 
 ALockerActor::ALockerActor()
 {
     PrimaryActorTick.bCanEverTick = true;
-
-    // Base mesh initialized in parent
-
-    // Pivot as hinge
-    DoorPivot = CreateDefaultSubobject<USceneComponent>(TEXT("DoorPivot"));
-    DoorPivot->SetupAttachment(Mesh);
 
     // Door mesh: attach to pivot
     LockerDoorMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("LockerDoorMesh"));
@@ -33,11 +28,6 @@ ALockerActor::ALockerActor()
     // Door rotations
     DoorClosedRotation = FRotator::ZeroRotator;
     DoorOpenRotation = FRotator(0.f, 90.f, 0.f);
-
-    // Timeline
-    DoorTimeline = CreateDefaultSubobject<UTimelineComponent>(TEXT("DoorTimeline"));
-    static ConstructorHelpers::FObjectFinder<UCurveFloat> CurveObj(TEXT("/Game/Curves/DoorOpenCurve"));
-    if (CurveObj.Succeeded()) DoorOpenCurve = CurveObj.Object;
 
     // Audio Component
     DoorAudioComp = CreateDefaultSubobject<UAudioComponent>(TEXT("DoorAudioComp"));
@@ -72,12 +62,6 @@ void ALockerActor::Tick(float DeltaTime)
 {
     Super::Tick(DeltaTime);
     if (DoorTimeline) DoorTimeline->TickComponent(DeltaTime, ELevelTick::LEVELTICK_TimeOnly, nullptr);
-}
-
-void ALockerActor::HandleDoorProgress(float Value)
-{
-    FRotator NewRot = FMath::Lerp(DoorClosedRotation, DoorOpenRotation, Value);
-    DoorPivot->SetRelativeRotation(NewRot);
 }
 
 void ALockerActor::OnDoorTimelineFinished()
@@ -120,17 +104,35 @@ void ALockerActor::PlayDoorSound(USoundBase* Sound)
     }
 }
 
-void ALockerActor::Interact(AHorrorGameCharacter* Player)
+bool ALockerActor::CanOpenDoor_Implementation(AHorrorGameCharacter* Player)
 {
-    if (!Player || !DoorTimeline) return;
+    if (!Player || !DoorTimeline) return false;
 
     // Set the player for callback
     if (!bPlayerHidden)
     {
         HiddenPlayer = Player;
+        return true;
     }
 
-    // Always play open animation and sound
-    DoorTimeline->PlayFromStart();
-    PlayDoorSound(OpenDoorSound);
+    if (DoorTimeline)
+    {
+        // Always play open animation and sound
+        DoorTimeline->PlayFromStart();
+        PlayDoorSound(OpenDoorSound);
+        return true;
+    }
+
+    return false;
+}
+
+void ALockerActor::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
+{
+    Super::GetLifetimeReplicatedProps(OutLifetimeProps);
+	DOREPLIFETIME(ALockerActor, bPlayerHidden);
+}
+
+void ALockerActor::OnRep_PlayerHidden()
+{
+	LockerDoorMesh->SetVisibility(bPlayerHidden);
 }

@@ -4,12 +4,11 @@
 #include "GameFramework/Actor.h"
 #include "Components/TimelineComponent.h"
 #include "Components/AudioComponent.h"
-#include "HorrorGame/Interface/Interact.h"
-#include "HorrorGame/Actor/InteractableActor.h"
+#include "HorrorGame/Actor/Door/DoorRootActor.h"
 #include "LockerActor.generated.h"
 
 UCLASS()
-class HORRORGAME_API ALockerActor : public AInteractableActor, public IInteract
+class HORRORGAME_API ALockerActor : public ADoorRootActor
 {
     GENERATED_BODY()
 
@@ -20,10 +19,6 @@ protected:
     virtual void BeginPlay() override;
     virtual void Tick(float DeltaTime) override;
 
-    // Pivot for proper hinge behavior
-    UPROPERTY(EditAnywhere, Category = "Locker|Setup")
-    USceneComponent* DoorPivot;
-
     // Door mesh attached to pivot
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Locker")
     UStaticMeshComponent* LockerDoorMesh;
@@ -33,14 +28,6 @@ protected:
     USceneComponent* EntryPoint;
     UPROPERTY(EditAnywhere, Category = "Locker|Setup")
     USceneComponent* ExitPoint;
-
-    // Curve asset driving the door open/close
-    UPROPERTY(EditAnywhere, Category = "Locker|Setup")
-    UCurveFloat* DoorOpenCurve;
-
-    // Timeline for smooth door animation
-    UPROPERTY()
-    UTimelineComponent* DoorTimeline;
 
     // Closed and open rotations
     FRotator DoorClosedRotation;
@@ -57,20 +44,21 @@ protected:
     UPROPERTY(EditAnywhere, Category = "Sound")
     USoundBase* CloseDoorSound;
 
-    // Timeline tick callback
-    UFUNCTION()
-    void HandleDoorProgress(float Value);
+private:
+    virtual bool CanOpenDoor_Implementation(AHorrorGameCharacter* Player) override;
 
-    // Timeline finished callback
+	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
+
     UFUNCTION()
     void OnDoorTimelineFinished();
 
-    // Helper to play sound
     void PlayDoorSound(USoundBase* Sound);
 
-private:
-    virtual void Interact(AHorrorGameCharacter* Player) override;
+    UFUNCTION()
+	void OnRep_PlayerHidden();
 
+    UPROPERTY(ReplicatedUsing = OnRep_PlayerHidden)
     bool bPlayerHidden;
+
     AHorrorGameCharacter* HiddenPlayer;
 };

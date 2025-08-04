@@ -1,81 +1,80 @@
 ﻿#include "Door.h"
-#include "HorrorGame/Widget/Item/ItemWidget.h"
 #include "HorrorGame/Character/HorrorGameCharacter.h"
-
-#include "Components/StaticMeshComponent.h"
-#include "Kismet/GameplayStatics.h"
-#include "Engine/World.h"
-#include "Components/SphereComponent.h"
-#include "Components/WidgetComponent.h"
-#include "Animation/WidgetAnimation.h"
 
 ADoor::ADoor()
 {
-    PrimaryActorTick.bCanEverTick = true;
+    // Set specific default values for this door type
+    DoorRotateAngle = 90.0f;
+    bRequireKey = false;
+    RequiredKeyName = TEXT("DefaultKey");
 
-    // Create components
-    DoorFrame = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("DoorFrame"));
-    SetRootComponent(DoorFrame);
-
-    Mesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("Door"));
-    Mesh->SetupAttachment(DoorFrame);
-
-    // Default values
-    DoorRotateAngle = 90.f;
-    bIsDoorClosed = true;
-    bDoorOnSameSide = false;
-    Players = nullptr;
+    // You can customize the mesh, materials, etc. here
+    // DoorMesh->SetStaticMesh(YourSpecificDoorMesh);
 }
 
-void ADoor::BeginPlay()
+void ADoor::OnDoorInteraction_Implementation(AHorrorGameCharacter* Player)
 {
-    Super::BeginPlay();
+    // Call parent implementation first if needed
+    Super::OnDoorInteraction_Implementation(Player);
 
-    if (CurveFloat)
+    // Add custom flip-flop door behavior here
+    UE_LOG(LogTemp, Log, TEXT("Flip-flop door interaction with player: %s"),
+        Player ? *Player->GetName() : TEXT("Unknown"));
+
+    // Example: Play sound effect, trigger events, etc.
+    // PlayDoorInteractionSound();
+    // TriggerDoorEvents();
+}
+
+bool ADoor::CanOpenDoor_Implementation(AHorrorGameCharacter* Player)
+{
+    if (!Player)
     {
-        FOnTimelineFloat TimelineProgress;
-        TimelineProgress.BindUFunction(this, FName("OpenDoor"));
-        DoorTimeline.AddInterpFloat(CurveFloat, TimelineProgress);
+        UE_LOG(LogTemp, Warning, TEXT("No player for door interaction"));
+        return false;
     }
-}
 
-void ADoor::Tick(float DeltaTime)
-{
-    Super::Tick(DeltaTime);
-    DoorTimeline.TickTimeline(DeltaTime);
-}
-
-void ADoor::Interact(AHorrorGameCharacter* Player)
-{
-    if (!Player) return;
-
-    SetDoorSameSide();
-    if (bIsDoorClosed)
+    if (bIsAnimating)
     {
-        UE_LOG(LogTemp, Warning, TEXT("Door is opening"));
-        DoorTimeline.Play();
-        bIsDoorClosed = false;
+        UE_LOG(LogTemp, Warning, TEXT("Door is currently animating"));
+        return false;
     }
-    else
+
+    // Add key requirement check
+    if (bRequireKey && !RequiredKeyName.IsEmpty())
     {
-        UE_LOG(LogTemp, Warning, TEXT("Door is closing"));
-        DoorTimeline.Reverse();
-        bIsDoorClosed = true;
+        // Check if player has the required key
+        // This is pseudocode - implement based on your inventory system
+        /*
+        if (!Player->HasKey(RequiredKeyName))
+        {
+            UE_LOG(LogTemp, Warning, TEXT("Player doesn't have required key: %s"), *RequiredKeyName);
+            return false;
+        }
+        */
     }
+
+    // For flip-flop doors, always allow interaction if basic conditions are met
+    return true;
 }
 
-void ADoor::OpenDoor(float Value)
+void ADoor::PlayDoorAnimation_Implementation()
 {
-    const float Angle = bDoorOnSameSide ? -DoorRotateAngle : DoorRotateAngle;
-    Mesh->SetRelativeRotation(FRotator(0.f, Angle * Value, 0.f));
+    // Use parent implementation for basic animation
+    Super::PlayDoorAnimation_Implementation();
+
+    // Add any additional visual effects specific to this door
+    // Example: particle effects, additional sounds, etc.
+    UE_LOG(LogTemp, Log, TEXT("Playing custom flip-flop door animation"));
 }
 
-void ADoor::SetDoorSameSide()
+FRotator ADoor::CalculateDoorRotation(float AnimationValue)
 {
-    if (!Players) return;
+    // Use parent implementation as base
+    FRotator BaseRotation = Super::CalculateDoorRotation(AnimationValue);
 
-    FVector DoorToPlayer = Players->GetActorLocation() - GetActorLocation();
-    FVector DoorForward = GetActorForwardVector();
+    // Add any custom rotation modifications if needed
+    // For example, slight wobble, different swing pattern, etc.
 
-    bDoorOnSameSide = FVector::DotProduct(DoorToPlayer, DoorForward) >= 0;
+    return BaseRotation;
 }

@@ -70,17 +70,9 @@ void AHospitalDoorActor::Tick(float DeltaTime)
     }
 }
 
-void AHospitalDoorActor::Interact(AHorrorGameCharacter* Player)
+bool AHospitalDoorActor::CanOpenDoor_Implementation(AHorrorGameCharacter* Player)
 {
-    if (HasAuthority())
-        ServerInteract_Implementation(Player);
-    else
-        ServerInteract(Player);
-}
-
-void AHospitalDoorActor::ServerInteract_Implementation(AHorrorGameCharacter* Player)
-{
-    if (!Player) return;
+    if (!Player) return false;
 
     // Unlock stage
     if (bIsLocked)
@@ -93,13 +85,16 @@ void AHospitalDoorActor::ServerInteract_Implementation(AHorrorGameCharacter* Pla
                 bIsLocked = false;
                 ChainDoorMesh->SetVisibility(false, true);
                 ChainDoorMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
-                return;
+                return true;
             }
         }
         // Show notification
         if (Player->KeyNotificationWidget)
+        {
             Player->KeyNotificationWidget->UpdateKeyNotification(TEXT("Bolt Cutter"));
-        return;
+            return true;
+        }
+        return false;
     }
 
     // Open stage: only once
@@ -109,7 +104,9 @@ void AHospitalDoorActor::ServerInteract_Implementation(AHorrorGameCharacter* Pla
         bHasOpened = true;
         PlayOpenDoorAnim();
         UE_LOG(LogTemp, Warning, TEXT("The Door is opening!"));
+        return true;
     }
+    return true;
 }
 
 void AHospitalDoorActor::UnlockDoor(AHorrorGameCharacter* Player)
@@ -149,12 +146,6 @@ void AHospitalDoorActor::OnRep_IsLocked()
 {
     ChainDoorMesh->SetVisibility(bIsLocked, true);
     ChainDoorMesh->SetCollisionEnabled(bIsLocked ? ECollisionEnabled::QueryAndPhysics : ECollisionEnabled::NoCollision);
-}
-
-void AHospitalDoorActor::OnRep_HasOpened()
-{
-    if (bHasOpened)
-        PlayOpenDoorAnim();
 }
 
 void AHospitalDoorActor::PlayOpenDoorAnim()

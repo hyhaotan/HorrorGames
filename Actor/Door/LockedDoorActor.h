@@ -6,6 +6,7 @@
 
 class UStaticMeshComponent;
 class AHorrorGameCharacter;
+class AKeys;
 
 UCLASS()
 class HORRORGAME_API ALockedDoorActor : public ADoorRootActor
@@ -17,29 +18,44 @@ public:
 
 protected:
     virtual void BeginPlay() override;
-    virtual void Tick(float DeltaTime) override;
 
-    /** Mesh hiển thị ổ khóa */
-    UPROPERTY(EditAnywhere, Category = "Door")
+    /** Lock mesh component */
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Door|Lock")
     UStaticMeshComponent* LockMesh;
 
-    /** ID chìa cần thiết để mở cửa */
-    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Door")
+    /** Required key ID to unlock this door */
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Door|Lock")
     FName RequiredKeyID;
 
-    /** Trạng thái khóa / mở */
-    UPROPERTY(ReplicatedUsing = OnRep_IsLocked)
-    bool bIsLocked;
+    /** Is door currently locked */
+    UPROPERTY(ReplicatedUsing = OnRep_IsLocked, BlueprintReadOnly, Category = "Door|Lock")
+    bool bIsLocked = true;
 
-    /** OnRep callback cho trạng thái khóa */
+    /** Success message when door is unlocked */
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Door|Lock")
+    FString UnlockSuccessMessage = TEXT("Mở khóa thành công!");
+
+    /** RepNotify for lock state */
     UFUNCTION()
     void OnRep_IsLocked();
 
-    /** Unlock door (gỡ khóa, xóa chìa, show thành công) */
+    /** Unlock door logic */
+    UFUNCTION(BlueprintCallable, Category = "Door|Lock")
     void UnlockDoor(AHorrorGameCharacter* Player);
 
-    /** Kiểm tra điều kiện mở cửa riêng cho LockedDoorActor */
+    /** Show key notification to player */
+    UFUNCTION(BlueprintCallable, Category = "Door|Lock")
+    void ShowKeyNotification(AHorrorGameCharacter* Player, const FString& Message);
+
+    /** Override door opening conditions for locked door */
     virtual bool CanOpenDoor_Implementation(AHorrorGameCharacter* Player) override;
+
+    /** Override interaction behavior for locked door */
+    virtual void OnDoorInteraction_Implementation(AHorrorGameCharacter* Player) override;
+
+    /** Check if player has the required key */
+    UFUNCTION(BlueprintCallable, Category = "Door|Lock")
+    bool PlayerHasRequiredKey(AHorrorGameCharacter* Player, AKeys*& OutKey);
 
     virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 };
