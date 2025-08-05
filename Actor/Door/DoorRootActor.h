@@ -38,6 +38,9 @@ protected:
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Door")
     USceneComponent* DoorPivot;
 
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Door")
+    class USceneComponent* DoorMeshPivot;
+
     /** Door mesh component */
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Door")
     UStaticMeshComponent* DoorMesh;
@@ -78,6 +81,9 @@ protected:
 
     UPROPERTY(Replicated)
     bool bDoorOnSameSide = false;
+
+    UPROPERTY(Replicated)
+    bool bDoorDirectionSet = false;
 
     /** Current player interacting with door */
     UPROPERTY()
@@ -122,4 +128,10 @@ protected:
 private:
     /** Interact interface implementation */
     virtual void Interact(AHorrorGameCharacter* Player) override;
+
+    UFUNCTION(BlueprintCallable, Category = "Door")
+    void SetDoorPivotPosition(FVector PivotOffsets);
+
+    UFUNCTION(BlueprintCallable, Category = "Door")
+    void AutoSetHingePivot(bool bLeftHinge = true);
 };

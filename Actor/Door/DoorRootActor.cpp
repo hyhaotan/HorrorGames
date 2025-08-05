@@ -11,17 +11,25 @@ ADoorRootActor::ADoorRootActor()
     PrimaryActorTick.bCanEverTick = true;
     bReplicates = true;
 
-    // Create door pivot (hinge point)
+    // Create root component (không xoay)
     DoorPivot = CreateDefaultSubobject<USceneComponent>(TEXT("DoorPivot"));
     RootComponent = DoorPivot;
 
-    // Create door mesh
-    DoorMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("DoorMesh"));
-    DoorMesh->SetupAttachment(DoorPivot);
-
-    // Create optional door frame
+    // Create door frame (attach trực tiếp vào root, không bị xoay)
     DoorFrame = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("DoorFrame"));
     DoorFrame->SetupAttachment(RootComponent);
+
+    // Create door mesh pivot (đây mới là điểm xoay cho door mesh)
+    DoorMeshPivot = CreateDefaultSubobject<USceneComponent>(TEXT("DoorMeshPivot"));
+    DoorMeshPivot->SetupAttachment(RootComponent);
+
+    // Create door mesh (attach vào DoorMeshPivot)
+    DoorMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("DoorMesh"));
+    DoorMesh->SetupAttachment(DoorMeshPivot);
+
+    DoorMeshPivot->SetRelativeLocation(FVector(0.0f, 50.0f,0.0f));
+
+    DoorMesh->SetRelativeLocation(FVector(0.0f, -6.0f, 0.0f));
 
     // Create timeline component
     DoorTimeline = CreateDefaultSubobject<UTimelineComponent>(TEXT("DoorTimeline"));
@@ -54,8 +62,8 @@ void ADoorRootActor::BeginPlay()
 {
     Super::BeginPlay();
 
-    // Store initial rotation as closed state
-    ClosedRotation = DoorPivot->GetRelativeRotation();
+    // Store initial rotation as closed state (của DoorMeshPivot, không phải DoorPivot)
+    ClosedRotation = DoorMeshPivot->GetRelativeRotation();
     OpenRotation = ClosedRotation + FRotator(0.0f, DoorRotateAngle, 0.0f);
 
     // Setup timeline
@@ -114,6 +122,44 @@ void ADoorRootActor::Interact(AHorrorGameCharacter* Player)
     }
 }
 
+void ADoorRootActor::SetDoorPivotPosition(FVector PivotOffsets)
+{
+    if (DoorMeshPivot && DoorMesh)
+    {
+        DoorMeshPivot->SetRelativeLocation(PivotOffsets);
+        // Offset ngược lại cho door mesh để giữ vị trí gốc
+        DoorMesh->SetRelativeLocation(-PivotOffsets);
+    }
+}
+
+void ADoorRootActor::AutoSetHingePivot(bool bLeftHinge)
+{
+    if (!DoorMesh || !DoorMesh->GetStaticMesh()) return;
+
+    // Lấy bounds của door mesh
+    FBoxSphereBounds MeshBounds = DoorMesh->GetStaticMesh()->GetBounds();
+    FVector MeshExtent = MeshBounds.BoxExtent;
+
+    // Tính toán vị trí bản lề
+    FVector HingeOffset;
+    if (bLeftHinge)
+    {
+        // Bản lề bên trái (nhìn từ phía trước cửa)
+        HingeOffset = FVector(0.0f, -MeshExtent.Y, 0.0f);
+    }
+    else
+    {
+        // Bản lề bên phải
+        HingeOffset = FVector(0.0f, MeshExtent.Y, 0.0f);
+    }
+
+    SetDoorPivotPosition(HingeOffset);
+
+    UE_LOG(LogTemp, Log, TEXT("Auto-set hinge pivot: %s, Offset: %s"),
+        bLeftHinge ? TEXT("Left") : TEXT("Right"),
+        *HingeOffset.ToString());
+}
+
 bool ADoorRootActor::ServerDoorInteract_Validate(AHorrorGameCharacter* Player)
 {
     return Player != nullptr;
@@ -131,24 +177,22 @@ void ADoorRootActor::ServerDoorInteract_Implementation(AHorrorGameCharacter* Pla
         return;
     }
 
-    // Set current player and calculate side
     CurrentPlayer = Player;
-    SetDoorSameSide();
 
-    // Call the overridable interaction event
+    // CHỈ tính toán hướng cửa khi chưa được set HOẶC khi cửa đang đóng hoàn toàn
+    if (!bDoorDirectionSet || bIsDoorClosed)
+    {
+        SetDoorSameSide();
+        bDoorDirectionSet = true;
+        UE_LOG(LogTemp, Log, TEXT("Setting door direction - Same side: %s"),
+            bDoorOnSameSide ? TEXT("true") : TEXT("false"));
+    }
+
     OnDoorInteraction(Player);
-
-    // Default behavior: toggle door state
     bIsDoorClosed = !bIsDoorClosed;
     bIsAnimating = true;
 
-    UE_LOG(LogTemp, Log, TEXT("Door %s on server"),
-        bIsDoorClosed ? TEXT("closing") : TEXT("opening"));
-
-    // Trigger replication
     OnRep_DoorStateChanged();
-
-    // Play animation on server
     PlayDoorAnimation();
 }
 
@@ -204,10 +248,10 @@ void ADoorRootActor::PlayDoorAnimation_Implementation()
 
 void ADoorRootActor::HandleDoorProgress(float Value)
 {
-    if (!DoorPivot) return;
+    if (!DoorMeshPivot) return;
 
     FRotator NewRotation = CalculateDoorRotation(Value);
-    DoorPivot->SetRelativeRotation(NewRotation);
+    DoorMeshPivot->SetRelativeRotation(NewRotation);
 }
 
 FRotator ADoorRootActor::CalculateDoorRotation(float AnimationValue)
@@ -248,4 +292,5 @@ void ADoorRootActor::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLi
     DOREPLIFETIME(ADoorRootActor, bIsDoorClosed);
     DOREPLIFETIME(ADoorRootActor, bIsAnimating);
     DOREPLIFETIME(ADoorRootActor, bDoorOnSameSide);
+    DOREPLIFETIME(ADoorRootActor, bDoorDirectionSet);
 }
