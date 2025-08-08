@@ -1,343 +1,523 @@
-﻿// Fill out your copyright notice in the Description page of Project Settings.
-
-#include "SprintComponent.h"
+﻿#include "HorrorGame/Actor/Component/SprintComponent.h"
 #include "HorrorGame/Character/HorrorGameCharacter.h"
 #include "Net/UnrealNetwork.h"
 #include "GameFramework/CharacterMovementComponent.h"
+#include "Engine/World.h"
+#include "TimerManager.h"
 
 USprintComponent::USprintComponent()
 {
 	PrimaryComponentTick.bCanEverTick = true;
-	SetIsReplicatedByDefault(true); // Important for component replication
+	SetIsReplicatedByDefault(true);
 
-	// Initialize stamina values
-	CurrentStamina = MaxStamina = 1.f;
-	StaminaSpringUsageRate = 0.1f;
-	StaminaRechargeRate = 0.1f;
-	CanStaminaRecharge = true;
-	DelayForStaminaRecharge = 2.f;
+	// Initialize stamina
+	CurrentStamina = MaxStamina;
+	bIsSprinting = false;
+	bCanRegenStamina = true;
+	bIsExhausted = false;
 
-	// Initialize movement speeds
-	WalkSpeed = 200.f;
-	MaxSprintSpeed = 600.f;
+	// Client prediction
+	PredictedStamina = MaxStamina;
+	bPredictedSprinting = false;
+	bPredictedExhausted = false;
+	bPredictedCanRegen = true;
 
-	// Initialize sprint state
-	bIsSprint = false;
+	// Network optimization
+	LastNetworkUpdateTime = 0.0f;
+	LastStaminaBroadcast = 0.0f;
+
+	// State tracking
+	LastValidStamina = MaxStamina;
+	bWasSprintingLastFrame = false;
 }
 
 void USprintComponent::BeginPlay()
 {
 	Super::BeginPlay();
 
-	// Cache the owner character
+	// Cache owner character
 	OwnerCharacter = Cast<AHorrorGameCharacter>(GetOwner());
 	if (!OwnerCharacter)
 	{
-		UE_LOG(LogTemp, Error, TEXT("SprintComponent: Owner is not a HorrorGameCharacter!"));
+		UE_LOG(LogTemp, Error, TEXT("SprintComponent: Owner is not a HorrorGameCharacter"));
 		SetComponentTickEnabled(false);
 		return;
 	}
 
-	// Set the default walk speed
-	OwnerCharacter->GetCharacterMovement()->MaxWalkSpeed = WalkSpeed;
-
-	// Initialize UI if we're on the client
-	if (OnStaminaChanged.IsBound())
+	// Set initial walk speed
+	if (OwnerCharacter->GetCharacterMovement())
 	{
-		OnStaminaChanged.Broadcast(CurrentStamina, MaxStamina);
+		OwnerCharacter->GetCharacterMovement()->MaxWalkSpeed = WalkSpeed;
 	}
+
+	// Initialize stamina to full
+	CurrentStamina = MaxStamina;
+	PredictedStamina = MaxStamina;
+	LastValidStamina = MaxStamina;
+
+	// Broadcast initial state
+	BroadcastStaminaChange();
+	BroadcastSprintStateChange();
 }
 
 void USprintComponent::TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction)
 {
 	Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
 
-	// Handle stamina on both server and client for smooth prediction
+	if (!OwnerCharacter)
+		return;
+
 	if (GetOwner()->HasAuthority())
 	{
-		HandleStaminaSprint(DeltaTime);
+		// Server: Authoritative stamina and movement updates
+		UpdateStamina(DeltaTime);
+		CheckExhaustionState();
+		UpdateMovementSpeed();
+
+		// Force stop sprint if conditions are no longer met
+		if (bIsSprinting && ShouldForceStopSprint())
+		{
+			ServerStopSprint();
+		}
+
+		// Network optimization: Only send updates at specified frequency
+		float CurrentTime = GetWorld()->GetTimeSeconds();
+		if (CurrentTime - LastNetworkUpdateTime >= NetworkUpdateFrequency)
+		{
+			LastNetworkUpdateTime = CurrentTime;
+		}
 	}
-	else
+	else if (OwnerCharacter->IsLocallyControlled())
 	{
-		// Client-side prediction for smooth experience
-		HandleStaminaSprintPrediction(DeltaTime);
+		// Client: Handle prediction for locally controlled character
+		HandleClientPrediction(DeltaTime);
 	}
+
+	bWasSprintingLastFrame = bIsSprinting;
 }
 
 void USprintComponent::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
 {
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 
-	// Replicate stamina less frequently to reduce network traffic during speed transitions
+	// Replicate core state
 	DOREPLIFETIME_CONDITION(USprintComponent, CurrentStamina, COND_SkipOwner);
-	DOREPLIFETIME(USprintComponent, bIsSprint);
-
-	// Add custom replication for smoother experience
-	FDoRepLifetimeParams StaminaParams;
-	StaminaParams.Condition = COND_SkipOwner;
-	StaminaParams.RepNotifyCondition = REPNOTIFY_OnChanged;
-	DOREPLIFETIME_WITH_PARAMS_FAST(USprintComponent, CurrentStamina, StaminaParams);
+	DOREPLIFETIME(USprintComponent, bIsSprinting);
+	DOREPLIFETIME(USprintComponent, bCanRegenStamina);
+	DOREPLIFETIME(USprintComponent, bIsExhausted);
 }
 
-void USprintComponent::HandleStaminaSprint(float DeltaTime)
+void USprintComponent::StartSprint()
 {
-	if (!OwnerCharacter) return;
-
-	// Don't handle stamina if crouched
-	if (OwnerCharacter->bIsCrouched)
-	{
+	if (!OwnerCharacter)
 		return;
+
+	// Immediate local prediction for responsiveness
+	if (OwnerCharacter->IsLocallyControlled() && CanStartSprint())
+	{
+		bPredictedSprinting = true;
+		if (OwnerCharacter->GetCharacterMovement())
+		{
+			OwnerCharacter->GetCharacterMovement()->MaxWalkSpeed = CalculateCurrentSprintSpeed();
+		}
+		BroadcastSprintStateChange();
 	}
 
-	float OldStamina = CurrentStamina;
-	float OldSprintSpeed = bIsSprint ? CalculateSprintSpeed(CurrentStamina) : WalkSpeed;
-
-	if (bIsSprint)
+	// Send to server regardless of authority (server will validate)
+	if (!GetOwner()->HasAuthority())
 	{
-		// Consume stamina while sprinting
-		CurrentStamina = FMath::Clamp(CurrentStamina - (StaminaSpringUsageRate * DeltaTime), 0.f, MaxStamina);
-
-		if (CurrentStamina <= 0.f)
-		{
-			DepletedAllStamina();
-		}
-		else
-		{
-			// Update speed only if there's a significant change to avoid micro-adjustments
-			float NewSprintSpeed = CalculateSprintSpeed(CurrentStamina);
-			if (FMath::Abs(OldSprintSpeed - NewSprintSpeed) > 10.f) // 10 unit threshold
-			{
-				UpdateSprintSpeed();
-			}
-		}
+		ServerStartSprint();
 	}
 	else
 	{
-		// Regenerate stamina when not sprinting
-		if (CurrentStamina < MaxStamina && CanStaminaRecharge)
-		{
-			CurrentStamina = FMath::Clamp(CurrentStamina + (StaminaRechargeRate * DeltaTime), 0.f, MaxStamina);
-		}
-	}
-
-	// Broadcast UI update if stamina changed significantly
-	if (FMath::Abs(OldStamina - CurrentStamina) > 0.01f)
-	{
-		if (OnStaminaChanged.IsBound())
-		{
-			OnStaminaChanged.Broadcast(CurrentStamina, MaxStamina);
-		}
+		ServerStartSprint();
 	}
 }
 
-void USprintComponent::HandleStaminaSprintPrediction(float DeltaTime)
+void USprintComponent::StopSprint()
 {
-	if (!OwnerCharacter) return;
-
-	// Client-side prediction - same logic as server but only for local player
-	if (!OwnerCharacter->IsLocallyControlled()) return;
-
-	// Don't handle stamina if crouched
-	if (OwnerCharacter->bIsCrouched)
-	{
+	if (!OwnerCharacter)
 		return;
-	}
 
-	if (bIsSprint)
+	// Immediate local prediction
+	if (OwnerCharacter->IsLocallyControlled())
 	{
-		float OldStamina = CurrentStamina;
-		float OldSpeed = CalculateSprintSpeed(CurrentStamina);
-
-		// Predict stamina consumption
-		float PredictedStamina = FMath::Clamp(CurrentStamina - (StaminaSpringUsageRate * DeltaTime), 0.f, MaxStamina);
-
-		// Only update speed if there's a significant change
-		float NewSpeed = CalculateSprintSpeed(PredictedStamina);
-		OwnerCharacter->GetCharacterMovement()->MaxWalkSpeed = NewSpeed;
-	}
-
-	// Update UI for local player - less frequent updates to reduce network traffic
-	static float UIUpdateTimer = 0.f;
-	UIUpdateTimer += DeltaTime;
-	if (UIUpdateTimer >= 0.1f) // Update UI every 0.1 seconds
-	{
-		UIUpdateTimer = 0.f;
-		if (OnStaminaChanged.IsBound())
+		bPredictedSprinting = false;
+		if (OwnerCharacter->GetCharacterMovement())
 		{
-			OnStaminaChanged.Broadcast(CurrentStamina, MaxStamina);
+			OwnerCharacter->GetCharacterMovement()->MaxWalkSpeed = WalkSpeed;
 		}
-	}
-}
-
-void USprintComponent::DepletedAllStamina()
-{
-	UnSprint();
-}
-
-void USprintComponent::OnRep_SprintChanged()
-{
-	UpdateSprintSpeed();
-}
-
-void USprintComponent::OnRep_StaminaChanged()
-{
-	// Update UI on clients when stamina changes
-	if (OnStaminaChanged.IsBound())
-	{
-		OnStaminaChanged.Broadcast(CurrentStamina, MaxStamina);
+		BroadcastSprintStateChange();
 	}
 
-	// Update speed when stamina replicates
-	if (bIsSprint)
+	// Send to server
+	if (!GetOwner()->HasAuthority())
 	{
-		UpdateSprintSpeed();
-	}
-}
-
-void USprintComponent::UpdateSprintSpeed()
-{
-	if (!OwnerCharacter) return;
-
-	float DesiredSpeed = bIsSprint ? CalculateSprintSpeed() : WalkSpeed;
-	OwnerCharacter->GetCharacterMovement()->MaxWalkSpeed = DesiredSpeed;
-}
-
-float USprintComponent::CalculateSprintSpeed() const
-{
-	return CalculateSprintSpeed(CurrentStamina);
-}
-
-float USprintComponent::CalculateSprintSpeed(float StaminaValue) const
-{
-	if (StaminaValue >= 0.4f)
-	{
-		return MaxSprintSpeed;
-	}
-
-	// Use step-based reduction instead of linear interpolation to reduce jitter
-	float StaminaRatio = StaminaValue / 0.4f;
-
-	// Create speed tiers to reduce micro-adjustments
-	if (StaminaRatio >= 0.75f) 
-	{
-		return FMath::Lerp(MaxSprintSpeed * 0.9f, MaxSprintSpeed, (StaminaRatio - 0.75f) / 0.25f);
-	}
-	else if (StaminaRatio >= 0.5f) 
-	{
-		return FMath::Lerp(MaxSprintSpeed * 0.75f, MaxSprintSpeed * 0.9f, (StaminaRatio - 0.5f) / 0.25f);
-	}
-	else if (StaminaRatio >= 0.25f)
-	{
-		return FMath::Lerp(MaxSprintSpeed * 0.6f, MaxSprintSpeed * 0.75f, (StaminaRatio - 0.25f) / 0.25f);
+		ServerStopSprint();
 	}
 	else
 	{
-		return FMath::Lerp(WalkSpeed, MaxSprintSpeed * 0.6f, StaminaRatio / 0.25f);
+		ServerStopSprint();
 	}
 }
 
-void USprintComponent::EnableStaminaGain()
+void USprintComponent::ServerStartSprint_Implementation()
 {
-	CanStaminaRecharge = true;
-}
-
-void USprintComponent::Server_StartSprint_Implementation()
-{
-	if (!OwnerCharacter) return;
-
-	// Check if we can sprint
-	if (OwnerCharacter->bIsKnockedDown ||
-		OwnerCharacter->bIsCrouched ||
-		OwnerCharacter->GetVelocity().IsNearlyZero() ||
-		CurrentStamina <= 0.f)
-	{
+	if (!CanStartSprint())
 		return;
-	}
 
-	bIsSprint = true;
-	UpdateSprintSpeed();
+	bIsSprinting = true;
+	bCanRegenStamina = false;
 
-	// Stop stamina recharge while sprinting
-	CanStaminaRecharge = false;
-	GetWorld()->GetTimerManager().ClearTimer(StaminaRechargeTimerHandle);
-}
-
-void USprintComponent::Server_StopSprint_Implementation()
-{
-	if (!bIsSprint) return;
-
-	bIsSprint = false;
-	UpdateSprintSpeed();
-
-	// Start timer to enable stamina recharge after delay
+	// Clear any existing regeneration timer
 	if (GetWorld())
 	{
+		GetWorld()->GetTimerManager().ClearTimer(StaminaRegenDelayTimer);
+	}
+
+	UpdateMovementSpeed();
+	BroadcastSprintStateChange();
+
+	UE_LOG(LogTemp, Log, TEXT("Server: Started sprinting. Stamina: %.1f"), CurrentStamina);
+}
+
+void USprintComponent::ServerStopSprint_Implementation()
+{
+	if (!bIsSprinting)
+		return;
+
+	bIsSprinting = false;
+	UpdateMovementSpeed();
+
+	// Start regeneration delay timer only if we have some stamina left
+	if (CurrentStamina > 0.0f && GetWorld())
+	{
 		GetWorld()->GetTimerManager().SetTimer(
-			StaminaRechargeTimerHandle,
+			StaminaRegenDelayTimer,
 			this,
-			&USprintComponent::EnableStaminaGain,
-			DelayForStaminaRecharge,
+			&USprintComponent::StartStaminaRegeneration,
+			StaminaRegenDelay,
 			false
 		);
 	}
+
+	BroadcastSprintStateChange();
+
+	UE_LOG(LogTemp, Log, TEXT("Server: Stopped sprinting. Stamina: %.1f"), CurrentStamina);
 }
 
-void USprintComponent::Sprint()
+bool USprintComponent::CanSprint() const
 {
-	if (!OwnerCharacter) return;
+	return CanStartSprint();
+}
 
-	// Immediate local response for better feel
-	if (OwnerCharacter->IsLocallyControlled())
+bool USprintComponent::CanStartSprint() const
+{
+	if (!OwnerCharacter)
+		return false;
+
+	// Check if exhausted (need to recover more before sprinting again)
+	if (bIsExhausted && CurrentStamina < MinStaminaToSprint * 1.5f)
+		return false;
+
+	// Check minimum stamina requirement
+	if (CurrentStamina < MinStaminaToSprint)
+		return false;
+
+	// Check if character is crouched
+	if (OwnerCharacter->bIsCrouched)
+		return false;
+
+	// Check if character is moving enough
+	if (!IsMovingEnoughToSprint())
+		return false;
+
+	// Check if character is knocked down
+	if (OwnerCharacter->IsKnockedDown())
+		return false;
+
+	return true;
+}
+
+bool USprintComponent::ShouldForceStopSprint() const
+{
+	// Force stop if stamina is completely depleted
+	if (CurrentStamina <= StaminaExhaustionThreshold)
+		return true;
+
+	// Force stop if not moving enough
+	if (!IsMovingEnoughToSprint())
+		return true;
+
+	// Force stop if crouched or knocked down
+	if (OwnerCharacter && (OwnerCharacter->bIsCrouched || OwnerCharacter->IsKnockedDown()))
+		return true;
+
+	return false;
+}
+
+bool USprintComponent::IsMovingEnoughToSprint() const
+{
+	if (!OwnerCharacter)
+		return false;
+
+	return OwnerCharacter->GetVelocity().Size2D() > 50.0f; // Increased threshold for more realistic feel
+}
+
+void USprintComponent::UpdateStamina(float DeltaTime)
+{
+	float OldStamina = CurrentStamina;
+
+	if (bIsSprinting)
 	{
-		// Check conditions locally first
-		if (OwnerCharacter->bIsKnockedDown ||
-			OwnerCharacter->bIsCrouched ||
-			OwnerCharacter->GetVelocity().IsNearlyZero() ||
-			CurrentStamina <= 0.f)
+		// Only drain stamina if actually moving
+		if (IsMovingEnoughToSprint())
 		{
-			return;
-		}
-
-		// Predict sprint state locally for immediate response
-		if (!bIsSprint)
-		{
-			bIsSprint = true;
-			UpdateSprintSpeed();
-			CanStaminaRecharge = false;
+			CurrentStamina -= StaminaDrainRate * DeltaTime;
+			CurrentStamina = FMath::Max(CurrentStamina, 0.0f);
 		}
 	}
-
-	if (OwnerCharacter->HasAuthority())
+	else if (bCanRegenStamina && !bIsExhausted)
 	{
-		// Call implementation directly on server
-		Server_StartSprint_Implementation();
+		// Regenerate stamina when not sprinting and not exhausted
+		CurrentStamina += StaminaRegenRate * DeltaTime;
+		CurrentStamina = FMath::Min(CurrentStamina, MaxStamina);
 	}
-	else
+
+	// Broadcast significant changes
+	if (FMath::Abs(OldStamina - CurrentStamina) > 1.0f)
 	{
-		// Call RPC on client
-		Server_StartSprint();
+		BroadcastStaminaChange();
 	}
 }
 
-void USprintComponent::UnSprint()
+void USprintComponent::CheckExhaustionState()
 {
-	if (!OwnerCharacter) return;
+	bool bWasExhausted = bIsExhausted;
 
-	// Immediate local response
-	if (OwnerCharacter->IsLocallyControlled() && bIsSprint)
+	// Become exhausted when stamina hits the threshold
+	if (CurrentStamina <= StaminaExhaustionThreshold && bIsSprinting)
 	{
-		bIsSprint = false;
-		UpdateSprintSpeed();
+		bIsExhausted = true;
+		bCanRegenStamina = false;
+
+		// Force stop sprinting
+		if (bIsSprinting)
+		{
+			bIsSprinting = false;
+			UpdateMovementSpeed();
+			BroadcastSprintStateChange();
+		}
+
+		// Longer delay when exhausted
+		if (GetWorld())
+		{
+			GetWorld()->GetTimerManager().SetTimer(
+				StaminaRegenDelayTimer,
+				this,
+				&USprintComponent::StartStaminaRegeneration,
+				StaminaRegenDelay * 1.5f, // 50% longer delay when exhausted
+				false
+			);
+		}
+	}
+	// Recover from exhaustion when stamina is restored enough
+	else if (bIsExhausted && CurrentStamina >= MinStaminaToSprint)
+	{
+		bIsExhausted = false;
 	}
 
-	if (OwnerCharacter->HasAuthority())
+	// Log exhaustion state changes
+	if (bWasExhausted != bIsExhausted)
 	{
-		// Call implementation directly on server
-		Server_StopSprint_Implementation();
+		UE_LOG(LogTemp, Log, TEXT("Exhaustion state changed: %s"), bIsExhausted ? TEXT("Exhausted") : TEXT("Recovered"));
 	}
-	else
+}
+
+void USprintComponent::UpdateMovementSpeed()
+{
+	if (!OwnerCharacter || !OwnerCharacter->GetCharacterMovement())
+		return;
+
+	float TargetSpeed = bIsSprinting ? CalculateCurrentSprintSpeed() : WalkSpeed;
+	OwnerCharacter->GetCharacterMovement()->MaxWalkSpeed = TargetSpeed;
+}
+
+float USprintComponent::CalculateCurrentSprintSpeed() const
+{
+	if (!bIsSprinting)
+		return WalkSpeed;
+
+	// Calculate speed based on current stamina
+	float StaminaRatio = GetStaminaRatio();
+
+	if (StaminaRatio >= MinStaminaRatioForFullSpeed)
 	{
-		// Call RPC on client
-		Server_StopSprint();
+		return SprintSpeed;
+	}
+
+	// Gradually reduce speed as stamina depletes
+	float SpeedMultiplier = FMath::Max(MinSpeedMultiplier, StaminaRatio / MinStaminaRatioForFullSpeed);
+	return FMath::Lerp(WalkSpeed, SprintSpeed, SpeedMultiplier);
+}
+
+void USprintComponent::HandleClientPrediction(float DeltaTime)
+{
+	if (!OwnerCharacter)
+		return;
+
+	// Predict stamina changes locally for smooth UI
+	float OldPredictedStamina = PredictedStamina;
+
+	if (bPredictedSprinting && CanStartSprint())
+	{
+		if (IsMovingEnoughToSprint())
+		{
+			PredictedStamina -= StaminaDrainRate * DeltaTime;
+			PredictedStamina = FMath::Max(PredictedStamina, 0.0f);
+		}
+
+		// Check for predicted exhaustion
+		if (PredictedStamina <= StaminaExhaustionThreshold)
+		{
+			bPredictedSprinting = false;
+			bPredictedExhausted = true;
+			bPredictedCanRegen = false;
+
+			if (OwnerCharacter->GetCharacterMovement())
+			{
+				OwnerCharacter->GetCharacterMovement()->MaxWalkSpeed = WalkSpeed;
+			}
+		}
+		else
+		{
+			// Update predicted speed
+			float StaminaRatio = PredictedStamina / MaxStamina;
+			float SpeedMultiplier = FMath::Max(MinSpeedMultiplier, StaminaRatio / MinStaminaRatioForFullSpeed);
+			float PredictedSpeed = FMath::Lerp(WalkSpeed, SprintSpeed, SpeedMultiplier);
+
+			if (OwnerCharacter->GetCharacterMovement())
+			{
+				OwnerCharacter->GetCharacterMovement()->MaxWalkSpeed = PredictedSpeed;
+			}
+		}
+	}
+	else if (!bPredictedSprinting && bPredictedCanRegen && !bPredictedExhausted)
+	{
+		PredictedStamina += StaminaRegenRate * DeltaTime;
+		PredictedStamina = FMath::Min(PredictedStamina, MaxStamina);
+
+		// Recover from predicted exhaustion
+		if (bPredictedExhausted && PredictedStamina >= MinStaminaToSprint)
+		{
+			bPredictedExhausted = false;
+		}
+	}
+
+	// Update UI with predicted values
+	if (FMath::Abs(OldPredictedStamina - PredictedStamina) > 1.0f)
+	{
+		if (OnStaminaChanged.IsBound())
+		{
+			OnStaminaChanged.Broadcast(PredictedStamina, MaxStamina);
+		}
+	}
+
+	// Reconcile with server occasionally
+	static float ReconcileTimer = 0.0f;
+	ReconcileTimer += DeltaTime;
+	if (ReconcileTimer >= 0.5f)
+	{
+		ReconcileTimer = 0.0f;
+		ReconcileWithServer();
+	}
+}
+
+void USprintComponent::ReconcileWithServer()
+{
+	// Gradually adjust predicted values towards server values
+	float StaminaDifference = CurrentStamina - PredictedStamina;
+	if (FMath::Abs(StaminaDifference) > 5.0f)
+	{
+		PredictedStamina = FMath::FInterpTo(PredictedStamina, CurrentStamina, GetWorld()->GetDeltaSeconds(), 3.0f);
+	}
+
+	// Sync sprint state if different
+	if (bPredictedSprinting != bIsSprinting)
+	{
+		bPredictedSprinting = bIsSprinting;
+		UpdateMovementSpeed();
+	}
+
+	// Sync exhaustion state
+	if (bPredictedExhausted != bIsExhausted)
+	{
+		bPredictedExhausted = bIsExhausted;
+	}
+
+	// Sync regeneration state
+	if (bPredictedCanRegen != bCanRegenStamina)
+	{
+		bPredictedCanRegen = bCanRegenStamina;
+	}
+}
+
+void USprintComponent::StartStaminaRegeneration()
+{
+	bCanRegenStamina = true;
+
+	UE_LOG(LogTemp, Log, TEXT("Stamina regeneration started. Current: %.1f"), CurrentStamina);
+}
+
+void USprintComponent::BroadcastStaminaChange()
+{
+	float CurrentTime = GetWorld() ? GetWorld()->GetTimeSeconds() : 0.0f;
+
+	// Throttle broadcasts to avoid spam
+	if (CurrentTime - LastStaminaBroadcast >= StaminaBroadcastFrequency)
+	{
+		LastStaminaBroadcast = CurrentTime;
+
+		if (OnStaminaChanged.IsBound())
+		{
+			float BroadcastStamina = GetOwner()->HasAuthority() ? CurrentStamina : PredictedStamina;
+			OnStaminaChanged.Broadcast(BroadcastStamina, MaxStamina);
+		}
+	}
+}
+
+void USprintComponent::BroadcastSprintStateChange()
+{
+	if (OnSprintStateChanged.IsBound())
+	{
+		bool CurrentSprintState = GetOwner()->HasAuthority() ? bIsSprinting : bPredictedSprinting;
+		OnSprintStateChanged.Broadcast(CurrentSprintState);
+	}
+}
+
+void USprintComponent::OnRep_CurrentStamina()
+{
+	// Validate replicated stamina
+	LastValidStamina = CurrentStamina;
+	BroadcastStaminaChange();
+
+	if (OwnerCharacter && !OwnerCharacter->IsLocallyControlled())
+	{
+		UpdateMovementSpeed();
+	}
+}
+
+void USprintComponent::OnRep_SprintState()
+{
+	UpdateMovementSpeed();
+	BroadcastSprintStateChange();
+}
+
+void USprintComponent::OnRep_CanRegenStamina()
+{
+	// Update prediction state for clients
+	if (!GetOwner()->HasAuthority())
+	{
+		bPredictedCanRegen = bCanRegenStamina;
 	}
 }

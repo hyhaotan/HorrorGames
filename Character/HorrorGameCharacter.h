@@ -93,6 +93,8 @@ public:
 	
 	virtual void BeginPlay() override;
 
+	virtual void PostInitializeComponents() override;
+
 	virtual void Tick(float DeltaTime) override;
 
 protected:
@@ -191,6 +193,9 @@ public:
 
 	UFUNCTION()
 	void OnRep_IsKnockedDown();
+
+	UFUNCTION(BlueprintImplementableEvent, Category = "Headbob")
+	void OnHeadbobStateChanged(EHeadbobState NewState, EHeadbobState OldState);
 	//------------------------------------------------PROPERTY--------------------------------------------------------//
 	//------------------------------------------------OTHER--------------------------------------------------------//
 	UPROPERTY(BlueprintAssignable, Category = "Inventory")
@@ -245,17 +250,6 @@ public:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "PostProcess")
 	class UPostProcessComponent* PostProcessComponent;
 
-	UPROPERTY(EditDefaultsOnly, Category = "HeadBob")
-	TSubclassOf<UCameraShakeBase> WalkCameraShakeClass;
-
-	/** Camera shake khi chạy */
-	UPROPERTY(EditDefaultsOnly, Category = "HeadBob")
-	TSubclassOf<UCameraShakeBase> SprintCameraShakeClass;
-
-	/** Camera shake khi đứng yên hoặc rơi */
-	UPROPERTY(EditDefaultsOnly, Category = "HeadBob")
-	TSubclassOf<UCameraShakeBase> IdleCameraShakeClass;
-
 	UPROPERTY(EditDefaultsOnly, Category = "UI")
 	TSubclassOf<USanityWidget> SanityWidgetClass;
 
@@ -287,8 +281,12 @@ public:
 	UPROPERTY(EditDefaultsOnly, Category = "UI")
 	TSubclassOf<UUserWidget> NoteWidgetClass;
 
-	UPROPERTY(EditInstanceOnly, BlueprintReadWrite, Category = "Component | Sprint", meta = (AllowPrivateAccess))
+	//Component
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
 	class USprintComponent* SprintComponent;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
+	class UHeadbobComponent* HeadbobComponent;
 	//------------------------------------------------BOOLEAN--------------------------------------------------------//
 
 	UPROPERTY(EditAnywhere, Replicated,BlueprintReadOnly, Category = "Flashlight")
@@ -417,12 +415,11 @@ private:
 	//-----------------------------------------------------------------------------//
 	void ToggleCrouch();
 
-	void StartSprint();
-	void StopSprint();
+	void Sprint();
+	void UnSprint();
 	//-----------------------------------------------------------------------------//
 	// SANITY & HEADBOB
 	//-----------------------------------------------------------------------------//
-	void InitializeHeadbob();
 	void SetupSanityWidget();
 	void SetupSanityTimeline();
 
@@ -477,6 +474,11 @@ private:
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 
 	void OnJumpscareCameraComplete();
+
+	UFUNCTION()
+	void HandleHeadbobStateChanged(EHeadbobState NewState, EHeadbobState OldState);
+	void EnableHeadbob(bool bEnable);
+	void SetCustomHeadbob(TSubclassOf<UCameraShakeBase> CustomShake, float Intensity);
 
 	UFUNCTION()
 	void OnRep_Inventory();

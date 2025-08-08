@@ -12,6 +12,7 @@
 ANPC_AIController::ANPC_AIController(FObjectInitializer const& ObjectInitializer)
 {
 	SetupPerceptionSystem();
+	PerceptionComponent->OnTargetPerceptionUpdated.AddDynamic(this, &ANPC_AIController::OnTargetPerceptionUpdated);
 }
 
 void ANPC_AIController::OnPossess(APawn* InPawn)
@@ -86,16 +87,19 @@ void ANPC_AIController::OnTargetDetected(AActor* Actor, FAIStimulus const Stimul
 			GetBlackboardComponent()->SetValueAsVector("LastHeardLocation", Stimulus.StimulusLocation);
 			MoveToSoundSource(Stimulus.StimulusLocation);
 		}
-		ANPC* MyNPC = Cast<ANPC>(GetInstigatorController());
-		if (MyNPC)
-		{
-			// Thực hiện hành động khi cast thành công
-			MyNPC->ToggleInvestigationWidgetVisibility();
-		}
 	}
 }
 
 void ANPC_AIController::MoveToSoundSource(FVector const& Location)
 {
 	MoveToLocation(Location);
+}
+
+void ANPC_AIController::OnTargetPerceptionUpdated(AActor* Actor, FAIStimulus Stimulus)
+{
+	if (auto* NPC = Cast<ANPC>(GetPawn()))
+	{
+		const bool bCanSee = Stimulus.WasSuccessfullySensed();
+		NPC->ToggleInvestigationWidgetVisibility(bCanSee);
+	}
 }

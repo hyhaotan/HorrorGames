@@ -1,4 +1,4 @@
-﻿#include "BTTask_JumpScare.h"
+﻿#include "HorrorGame/AI/BlackBoardTask/BTTask_JumpScare.h"
 #include "BehaviorTree/BlackboardComponent.h"
 #include "HorrorGame/AI/NPC_AIController.h"
 #include "HorrorGame/AI/NPC.h"
@@ -88,7 +88,6 @@ EBTNodeResult::Type UBTTask_JumpScare::ExecuteTask(UBehaviorTreeComponent& Owner
     {
         if (Player)
         {
-            // Gọi RPC đến client của player này để thực hiện jumpscare
             Player->ClientStartJumpScare(NPC, BlendTime, JumpScareDuration);
         }
     }

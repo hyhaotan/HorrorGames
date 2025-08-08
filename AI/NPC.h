@@ -39,7 +39,7 @@ public:
 
     /** Custom function to toggle visibility */
     UFUNCTION(BlueprintCallable, Category = "AI")
-    void ToggleInvestigationWidgetVisibility();
+    void ToggleInvestigationWidgetVisibility(bool bCanSeePlayer);
 
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "JumpScare")
     UCameraComponent* JumpScareCamera;
@@ -79,6 +79,9 @@ public:
 
     UPROPERTY(BlueprintReadWrite, Replicated)
     class AHorrorGameCharacter* JumpScareTargetPlayer;
+
+    UPROPERTY(EditDefaultsOnly, Category = "UI")
+	class UWidgetComponent* InvestigationWidgetComponent;
 
 protected:
     // Called when the game starts or when spawned
@@ -122,7 +125,6 @@ private:
     // Widget investigation
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "UI", meta = (AllowPrivateAccess = "true"))
     UUserWidget* InvestigateWidget;
-
 
     // Helper functions for search patterns
     void GenerateRandomSearchPoints();

@@ -5,8 +5,6 @@ ADoor::ADoor()
 {
     // Set specific default values for this door type
     DoorRotateAngle = 90.0f;
-    bRequireKey = false;
-    RequiredKeyName = TEXT("DefaultKey");
 
     // You can customize the mesh, materials, etc. here
     // DoorMesh->SetStaticMesh(YourSpecificDoorMesh);
@@ -21,9 +19,7 @@ void ADoor::OnDoorInteraction_Implementation(AHorrorGameCharacter* Player)
     UE_LOG(LogTemp, Log, TEXT("Flip-flop door interaction with player: %s"),
         Player ? *Player->GetName() : TEXT("Unknown"));
 
-    // Example: Play sound effect, trigger events, etc.
-    // PlayDoorInteractionSound();
-    // TriggerDoorEvents();
+    if (!bIsDoorClosed) bIsDoorClosed = false;
 }
 
 bool ADoor::CanOpenDoor_Implementation(AHorrorGameCharacter* Player)
@@ -38,20 +34,6 @@ bool ADoor::CanOpenDoor_Implementation(AHorrorGameCharacter* Player)
     {
         UE_LOG(LogTemp, Warning, TEXT("Door is currently animating"));
         return false;
-    }
-
-    // Add key requirement check
-    if (bRequireKey && !RequiredKeyName.IsEmpty())
-    {
-        // Check if player has the required key
-        // This is pseudocode - implement based on your inventory system
-        /*
-        if (!Player->HasKey(RequiredKeyName))
-        {
-            UE_LOG(LogTemp, Warning, TEXT("Player doesn't have required key: %s"), *RequiredKeyName);
-            return false;
-        }
-        */
     }
 
     // For flip-flop doors, always allow interaction if basic conditions are met

@@ -8,6 +8,7 @@
 #include "Kismet/GameplayStatics.h"
 #include "HorrorGame/Character/HorrorGameCharacter.h"
 #include "Kismet/KismetMathLibrary.h"
+#include "Components/WidgetComponent.h"
 
 ANPC::ANPC()
 {
@@ -23,9 +24,14 @@ ANPC::ANPC()
 	SetReplicateMovement(true);
 
 	JumpScareCamera = CreateDefaultSubobject<UCameraComponent>(TEXT("JumpScareCamera"));
-	JumpScareCamera->SetupAttachment(GetMesh(), "head"); // Attach to head socket
+	JumpScareCamera->SetupAttachment(GetMesh(), "head");
 	JumpScareCamera->SetRelativeLocation(FVector(0.0f, 0.0f, 0.0f));
 	JumpScareCamera->SetRelativeRotation(FRotator(0.0f, 0.0f, 0.0f));
+
+	InvestigationWidgetComponent = CreateDefaultSubobject<UWidgetComponent>(TEXT("InvestigationWidgetComponent"));
+	InvestigationWidgetComponent->SetupAttachment(RootComponent);
+	InvestigationWidgetComponent->SetWidgetSpace(EWidgetSpace::World);
+	InvestigationWidgetComponent->SetVisibility(false);
 }
 
 // Called when the game starts or when spawned
@@ -65,13 +71,16 @@ UAnimMontage* ANPC::GetMontage() const
 	return Montage;
 }
 
-void ANPC::ToggleInvestigationWidgetVisibility()
+void ANPC::ToggleInvestigationWidgetVisibility(bool bCanSeePlayer)
 {
-	if (InvestigateWidget)
+	if (InvestigationWidgetComponent)
 	{
-		// Flip-Flop logic to toggle visibility
-		bIsWidgetVisible = !bIsWidgetVisible;
-		InvestigateWidget->SetVisibility(bIsWidgetVisible ? ESlateVisibility::Visible : ESlateVisibility::Hidden);
+		// Chỉ toggle khi trạng thái thay đổi
+		if (bIsWidgetVisible != bCanSeePlayer)
+		{
+			bIsWidgetVisible = bCanSeePlayer;
+			InvestigationWidgetComponent->SetVisibility(bIsWidgetVisible? true : false);
+		}
 	}
 }
 

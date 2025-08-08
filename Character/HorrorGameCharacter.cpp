@@ -23,6 +23,7 @@
 #include "HorrorGame/Actor/Door/HospitalDoorActor.h"
 #include "HorrorGame/AI/NPC.h"
 #include "HorrorGame/Actor/Component/SprintComponent.h"
+#include "HorrorGame/Actor/Component/HeadbobComponent.h"
 
 // Engine
 #include "Engine/LocalPlayer.h"
@@ -126,17 +127,20 @@ AHorrorGameCharacter::AHorrorGameCharacter()
 
     AnimMontages.Add(EPlayerState::PS_Death, DeathMontage);
 
+	//Components
 	SprintComponent = CreateDefaultSubobject<USprintComponent>(TEXT("SprintComponent"));
-
-    GetCharacterMovement()->NetworkSimulatedSmoothLocationTime = 0.100f;
-    GetCharacterMovement()->NetworkSimulatedSmoothRotationTime = 0.050f;
-    GetCharacterMovement()->ListenServerNetworkSimulatedSmoothLocationTime = 0.040f;
-    GetCharacterMovement()->ListenServerNetworkSimulatedSmoothRotationTime = 0.033f;
+    HeadbobComponent = CreateDefaultSubobject<UHeadbobComponent>(TEXT("HeadbobComponent"));
 }
 
 void AHorrorGameCharacter::BeginPlay()
 {
 	Super::BeginPlay();
+
+    if (HeadbobComponent)
+    {
+        HeadbobComponent->OnHeadbobStateChanged.AddDynamic(this, &AHorrorGameCharacter::HandleHeadbobStateChanged);
+        HeadbobComponent->ForceUpdateHeadbob();
+    }
 
     SetupWidgets();
 
@@ -152,7 +156,6 @@ void AHorrorGameCharacter::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
 	Ticks(DeltaTime);
-    InitializeHeadbob();
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -197,8 +200,8 @@ void AHorrorGameCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInpu
         EnhancedInputComponent->BindAction(ZoomObjectAction, ETriggerEvent::Triggered, this, &AHorrorGameCharacter::HandleZoom);
 
         //Sprint
-        EnhancedInputComponent->BindAction(SprintAction, ETriggerEvent::Triggered, this, &AHorrorGameCharacter::StartSprint);
-        EnhancedInputComponent->BindAction(SprintAction, ETriggerEvent::Completed, this, &AHorrorGameCharacter::StopSprint);
+        EnhancedInputComponent->BindAction(SprintAction, ETriggerEvent::Triggered, this, &AHorrorGameCharacter::Sprint);
+        EnhancedInputComponent->BindAction(SprintAction, ETriggerEvent::Completed, this, &AHorrorGameCharacter::UnSprint);
 
         //Crouch
         EnhancedInputComponent->BindAction(CrouchAction, ETriggerEvent::Completed, this, &AHorrorGameCharacter::ToggleCrouch);
@@ -378,29 +381,60 @@ bool AHorrorGameCharacter::PerformInteractionLineTrace(FHitResult& OutHitResult)
     return bHit && OutHitResult.GetActor() == Actors;
 }
 
-void AHorrorGameCharacter::InitializeHeadbob()
+void AHorrorGameCharacter::PostInitializeComponents()
 {
-    const float Speed = GetVelocity().Size();
+    Super::PostInitializeComponents();
 
-    APlayerController* PC = Cast<APlayerController>(GetController());
-    if (!PC) return;
-
-    if (Speed > 0.f && CanJump())
+    if (HeadbobComponent)
     {
-        if (Speed < SprintComponent->SprintSpeedThreshold)
-        {
-            PC->ClientStartCameraShake(WalkCameraShakeClass, 1.0f);
-        }
-        else
-        {
-            PC->ClientStartCameraShake(SprintCameraShakeClass, 1.0f);
-        }
-    }
-    else
-    {
-        PC->ClientStartCameraShake(IdleCameraShakeClass, 1.0f);
+        // Ensure delegate is bound in case binding moved here
+        HeadbobComponent->OnHeadbobStateChanged.AddDynamic(this, &AHorrorGameCharacter::HandleHeadbobStateChanged);
     }
 }
+
+void AHorrorGameCharacter::HandleHeadbobStateChanged(EHeadbobState NewState, EHeadbobState OldState)
+{
+    switch (NewState)
+    {
+    case EHeadbobState::Sprinting:
+        // Play sprint sound, breathing effects, etc.
+        break;
+    case EHeadbobState::Walking:
+        // Play walk sound effects
+        break;
+    case EHeadbobState::Crouching:
+        // Play crouch movement sounds
+        break;
+    case EHeadbobState::None:
+        // Stop movement sounds
+        break;
+    case EHeadbobState::Custom:
+        // Custom effects
+        break;
+    default:
+        break;
+    }
+
+    // Notify blueprints
+    OnHeadbobStateChanged(NewState, OldState);
+}
+
+void AHorrorGameCharacter::EnableHeadbob(bool bEnable)
+{
+    if (HeadbobComponent)
+    {
+        HeadbobComponent->SetHeadbobEnabled(bEnable);
+    }
+}
+
+void AHorrorGameCharacter::SetCustomHeadbob(TSubclassOf<UCameraShakeBase> CustomShake, float Intensity)
+{
+    if (HeadbobComponent)
+    {
+        HeadbobComponent->SetCustomHeadbob(CustomShake, Intensity);
+    }
+}
+
 
 void AHorrorGameCharacter::OnEscape(const FInputActionValue& Value, FKey PressedKey)
 {
@@ -1049,14 +1083,14 @@ void AHorrorGameCharacter::ToggleCrouch()
 	}
 }
 
-void AHorrorGameCharacter::StartSprint()
+void AHorrorGameCharacter::Sprint()
 {
-    SprintComponent->Sprint();
+    SprintComponent->StartSprint();
 }
 
-void AHorrorGameCharacter::StopSprint()
+void AHorrorGameCharacter::UnSprint()
 {
-    SprintComponent->UnSprint();
+    SprintComponent->StopSprint();
 }
 
 void AHorrorGameCharacter::ClientStartJumpScare_Implementation(ANPC* JumpscareNPC, float BlendTime, float Duration)
@@ -1078,6 +1112,8 @@ void AHorrorGameCharacter::ClientStartJumpScare_Implementation(ANPC* JumpscareNP
     {
         return;
     }
+
+    this->DisableInput(PC);
 
     // Lưu view target hiện tại
     OriginalViewTarget = PC->GetViewTarget();
@@ -1121,6 +1157,8 @@ void AHorrorGameCharacter::OnJumpscareCameraComplete()
     {
         return;
     }
+
+	this->EnableInput(PC);
 
     // Chuyển camera về player
     if (OriginalViewTarget)

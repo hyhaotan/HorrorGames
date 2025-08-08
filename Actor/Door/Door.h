@@ -28,10 +28,4 @@ protected:
     virtual FRotator CalculateDoorRotation(float AnimationValue) override;
 
 private:
-    /** Any additional properties specific to this door type */
-    UPROPERTY(EditAnywhere, Category = "Door|FlipFlop")
-    bool bRequireKey = false;
-
-    UPROPERTY(EditAnywhere, Category = "Door|FlipFlop")
-    FString RequiredKeyName = TEXT("");
 };

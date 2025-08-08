@@ -1,4 +1,4 @@
-// Fill out your copyright notice in the Description page of Project Settings.
+Ôªø// Fill out your copyright notice in the Description page of Project Settings.
 
 
 #include "BTTask_IncrementPathIndex.h"
@@ -14,13 +14,13 @@ UBTTask_IncrementPathIndex::UBTTask_IncrementPathIndex(FObjectInitializer const&
 
 EBTNodeResult::Type UBTTask_IncrementPathIndex::ExecuteTask(UBehaviorTreeComponent& OwnerComp, uint8* NodeMemory)
 {
-	//th? v‡ l?y b? ?i?u khi?n c?a AI
+	//th? v√† l?y b? ?i?u khi?n c?a AI
 	if (auto* const Cont = Cast<ANPC_AIController>(OwnerComp.GetAIOwner()))
 	{
-		//th? v‡ l?y npc
+		//th? v√† l?y npc
 		if (auto* const NPC = Cast<ANPC>(Cont->GetPawn()))
 		{
-			//th? v‡ l?y blackboard
+			//th? v√† l?y blackboard
 			if (auto* const BC = OwnerComp.GetBlackboardComponent())
 			{
 				//get number of the patrol point and min and max indices
