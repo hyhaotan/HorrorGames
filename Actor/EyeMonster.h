@@ -1,15 +1,31 @@
-﻿#pragma once
+﻿// EyeMonster.h - Enhanced Horror Version
+#pragma once
 
 #include "CoreMinimal.h"
 #include "GameFramework/Actor.h"
+#include "Engine/World.h"
 #include "EyeMonster.generated.h"
 
 class USkeletalMeshComponent;
 class UParticleSystemComponent;
 class UBoxComponent;
-class UCameraShakeBase;
+class USceneComponent;
+class USanityComponent;
 class UUserWidget;
 class USoundBase;
+class UParticleSystem;
+class UAnimMontage;
+class UCameraShakeBase;
+
+// Enum for monster behavior states
+UENUM(BlueprintType)
+enum class EEyeMonsterState : uint8
+{
+    Lurking     UMETA(DisplayName = "Lurking"),      // Hidden, waiting
+    Staring     UMETA(DisplayName = "Staring"),      // Player is looking, building intensity
+    Aggressive  UMETA(DisplayName = "Aggressive"),   // High damage mode
+    Retreating  UMETA(DisplayName = "Retreating")    // Cooling down, preparing to hide
+};
 
 UCLASS()
 class HORRORGAME_API AEyeMonster : public AActor
@@ -18,161 +34,294 @@ class HORRORGAME_API AEyeMonster : public AActor
 
 public:
     AEyeMonster();
-    virtual void Tick(float DeltaTime) override;
-
-    UFUNCTION()
-    void DoBlink();
-
-    void SetIlluminated(bool bOn);
-
-    bool CanDamage() const { return !bIsCoveringEyes; }
 
 protected:
     virtual void BeginPlay() override;
 
-private:
-    /** Root scene component */
-    UPROPERTY(VisibleAnywhere, Category = "Components")
+public:
+    virtual void Tick(float DeltaTime) override;
+
+    // Core Components
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
     USceneComponent* SceneRoot;
 
-    /** Skeletal mesh for visual representation */
-    UPROPERTY(VisibleAnywhere, Category = "Components")
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
     USkeletalMeshComponent* MeshComponent;
 
-    /** Aura particle effect */
-    UPROPERTY(VisibleAnywhere, Category = "Components")
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
     UParticleSystemComponent* AuraEffect;
 
-    /** Defines the volume within which the monster can spawn */
-    UPROPERTY(VisibleAnywhere, Category = "Components")
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
     UBoxComponent* SpawnVolume;
 
-    /** Sound played when inflicting damage */
-    UPROPERTY(EditAnywhere, Category = "Effects|Sound")
-    USoundBase* DamageScreamSound;
+    // === ENHANCED HORROR CONFIGURATION ===
 
-    /** Camera shake on damage */
-    UPROPERTY(EditAnywhere, Category = "Effects|Camera")
-    TSubclassOf<UCameraShakeBase> CameraShakeClass;
+    // Look Detection
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Horror Settings|Detection")
+    float LookThreshold = 0.7f;
 
-    /** Blood overlay UI widget class */
-    UPROPERTY(EditDefaultsOnly, Category = "UI")
-    TSubclassOf<UUserWidget> BloodOverlayClass;
-
-    UPROPERTY(EditDefaultsOnly, Category = "Hallucination")
-    TSubclassOf<AActor> HallucinationActorClass;
-
-    UPROPERTY(EditAnywhere, Category = "Animation")
-    UAnimMontage* CoverEyesMontage = nullptr;
-
-    /** Duration the blood overlay remains on-screen */
-    UPROPERTY(EditAnywhere, Category = "UI")
-    float BloodOverlayDuration = 0.5f;
-
-    /** Runtime instance of the blood overlay */
-    UPROPERTY()
-    UUserWidget* BloodOverlayWidget = nullptr;
-
-    /** Damage dealt per interval when looked at */
-    UPROPERTY(EditAnywhere, Category = "EyeMonster")
-    float DamageValue = 5.f;
-
-    /** Minimum dot product threshold to consider player "looking" */
-    UPROPERTY(EditAnywhere, Category = "EyeMonster", meta = (ClampMin = "0.0", ClampMax = "1.0"))
-    float LookThreshold = 0.8f;
-
-    /** Height above which traces start */
-    UPROPERTY(EditAnywhere, Category = "EyeMonster")
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Horror Settings|Spawning")
     float TraceHeight = 1000.f;
 
-    /** Depth below which traces end */
-    UPROPERTY(EditAnywhere, Category = "EyeMonster")
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Horror Settings|Spawning")
     float TraceDepth = 2000.f;
 
-    /** Yaw offset when facing the player */
-    UPROPERTY(EditAnywhere, Category = "EyeMonster")
-    float YawOffset = -90.f;
+    // Sanity Damage System
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Horror Settings|Sanity Damage")
+    float BaseSanityDamage = 15.0f;
 
-    float HallucinationAccumTime = 0.f;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Horror Settings|Sanity Damage")
+    float MaxSanityDamage = 35.0f;
 
-    /** Smoothing speed for rotation (unused for instant facing) */
-    UPROPERTY(EditAnywhere, Category = "EyeMonster")
-    float RotationSpeed = 2.5f;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Horror Settings|Sanity Damage")
+    float SanityDamageInterval = 0.8f;
 
-    /** Time between each damage infliction when looking */
-    UPROPERTY(EditAnywhere, Category = "EyeMonster")
-    float LookDamageInterval = 1.0f;
+    // Staring Mechanics
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Horror Settings|Staring")
+    float StareIntensifyRate = 1.5f;
 
-    /** Accumulated time since last damage tick */
-    float LookDamageTimer = 0.f;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Horror Settings|Staring")
+    float MaxStareTime = 5.0f;
 
-    UPROPERTY(EditDefaultsOnly, Category = "Blink")
-    float BlinkDuration = 0.5f;
+    // Proximity Fear
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Horror Settings|Proximity")
+    float ProximityFearRadius = 500.0f;
 
-    UPROPERTY(EditDefaultsOnly, Category = "Blink")
-    float BlinkRadius = 500.f;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Horror Settings|Proximity")
+    float ProximityFearDamage = 5.0f;
 
-    UPROPERTY(EditAnywhere, Category = "Blink")
-    float CoverEyesDuration = 2.0f;
+    // Blink/Teleport Mechanics
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Horror Settings|Teleportation")
+    float BlinkCooldown = 8.0f;
 
-    bool bIsBlinking = false;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Horror Settings|Teleportation")
+    float BlinkTeleportRadius = 300.0f;
 
-    bool bIsCoveringEyes = false;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Horror Settings|Teleportation")
+    float BlinkRadius = 200.0f; // Legacy support
 
-    /** Original spawn volume center in world space */
-    FVector InitialSpawnCenter;
+    // === VISUAL EFFECTS ===
 
-    /** Original spawn volume half-extents */
-    FVector InitialSpawnExtent;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Visual Effects|UI")
+    TSubclassOf<UUserWidget> BloodOverlayClass;
 
-    /** Handle for self-destruction timer */
-    FTimerHandle DestroyTimerHandle;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Visual Effects|UI")
+    float BloodOverlayDuration = 2.0f;
 
-    /** Handle for respawn delegate timer */
-    FTimerHandle RespawnTimerHandle;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Visual Effects|Camera")
+    TSubclassOf<UCameraShakeBase> CameraShakeClass;
 
-    /** Handle for blood overlay removal timer */
-    FTimerHandle BloodOverlayTimerHandle;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Visual Effects|Particles")
+    UParticleSystem* AggressiveAuraEffect;
 
-    FTimerHandle BlinkTimerHandle;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Visual Effects|Particles")
+    UParticleSystem* BlinkParticleEffect;
 
-    /** Spawns the monster at a random ground location within the defined volume */
-    void SpawnAtRandomLocation();
+    // === AUDIO SYSTEM ===
 
-    /** Performs a vertical trace to find ground at XY and outputs the hit point */
-    bool GetGroundSpawnLocation(const FVector2D& XY, FVector& OutLocation) const;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Audio|Damage")
+    USoundBase* DamageScreamSound;
 
-    /** Applies damage over time if the player is looking */
-    void ApplyLookDamage(float DeltaTime);
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Audio|Staring")
+    USoundBase* StareStartSound;
 
-    /** Checks if the player view is directed at this actor without obstruction */
-    bool IsPlayerLookingAtMonster() const;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Audio|Aggressive")
+    USoundBase* AggressiveSound;
 
-    /** Instantly faces the actor toward the player */
-    void FacePlayer(float DeltaTime = 0.f);
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Audio|Movement")
+    USoundBase* StealthBlinkSound;
 
-    /** Inflicts damage, shows UI, camera shake, and sound */
-    void InflictDamage();
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Audio|Movement")
+    USoundBase* EscapeBlinkSound;
 
-    /** Safe helper to display and remove the blood overlay */
-    void ShowBloodOverlay(APlayerController* PC);
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Audio|Movement")
+    USoundBase* RetreatSound;
 
-    /** Safe helper to trigger camera shake */
-    void ShakeCamera(APlayerController* PC) const;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Audio|Movement")
+    USoundBase* BlinkEffectSound;
 
-    /** Safe helper to play damage sound */
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Audio|Proximity")
+    USoundBase* ProximityFearSound;
+
+    // === ANIMATION ===
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Animation")
+    UAnimMontage* CoverEyesMontage;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Animation")
+    float CoverEyesDuration = 1.0f;
+
+    // === ROTATION ===
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Behavior")
+    float YawOffset = 0.0f;
+
+    // === PUBLIC INTERFACE ===
+
+    UFUNCTION(BlueprintCallable, Category = "Monster Behavior")
+    void DoBlink();
+
+    UFUNCTION(BlueprintCallable, Category = "Monster Behavior")
+    void SetIlluminated(bool bOn);
+
+    UFUNCTION(BlueprintPure, Category = "Monster State")
+    EEyeMonsterState GetCurrentState() const { return CurrentState; }
+
+    UFUNCTION(BlueprintPure, Category = "Monster State")
+    bool IsPlayerStaring() const { return bIsStaring; }
+
+    UFUNCTION(BlueprintPure, Category = "Monster State")
+    float GetStareIntensity() const { return CurrentStareIntensity; }
+
+    UFUNCTION(BlueprintPure, Category = "Monster State")
+    float GetCurrentStareTime() const { return CurrentStareTime; }
+
+protected:
+    // === STATE MANAGEMENT ===
+
+    UPROPERTY(BlueprintReadOnly, Category = "State")
+    EEyeMonsterState CurrentState = EEyeMonsterState::Lurking;
+
+    // State Update Methods
+    void UpdateBehaviorState(float DeltaTime);
+    void HandleLurkingState(float DeltaTime);
+    void HandleStaringState(float DeltaTime);
+    void HandleAggressiveState(float DeltaTime);
+    void HandleRetreatingState(float DeltaTime);
+    void SetCurrentBehaviorState(EEyeMonsterState NewState);
+
+    // === STARING SYSTEM ===
+
+    void ProcessStaring(float DeltaTime);
+    void OnPlayerStartedLooking();
+    void OnPlayerStoppedLooking();
+    void ApplyStaringSanityDamage(float DeltaTime);
+    void ApplyAggressiveSanityDamage(float DeltaTime);
+    void ResetStareData();
+
+    // === PROXIMITY FEAR ===
+
+    void CheckProximityFear(float DeltaTime);
+
+    // === TELEPORTATION SYSTEM ===
+
+    void PerformStealthBlink();
+    void PerformAggressiveBlink();
+    void PerformEscapeBlink();
+    void PerformRetreatTeleport();
+
+    // Position Finding
+    FVector FindStealthyPosition();
+    FVector FindAggressivePosition(const FVector& PlayerLocation);
+    FVector FindEscapePosition();
+    FVector FindRetreatPosition();
+
+    // Teleport Conditions
+    bool CanPerformBlink() const;
+    bool ShouldRandomBlink() const;
+
+    // === AGGRESSIVE STATE ===
+
+    void TriggerAggressiveResponse();
+    void TriggerAggressiveEffects();
+    void ShowIntenseBloodOverlay();
+    void SpawnAggressiveEffects();
+
+    // === VISUAL EFFECTS ===
+
+    void StartEyeGlow();
+    void StopEyeGlow();
+    void UpdateVisualEffects(float DeltaTime);
+    void TriggerSanityDamageEffects(float DamageAmount);
+    void TriggerProximityFearEffect();
+    void TriggerBlinkEffects();
+
+    // === AUDIO SYSTEM ===
+
+    void PlayStareSound();
+    void PlayAggressiveSound();
+    void PlayStealthSound();
+    void PlayEscapeSound();
+    void PlayRetreatSound();
     void PlayDamageSound() const;
 
-    /** Removes the blood overlay widget */
+    // === UTILITY METHODS ===
+
+    bool IsPlayerLookingAtMonster() const;
+    FVector GetPlayerLocation() const;
+    void FacePlayer(float DeltaTime);
+
+    // Legacy UI Methods
+    void ShowBloodOverlay(APlayerController* PC, float Intensity = 1.0f);
     void RemoveBloodOverlay();
+    void ShakeCamera(APlayerController* PC, float Intensity = 1.0f) const;
 
-    /** Schedules self-destruction and respawn */
-    void RespawnAndDestroy();
-
-    /** Handles destruction, respawn delegate scheduling, and cleanup */
-    void HandleSelfDestruct();
-
-    void FinishBlink();
+    // === SPAWNING SYSTEM ===
 
     void DrawSpawnDebug() const;
+    void RespawnAndDestroy();
+    void HandleSelfDestruct();
+    void SpawnAtRandomLocation();
+    bool GetGroundSpawnLocation(const FVector2D& XY, FVector& OutLocation) const;
+
+    // Legacy Blink Methods
+    void FinishBlink();
+
+private:
+    // === CACHED COMPONENTS ===
+
+    UPROPERTY()
+    USanityComponent* CachedSanityComponent;
+
+    UPROPERTY()
+    UUserWidget* BloodOverlayWidget;
+
+    // === STATE VARIABLES ===
+
+    // Staring State
+    bool bIsStaring = false;
+    float CurrentStareTime = 0.0f;
+    float CurrentStareIntensity = 1.0f;
+    float SanityDamageTimer = 0.0f;
+
+    // Aggressive State
+    float AggressiveCooldownTimer = 0.0f;
+    float AggressiveDamageTimer = 0.0f;
+
+    // Retreating State
+    float RetreatCooldownTimer = 0.0f;
+
+    // Proximity Fear
+    float ProximityFearTimer = 0.0f;
+
+    // Player Awareness
+    bool bPlayerAware = false;
+
+    // Teleportation
+    float LastBlinkTime = 0.0f;
+
+    // Visual Effects
+    bool bEyesGlowing = false;
+    float EyeGlowIntensity = 1.0f;
+
+    // Legacy Animation State
+    bool bIsBlinking = false;
+    bool bIsCoveringEyes = false;
+
+    // === SPAWN SYSTEM ===
+
+    FVector InitialSpawnCenter;
+    FVector InitialSpawnExtent;
+
+    // === TIMER HANDLES ===
+
+    FTimerHandle DestroyTimerHandle;
+    FTimerHandle RespawnTimerHandle;
+    FTimerHandle BloodOverlayTimerHandle;
+    FTimerHandle BlinkTimerHandle;
+    FTimerHandle BlinkEffectTimer;
+
+    // === HELPER FUNCTIONS ===
+
+    bool CanDamage() const { return CachedSanityComponent != nullptr; }
 };

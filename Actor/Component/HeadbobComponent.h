@@ -3,21 +3,24 @@
 #include "CoreMinimal.h"
 #include "Components/ActorComponent.h"
 #include "Camera/CameraShakeBase.h"
-#include "Engine/Engine.h"
 #include "HeadbobComponent.generated.h"
 
 UENUM(BlueprintType)
 enum class EHeadbobState : uint8
 {
-    None,
-    Walking,
-    Sprinting,
-    Crouching,
-    Idle,
-    Custom
+    None        UMETA(DisplayName = "None"),
+    Idle        UMETA(DisplayName = "Idle"),
+    Walking     UMETA(DisplayName = "Walking"),
+    Sprinting   UMETA(DisplayName = "Sprinting"),
+    Crouching   UMETA(DisplayName = "Crouching"),
+    Custom      UMETA(DisplayName = "Custom")
 };
 
-DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnHeadbobStateChanged, EHeadbobState, NewState, EHeadbobState, OldState);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnHeadbobStateChanged, EHeadbobState, NewState, EHeadbobState, PreviousState);
+
+class USprintComponent;
+class USanityComponent;
+class ACharacter;
 
 UCLASS(ClassGroup = (Custom), meta = (BlueprintSpawnableComponent))
 class HORRORGAME_API UHeadbobComponent : public UActorComponent
@@ -27,9 +30,10 @@ class HORRORGAME_API UHeadbobComponent : public UActorComponent
 public:
     UHeadbobComponent();
 
+    virtual void BeginPlay() override;
     virtual void TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction) override;
 
-    // Public interface
+    // --- Public API ---
     UFUNCTION(BlueprintCallable, Category = "Headbob")
     void StartHeadbob();
 
@@ -42,118 +46,143 @@ public:
     UFUNCTION(BlueprintCallable, Category = "Headbob")
     void SetHeadbobEnabled(bool bEnabled);
 
-    UFUNCTION(BlueprintPure, Category = "Headbob")
-    bool IsHeadbobActive() const { return bIsCurrentlyHeadbobbing; }
-
-    UFUNCTION(BlueprintPure, Category = "Headbob")
-    EHeadbobState GetCurrentHeadbobState() const { return CurrentHeadbobState; }
-
     UFUNCTION(BlueprintCallable, Category = "Headbob")
     void SetCustomHeadbob(TSubclassOf<UCameraShakeBase> CustomShake, float Intensity);
 
-    // Delegates
-    UPROPERTY(BlueprintAssignable)
+    // Returns a vector offset (local) to apply to camera/neck
+    UFUNCTION(BlueprintCallable, Category = "Headbob")
+    FVector GetHeadbobOffset() const;
+
+    // Delegate
+    UPROPERTY(BlueprintAssignable, Category = "Headbob")
     FOnHeadbobStateChanged OnHeadbobStateChanged;
 
 protected:
-    virtual void BeginPlay() override;
-
-    // Camera Shake Classes
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Headbob|Shakes")
-    TSubclassOf<UCameraShakeBase> WalkCameraShakeClass;
-
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Headbob|Shakes")
-    TSubclassOf<UCameraShakeBase> SprintCameraShakeClass;
-
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Headbob|Shakes")
-    TSubclassOf<UCameraShakeBase> CrouchCameraShakeClass;
-
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Headbob|Shakes")
-    TSubclassOf<UCameraShakeBase> IdleCameraShakeClass;
-
-    // Performance Settings
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Headbob|Performance", meta = (ClampMin = "0.05", ClampMax = "0.5"))
-    float UpdateFrequency = 0.1f;
-
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Headbob|Performance", meta = (ClampMin = "10.0", ClampMax = "200.0"))
-    float MinSpeedForHeadbob = 50.0f;
-
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Headbob|Performance", meta = (ClampMin = "10.0", ClampMax = "200.0"))
-    float SpeedChangeThreshold = 75.0f; // How much speed must change to trigger shake update
-
-    // Intensity Settings
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Headbob|Intensity", meta = (ClampMin = "0.1", ClampMax = "3.0"))
-    float WalkIntensity = 0.8f;
-
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Headbob|Intensity", meta = (ClampMin = "0.1", ClampMax = "3.0"))
-    float SprintIntensity = 1.2f;
-
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Headbob|Intensity", meta = (ClampMin = "0.1", ClampMax = "2.0"))
-    float CrouchIntensity = 0.5f;
-
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Headbob|Intensity", meta = (ClampMin = "0.2", ClampMax = "1.0"))
-    float MinIntensityMultiplier = 0.4f;
-
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Headbob|Intensity", meta = (ClampMin = "1.0", ClampMax = "3.0"))
-    float MaxIntensityMultiplier = 1.5f;
-
-    // Transition Settings
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Headbob|Transitions")
-    bool bSmoothTransitions = true;
-
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Headbob|Transitions", meta = (ClampMin = "0.1", ClampMax = "1.0"))
-    float TransitionFadeTime = 0.3f;
-
-    // Debug Settings
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Headbob|Debug")
-    bool bDebugHeadbob = false;
-
-private:
-    // Component references
-    UPROPERTY()
-    class ACharacter* OwnerCharacter;
-
-    UPROPERTY()
-    class APlayerController* PlayerController;
-
-    UPROPERTY()
-    class USprintComponent* SprintComponent;
-
-    // State tracking
-    EHeadbobState CurrentHeadbobState;
-    EHeadbobState PreviousHeadbobState;
-    bool bIsCurrentlyHeadbobbing;
-    bool bHeadbobEnabled;
-
-    // Current shake info
-    UPROPERTY()
-    class UCameraShakeBase* CurrentCameraShake;
-    TSubclassOf<UCameraShakeBase> CurrentShakeClass;
-    float CurrentIntensity;
-
-    // Timing
-    float LastUpdateTime;
-    float LastSpeedCheck;
-    float LastMovementSpeed;
-
-    // Custom headbob
-    TSubclassOf<UCameraShakeBase> CustomShakeClass;
-    float CustomIntensity;
-
-    // Core functions
+    // Core logic
     void UpdateHeadbobState();
     void ProcessHeadbobTransition();
     void ApplyHeadbob();
     void ClearCurrentShake();
 
-    // Helper functions
     EHeadbobState DetermineHeadbobState() const;
     bool ShouldPlayHeadbob() const;
     float CalculateIntensity() const;
     TSubclassOf<UCameraShakeBase> GetShakeClassForState(EHeadbobState State) const;
     float GetBaseIntensityForState(EHeadbobState State) const;
 
-    // Validation
-    bool ValidateComponents();
+    // NEW: base headbob waveform generator used by GetHeadbobOffset
+    FVector CalculateBaseHeadbob() const;
+
+    // Sanity influence
+    float GetSanityModifier() const;
+    void UpdateHeadbobIntensity();
+
     void LogHeadbobChange(EHeadbobState NewState, float Speed, float Intensity) const;
+    bool ValidateComponents();
+
+protected:
+    // Owner refs
+    UPROPERTY(Transient)
+    ACharacter* OwnerCharacter;
+
+    UPROPERTY(Transient)
+    APlayerController* PlayerController;
+
+    UPROPERTY(Transient)
+    USprintComponent* SprintComponent;
+
+    UPROPERTY(Transient)
+    USanityComponent* SanityComponent;
+
+    // State
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Headbob")
+    EHeadbobState CurrentHeadbobState;
+
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Headbob")
+    EHeadbobState PreviousHeadbobState;
+
+    bool bIsCurrentlyHeadbobbing;
+
+    // Controls whether camera shake (PlayerCameraManager) is toggled
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Headbob")
+    bool bHeadbobEnabled;
+
+    // Controls whether GetHeadbobOffset() produces non-zero offsets (useful to disable visual offset while keeping camera shakes)
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Headbob")
+    bool bEnableHeadbob;
+
+    // Debug
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Headbob|Debug")
+    bool bDebugHeadbob;
+
+    // Timing
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Headbob")
+    float UpdateFrequency = 0.05f;
+
+    float LastUpdateTime;
+
+    // Camera shake management
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Headbob|CameraShake")
+    TSubclassOf<UCameraShakeBase> WalkCameraShakeClass;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Headbob|CameraShake")
+    TSubclassOf<UCameraShakeBase> SprintCameraShakeClass;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Headbob|CameraShake")
+    TSubclassOf<UCameraShakeBase> CrouchCameraShakeClass;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Headbob|CameraShake")
+    TSubclassOf<UCameraShakeBase> IdleCameraShakeClass;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Headbob|CameraShake")
+    TSubclassOf<UCameraShakeBase> CustomShakeClass;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Headbob|CameraShake")
+    bool bSmoothTransitions = true;
+
+    // Intensities
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Headbob|Intensity")
+    float WalkIntensity = 1.0f;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Headbob|Intensity")
+    float SprintIntensity = 1.8f;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Headbob|Intensity")
+    float CrouchIntensity = 0.6f;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Headbob|Intensity")
+    float IdleIntensity = 0.2f;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Headbob|Intensity")
+    float BaseHeadbobIntensity = 1.0f;
+
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Headbob")
+    float CurrentIntensity;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Headbob")
+    float CustomIntensity = 1.0f;
+
+    // Speed thresholds
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Headbob")
+    float MinSpeedForHeadbob = 10.0f;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Headbob|Intensity")
+    float MinIntensityMultiplier = 0.5f;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Headbob|Intensity")
+    float MaxIntensityMultiplier = 2.5f;
+
+    // Camera shake runtime
+    UPROPERTY(Transient)
+    UCameraShakeBase* CurrentCameraShake;
+
+    UPROPERTY(Transient)
+    TSubclassOf<UCameraShakeBase> CurrentShakeClass;
+
+    // other runtime
+    float LastMovementSpeed;
+
+    // Optional: tuning for CalculateBaseHeadbob
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Headbob|Tuning")
+    float MaxHeadbobOffset = 1.5f; // in cm or world-units, tune to taste
 };

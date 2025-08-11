@@ -40,6 +40,16 @@ enum class EPlayerState : uint8
 	PS_Death  UMETA(DisplayName = "Death")
 };
 
+UENUM(BlueprintType)
+enum class EHallucinationType : uint8
+{
+	FakeMonster,
+	FalseSound,
+	WallMovement,
+	ShadowPeople,
+	FakeExit
+};
+
 UCLASS(config=Game)
 class AHorrorGameCharacter : public ACharacter
 {
@@ -137,11 +147,6 @@ public:
 		bIsPlayingPanicShake = false;
 	}
 
-	void RecoverSanity(float Delta);
-
-	void PauseSanityDrain();
-	void ResumeSanityDrain();
-
 	void SetCurrentNoteActor(ANoteActor* Note) { CurrentNote = Note; }
 
 	void DropInventoryItem(bool bFromBag, int32 Index);
@@ -196,6 +201,58 @@ public:
 
 	UFUNCTION(BlueprintImplementableEvent, Category = "Headbob")
 	void OnHeadbobStateChanged(EHeadbobState NewState, EHeadbobState OldState);
+
+	// Returns sanity as a normalized value [0..1]
+	UFUNCTION(BlueprintCallable, Category = "Sanity")
+	float GetSanityLevel() const;
+
+	// Returns computed fear level [0..1]
+	UFUNCTION(BlueprintCallable, Category = "Sanity")
+	float GetFearLevel() const;
+
+	// Called when sanity crosses certain thresholds
+	UFUNCTION()
+	void OnSanityThresholdReached(float ThresholdPercent);
+
+	UFUNCTION(BlueprintCallable, Category = "Sanity")
+	void OnPanicAttack();
+
+	UFUNCTION(BlueprintCallable, Category = "Sanity")
+	void OnHallucination();
+
+	// Notify character that a chase started (server or AI will call)
+	UFUNCTION(BlueprintCallable, Category = "AI")
+	void NotifyChasedByMonster(float ChaseIntensity);
+
+	// Darkness zone enter/exit
+	UFUNCTION(BlueprintCallable, Category = "Environment")
+	void EnterDarknessZone(float DarknessIntensity);
+
+	UFUNCTION(BlueprintCallable, Category = "Environment")
+	void ExitDarknessZone(float DarknessIntensity);
+
+	// State queries
+	UFUNCTION(BlueprintPure, Category = "Sanity")
+	bool IsBeingChased() const;
+
+	UFUNCTION(BlueprintPure, Category = "Sanity")
+	bool IsInDarkness() const;
+
+	UFUNCTION(BlueprintPure, Category = "Sanity")
+	bool IsInThreatProximity() const;
+
+	/* ----------------------- BP Events / Hooks ----------------------- */
+	UFUNCTION(BlueprintImplementableEvent, Category = "Sanity")
+	void BP_OnSanityThresholdReached(float ThresholdPercent);
+
+	UFUNCTION(BlueprintImplementableEvent, Category = "Sanity")
+	void BP_OnPanicAttack();
+
+	UFUNCTION(BlueprintImplementableEvent, Category = "Sanity")
+	void BP_OnHallucination();
+
+	UFUNCTION(BlueprintImplementableEvent, Category = "AI")
+	void BP_OnChasedByMonster(float ChaseIntensity);
 	//------------------------------------------------PROPERTY--------------------------------------------------------//
 	//------------------------------------------------OTHER--------------------------------------------------------//
 	UPROPERTY(BlueprintAssignable, Category = "Inventory")
@@ -250,25 +307,9 @@ public:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "PostProcess")
 	class UPostProcessComponent* PostProcessComponent;
 
-	UPROPERTY(EditDefaultsOnly, Category = "UI")
-	TSubclassOf<USanityWidget> SanityWidgetClass;
-
-	USanityWidget* SanityWidget;
-
-	/** Camera shake khi sanity thấp */
-	UPROPERTY(EditAnywhere, Category = "Effects")
-	TSubclassOf<UCameraShakeBase> LowSanityShake;
-
 	/** PostProcess volume để blur/ghost */
 	UPROPERTY(VisibleAnywhere, Category = "Effects")
 	UPostProcessComponent* PPComponent;
-
-	/** Timeline for drain */
-	UPROPERTY(EditAnywhere, Category = "Sanity")
-	UCurveFloat* SanityDrainCurve;
-
-	UPROPERTY()
-	UTimelineComponent* SanityTimeline;
 
 	UPROPERTY(EditAnywhere, Category = "UI")
 	TSubclassOf<UKnockOutWidget> KnockOutWidgetClass;
@@ -287,6 +328,12 @@ public:
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
 	class UHeadbobComponent* HeadbobComponent;
+	
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
+	class USanityComponent* SanityComponent;
+
+	UPROPERTY()
+	class UFearComponent* FearComponent;
 	//------------------------------------------------BOOLEAN--------------------------------------------------------//
 
 	UPROPERTY(EditAnywhere, Replicated,BlueprintReadOnly, Category = "Flashlight")
@@ -316,6 +363,13 @@ public:
 
 	UPROPERTY(VisibleDefaultsOnly, BlueprintReadOnly, Category = "Hold Item")
 	bool bIsHoldingItem = false;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Sanity")
+	bool bIsBeingChased = false;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Debug")
+	bool bDebugSanity = false;
+
 	//------------------------------------------------VECTOR--------------------------------------------------------//	  
 	
 	//------------------------------------------------FLOAT--------------------------------------------------------//
@@ -344,6 +398,48 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Knockdown")
 	float KnockDownDuration = 3.0f;
 
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Sanity")
+	float LastChaseTime = 0.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Sanity")
+	float ChaseMemoryTime = 6.0f;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Sanity")
+	float CurrentChaseIntensity = 0.0f;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Environment")
+	float DarknessExposureTime = 0.0f;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Environment")
+	float CurrentDarknessIntensity = 0.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Environment")
+	float DarknessSanityDrainRate = 0.5f; // sanity points per second * intensity
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Environment")
+	float CurrentLightLevel = 1.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Environment")
+	float DarknessThreshold = 0.3f;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Threat")
+	float ThreatProximityAmount = 0.0f; // normalized
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Threat")
+	float ThreatProximityDistance = 600.0f;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Threat")
+	float NearestMonsterDistance = FLT_MAX;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Threat")
+	float MaxFearDistance = 2000.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Movement")
+	float DefaultWalkSpeed = 600.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Movement")
+	float PanicDuration = 3.0f;
+
 	//------------------------------------------------INT--------------------------------------------------------//
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Grab")
 	int32 InteractLineTraceLength = 500;
@@ -356,6 +452,9 @@ public:
 	UPROPERTY(BlueprintReadOnly, Category = "Inventory")
 	int32 EquippedIndex = INDEX_NONE;
 
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Environment")
+	int32 DarknessVolumeCount = 0;
+
 	//------------------------------------------------ANIMATION--------------------------------------------------------//
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Animation")
 	UAnimMontage* DeathMontage;
@@ -363,6 +462,35 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Knockdown")
 	UAnimMontage* KnockDownMontage;
 
+	//------------------------------------------------OTHER--------------------------------------------------------//
+	/* ----------------------- Audio / Effects ----------------------- */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Audio")
+	USoundBase* LowSanityAlarmSound;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Audio")
+	USoundBase* NervousBreathingSound;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Audio")
+	USoundBase* AnxiousWhisperSound;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Audio")
+	USoundBase* UnstableSound;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Audio")
+	USoundBase* CriticalPanicSound;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Audio")
+	USoundBase* PanicAttackSound;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Audio")
+	USoundBase* FalseHallucinationSound;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Effects")
+	TSubclassOf<UCameraShakeBase> PanicCameraShake;
+
+	/* ----------------------- Hallucinations ----------------------- */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Hallucination")
+	TArray<EHallucinationType> HallucinationTypes;
 private:
 	//-----------------------------------------------------------------------------//
 	// SETTINGS & UI
@@ -420,8 +548,6 @@ private:
 	//-----------------------------------------------------------------------------//
 	// SANITY & HEADBOB
 	//-----------------------------------------------------------------------------//
-	void SetupSanityWidget();
-	void SetupSanityTimeline();
 
 	//-----------------------------------------------------------------------------//
 	// INPUT CALLBACKS & TIMELINE
@@ -429,14 +555,15 @@ private:
 	UFUNCTION()
 	void OnEscape(const FInputActionValue& Value, FKey PressedKey);
 
-	UFUNCTION()
-	void HandleDrainProgress(float Value);
-
 	void Ticks(float DeltaTime);
 
 	//-----------------------------------------------------------------------------//
 	// OtHER FUNCTIONS
 	//-----------------------------------------------------------------------------//
+		// Helper methods
+	float BaseSanityFear() const;
+	float ChaseFear()       const;
+	float DarknessFear()    const;
 
 	//-----------------------------------------------------------------------------//
 	// PROPERTIES
@@ -467,6 +594,8 @@ private:
 
 	FTimerHandle KnockDownTimerHandle;
 	FTimerHandle JumpscareTimerHandle;
+	FTimerHandle TimerHandle_ResetChase;
+	FTimerHandle TimerHandle_DarknessExposure;
 
 	UPROPERTY()
 	AActor* OriginalViewTarget;
@@ -482,5 +611,15 @@ private:
 
 	UFUNCTION()
 	void OnRep_Inventory();
+
+	void TriggerRandomHallucination();
+
+	void PlayFalseSound();
+	void TriggerWallMovementHallucination();
+
+	void RecalculateDarknessIntensity();
+
+	void StartDarknessExposure();
+	void StopDarknessExposure();
 };
 

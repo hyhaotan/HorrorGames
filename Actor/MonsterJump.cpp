@@ -2,6 +2,7 @@
 #include "HorrorGame/Character/HorrorGameCharacter.h"
 #include "HorrorGame/Widget/Progress/ProgressBarWidget.h"
 #include "HorrorGame/AI/NPC_AIController.h"
+#include "HorrorGame/Actor/Component/SanityComponent.h"
 
 #include "Blueprint/WidgetBlueprintLibrary.h"
 #include "GameFramework/CharacterMovementComponent.h"
@@ -62,7 +63,8 @@ void AMonsterJump::Tick(float DeltaTime)
 
     if (bIsGrabbing && CapturedPlayer)
     {
-        CapturedPlayer->RecoverSanity(DeltaTime * 1.f);
+		auto* const Sanity = CapturedPlayer->FindComponentByClass<USanityComponent>();
+        Sanity->RecoverSanity(DeltaTime * 1.f);
         if (EscapeProgress > 0.f)
         {
             EscapeProgress = FMath::Max(0.f, EscapeProgress - DeltaTime * 0.05f);
@@ -207,7 +209,8 @@ void AMonsterJump::CompleteEscape()
 
     if (CapturedPlayer)
     {
-        CapturedPlayer->ResumeSanityDrain();
+        auto* const Sanity = CapturedPlayer->FindComponentByClass<USanityComponent>();
+        Sanity->PauseSanitySystem();
         CapturedPlayer->bIsGrabbed = false;
         CapturedPlayer->GetCharacterMovement()->SetMovementMode(MOVE_Walking);
         CapturedPlayer->ClearGrabbingMonster();
@@ -271,6 +274,8 @@ void AMonsterJump::InitializeGrabbedPlayer(AHorrorGameCharacter* Player)
     Player->EnableThirdPerson();
     Player->GetCharacterMovement()->DisableMovement();
     Player->SetGrabbingMonster(this);
+    auto* const Sanity = CapturedPlayer->FindComponentByClass<USanityComponent>();
+    Sanity->ResumeSanitySystem();
 
     if (ProgressBarClass)
     {

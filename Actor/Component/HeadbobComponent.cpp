@@ -1,10 +1,12 @@
-#include "HorrorGame/Actor/Component/HeadbobComponent.h"
-#include "HorrorGame/Character/HorrorGameCharacter.h"
-#include "HorrorGame/Actor/Component/SprintComponent.h"
+﻿#include "HeadbobComponent.h"
 #include "GameFramework/Character.h"
 #include "GameFramework/PlayerController.h"
+#include "Camera/PlayerCameraManager.h"
 #include "Engine/World.h"
 #include "TimerManager.h"
+#include "HorrorGame/Actor/Component/SprintComponent.h"
+#include "HorrorGame/Actor/Component/SanityComponent.h"
+#include "HorrorGame/Character/HorrorGameCharacter.h"
 
 UHeadbobComponent::UHeadbobComponent()
 {
@@ -16,24 +18,29 @@ UHeadbobComponent::UHeadbobComponent()
     bIsCurrentlyHeadbobbing = false;
     bHeadbobEnabled = true;
 
+    // NEW: initialize enable flag for visual offsets
+    bEnableHeadbob = true;
+
     // Initialize tracking variables
     CurrentCameraShake = nullptr;
     CurrentShakeClass = nullptr;
     CurrentIntensity = 0.0f;
     LastUpdateTime = 0.0f;
-    LastSpeedCheck = 0.0f;
     LastMovementSpeed = 0.0f;
+    BaseHeadbobIntensity = 1.0f;
 
     // Initialize custom headbob
     CustomShakeClass = nullptr;
     CustomIntensity = 0.0f;
+
+    // Debug default
+    bDebugHeadbob = false;
 }
 
 void UHeadbobComponent::BeginPlay()
 {
     Super::BeginPlay();
 
-    // Cache component references
     OwnerCharacter = Cast<ACharacter>(GetOwner());
     if (!OwnerCharacter)
     {
@@ -44,6 +51,7 @@ void UHeadbobComponent::BeginPlay()
 
     PlayerController = Cast<APlayerController>(OwnerCharacter->GetController());
     SprintComponent = OwnerCharacter->FindComponentByClass<USprintComponent>();
+    SanityComponent = OwnerCharacter->FindComponentByClass<USanityComponent>();
 
     if (!ValidateComponents())
     {
@@ -51,7 +59,6 @@ void UHeadbobComponent::BeginPlay()
         return;
     }
 
-    // Initialize state
     CurrentHeadbobState = EHeadbobState::None;
     LastUpdateTime = GetWorld()->GetTimeSeconds();
 }
@@ -65,7 +72,6 @@ void UHeadbobComponent::TickComponent(float DeltaTime, ELevelTick TickType, FAct
 
     float CurrentTime = GetWorld()->GetTimeSeconds();
 
-    // Throttle updates for performance
     if (CurrentTime - LastUpdateTime >= UpdateFrequency)
     {
         LastUpdateTime = CurrentTime;
@@ -119,7 +125,6 @@ void UHeadbobComponent::SetCustomHeadbob(TSubclassOf<UCameraShakeBase> CustomSha
     CustomShakeClass = CustomShake;
     CustomIntensity = FMath::Clamp(Intensity, 0.1f, 3.0f);
 
-    // If we're currently in a headbob state, apply the custom one
     if (bIsCurrentlyHeadbobbing)
     {
         ForceUpdateHeadbob();
@@ -135,7 +140,6 @@ void UHeadbobComponent::UpdateHeadbobState()
         PreviousHeadbobState = CurrentHeadbobState;
         CurrentHeadbobState = NewState;
 
-        // Broadcast state change
         if (OnHeadbobStateChanged.IsBound())
         {
             OnHeadbobStateChanged.Broadcast(CurrentHeadbobState, PreviousHeadbobState);
@@ -171,7 +175,6 @@ void UHeadbobComponent::ProcessHeadbobTransition()
         return;
     }
 
-    // Apply headbob for current state
     ApplyHeadbob();
 }
 
@@ -184,26 +187,26 @@ void UHeadbobComponent::ApplyHeadbob()
 
     if (!DesiredShake) return;
 
-    // Check if we need to change the current shake
     bool bNeedsNewShake = !bIsCurrentlyHeadbobbing ||
         CurrentShakeClass != DesiredShake ||
         FMath::Abs(CurrentIntensity - DesiredIntensity) > 0.2f;
 
     if (bNeedsNewShake)
     {
-        // Clear existing shake
         ClearCurrentShake();
 
-        // Start new shake
-        CurrentCameraShake = PlayerController->PlayerCameraManager->StartCameraShake(DesiredShake, DesiredIntensity);
-        CurrentShakeClass = DesiredShake;
-        CurrentIntensity = DesiredIntensity;
-        bIsCurrentlyHeadbobbing = true;
-
-        if (bDebugHeadbob)
+        if (PlayerController->PlayerCameraManager)
         {
-            UE_LOG(LogTemp, Verbose, TEXT("Applied headbob: State=%d, Intensity=%.2f"),
-                (int32)CurrentHeadbobState, DesiredIntensity);
+            CurrentCameraShake = PlayerController->PlayerCameraManager->StartCameraShake(DesiredShake, DesiredIntensity);
+            CurrentShakeClass = DesiredShake;
+            CurrentIntensity = DesiredIntensity;
+            bIsCurrentlyHeadbobbing = true;
+
+            if (bDebugHeadbob)
+            {
+                UE_LOG(LogTemp, Verbose, TEXT("Applied headbob: State=%d, Intensity=%.2f"),
+                    (int32)CurrentHeadbobState, DesiredIntensity);
+            }
         }
     }
 }
@@ -224,15 +227,13 @@ EHeadbobState UHeadbobComponent::DetermineHeadbobState() const
 {
     if (!ShouldPlayHeadbob()) return EHeadbobState::None;
 
-    // Custom headbob takes priority
     if (CustomShakeClass) return EHeadbobState::Custom;
 
-    // Check character states
     if (OwnerCharacter->bIsCrouched) return EHeadbobState::Crouching;
 
     if (SprintComponent && SprintComponent->IsSprinting()) return EHeadbobState::Sprinting;
 
-	if (OwnerCharacter->GetVelocity().Size2D() <= 0.0f) return EHeadbobState::Idle;
+    if (OwnerCharacter->GetVelocity().Size2D() <= 0.0f) return EHeadbobState::Idle;
 
     return EHeadbobState::Walking;
 }
@@ -243,13 +244,10 @@ bool UHeadbobComponent::ShouldPlayHeadbob() const
 
     const float Speed = OwnerCharacter->GetVelocity().Size2D();
 
-    // Must be moving fast enough
     if (Speed < MinSpeedForHeadbob) return false;
 
-    // Must be on ground
     if (!OwnerCharacter->CanJump()) return false;
 
-    // Don't headbob when knocked down (if this function exists)
     if (AHorrorGameCharacter* HorrorChar = Cast<AHorrorGameCharacter>(OwnerCharacter))
     {
         if (HorrorChar->IsKnockedDown()) return false;
@@ -268,20 +266,18 @@ float UHeadbobComponent::CalculateIntensity() const
     float BaseIntensity = GetBaseIntensityForState(CurrentHeadbobState);
     const float Speed = OwnerCharacter->GetVelocity().Size2D();
 
-    // Scale intensity based on speed
     float SpeedMultiplier = 1.0f;
 
     if (CurrentHeadbobState == EHeadbobState::Sprinting && SprintComponent)
     {
-        SpeedMultiplier = Speed / SprintComponent->SprintSpeed;
+        SpeedMultiplier = Speed / FMath::Max(1.0f, SprintComponent->SprintSpeed);
     }
     else if (CurrentHeadbobState == EHeadbobState::Walking && SprintComponent)
     {
-        SpeedMultiplier = Speed / SprintComponent->WalkSpeed;
+        SpeedMultiplier = Speed / FMath::Max(1.0f, SprintComponent->WalkSpeed);
     }
     else if (CurrentHeadbobState == EHeadbobState::Crouching)
     {
-        // Crouch speed is typically slower
         SpeedMultiplier = FMath::Min(Speed / 150.0f, 1.0f);
     }
 
@@ -302,6 +298,8 @@ TSubclassOf<UCameraShakeBase> UHeadbobComponent::GetShakeClassForState(EHeadbobS
         return CrouchCameraShakeClass;
     case EHeadbobState::Custom:
         return CustomShakeClass;
+    case EHeadbobState::Idle:
+        return IdleCameraShakeClass;
     default:
         return nullptr;
     }
@@ -319,6 +317,8 @@ float UHeadbobComponent::GetBaseIntensityForState(EHeadbobState State) const
         return CrouchIntensity;
     case EHeadbobState::Custom:
         return CustomIntensity;
+    case EHeadbobState::Idle:
+        return IdleIntensity;
     default:
         return 0.0f;
     }
@@ -334,7 +334,6 @@ bool UHeadbobComponent::ValidateComponents()
 
     if (!PlayerController)
     {
-        // This might be normal for AI characters
         UE_LOG(LogTemp, Warning, TEXT("HeadbobComponent: No player controller - headbob disabled"));
         return false;
     }
@@ -351,10 +350,215 @@ void UHeadbobComponent::LogHeadbobChange(EHeadbobState NewState, float Speed, fl
     case EHeadbobState::Walking: StateName = TEXT("Walking"); break;
     case EHeadbobState::Sprinting: StateName = TEXT("Sprinting"); break;
     case EHeadbobState::Crouching: StateName = TEXT("Crouching"); break;
+    case EHeadbobState::Idle: StateName = TEXT("Idle"); break;
     case EHeadbobState::Custom: StateName = TEXT("Custom"); break;
     default: StateName = TEXT("Unknown"); break;
     }
 
     UE_LOG(LogTemp, Log, TEXT("Headbob State: %s | Speed: %.1f | Intensity: %.2f"),
         *StateName, Speed, Intensity);
-} 
+}
+
+float UHeadbobComponent::GetSanityModifier() const
+{
+    if (!SanityComponent) return 1.0f;
+
+    float BaseModifier = 1.0f;
+    ESanityState SanityState = SanityComponent->GetSanityState();
+
+    switch (SanityState)
+    {
+    case ESanityState::Stable:
+        BaseModifier = 1.0f;
+        break;
+    case ESanityState::Nervous:
+        BaseModifier = 1.0f + (FMath::Sin(GetWorld()->GetTimeSeconds() * 8.0f) * 0.1f);
+        break;
+    case ESanityState::Anxious:
+        BaseModifier = 1.0f + (FMath::Sin(GetWorld()->GetTimeSeconds() * 12.0f) * 0.15f);
+        BaseModifier += FMath::RandRange(-0.05f, 0.05f);
+        break;
+    case ESanityState::Unstable:
+    {
+        float TimeSeconds = GetWorld()->GetTimeSeconds();
+        BaseModifier = 1.0f + (FMath::Sin(TimeSeconds * 15.0f) * 0.2f);
+        BaseModifier += (FMath::Sin(TimeSeconds * 23.0f) * 0.1f);
+        BaseModifier += FMath::RandRange(-0.1f, 0.1f);
+    }
+    break;
+    case ESanityState::Critical:
+    {
+        float Time = GetWorld()->GetTimeSeconds();
+        BaseModifier = 1.0f;
+        BaseModifier += FMath::Sin(Time * 20.0f) * 0.3f;
+        BaseModifier += FMath::Sin(Time * 37.0f) * 0.2f;
+        BaseModifier += FMath::Sin(Time * 51.0f) * 0.15f;
+        BaseModifier += FMath::RandRange(-0.2f, 0.2f);
+
+        if (FMath::RandRange(0.0f, 1.0f) < 0.1f)
+        {
+            BaseModifier += FMath::RandRange(-0.5f, 0.5f);
+        }
+    }
+    break;
+    }
+
+    if (SanityComponent->bInPanicAttack)
+    {
+        float PanicShake = FMath::Sin(GetWorld()->GetTimeSeconds() * 30.0f) * 0.4f;
+        BaseModifier += PanicShake;
+        BaseModifier += FMath::RandRange(-0.3f, 0.3f);
+    }
+
+    if (AHorrorGameCharacter* HorrorChar = Cast<AHorrorGameCharacter>(GetOwner()))
+    {
+        float FearLevel = HorrorChar->GetFearLevel();
+        if (FearLevel > 0.5f)
+        {
+            float FearShake = (FearLevel - 0.5f) * 0.4f;
+            BaseModifier += FearShake * FMath::Sin(GetWorld()->GetTimeSeconds() * 25.0f);
+        }
+    }
+
+    return FMath::Clamp(BaseModifier, 0.1f, 3.0f);
+}
+
+FVector UHeadbobComponent::GetHeadbobOffset() const
+{
+    if (!bEnableHeadbob || !OwnerCharacter) return FVector::ZeroVector;
+
+    FVector BaseOffset = CalculateBaseHeadbob();
+
+    float SanityMod = GetSanityModifier();
+    BaseOffset *= SanityMod;
+
+    if (SanityComponent)
+    {
+        ESanityState State = SanityComponent->GetSanityState();
+
+        if (State >= ESanityState::Anxious)
+        {
+            float TremorIntensity = (int32)State * 0.1f;
+            float VerticalTremor = FMath::Sin(GetWorld()->GetTimeSeconds() * 40.0f) * TremorIntensity;
+            BaseOffset.Z += VerticalTremor;
+        }
+
+        if (State >= ESanityState::Unstable)
+        {
+            float HorizontalIntensity = ((int32)State - 2) * 0.15f;
+            float HorizontalShake = FMath::Sin(GetWorld()->GetTimeSeconds() * 33.0f) * HorizontalIntensity;
+            BaseOffset.Y += HorizontalShake;
+        }
+
+        if (State == ESanityState::Critical)
+        {
+            if (FMath::RandRange(0.0f, 1.0f) < 0.05f)
+            {
+                FVector RandomJerk = FVector(
+                    FMath::RandRange(-0.3f, 0.3f),
+                    FMath::RandRange(-0.3f, 0.3f),
+                    FMath::RandRange(-0.2f, 0.2f)
+                );
+                BaseOffset += RandomJerk;
+            }
+        }
+    }
+
+    return BaseOffset;
+}
+
+void UHeadbobComponent::UpdateHeadbobIntensity()
+{
+    if (!SanityComponent) return;
+
+    float BaseSanityIntensity = 1.0f - SanityComponent->GetSanityPercent();
+
+    ESanityState State = SanityComponent->GetSanityState();
+    float StateMultiplier = 1.0f;
+
+    switch (State)
+    {
+    case ESanityState::Stable:
+        StateMultiplier = 1.0f;
+        break;
+    case ESanityState::Nervous:
+        StateMultiplier = 1.2f;
+        break;
+    case ESanityState::Anxious:
+        StateMultiplier = 1.5f;
+        break;
+    case ESanityState::Unstable:
+        StateMultiplier = 2.0f;
+        break;
+    case ESanityState::Critical:
+        StateMultiplier = 3.0f;
+        break;
+    }
+
+    CurrentIntensity = BaseHeadbobIntensity * StateMultiplier;
+    CurrentIntensity = FMath::Clamp(CurrentIntensity, 0.1f, 5.0f);
+}
+
+FVector UHeadbobComponent::CalculateBaseHeadbob() const
+{
+    if (!OwnerCharacter) return FVector::ZeroVector;
+
+    const float TimeSeconds = GetWorld() ? GetWorld()->GetTimeSeconds() : 0.0f;
+    const float Speed = OwnerCharacter->GetVelocity().Size2D();
+
+    float Frequency = 0.0f;
+    float Amplitude = 0.0f;
+
+    switch (CurrentHeadbobState)
+    {
+    case EHeadbobState::Sprinting:
+        Frequency = 9.0f + (Speed / 300.0f);
+        Amplitude = SprintIntensity * BaseHeadbobIntensity * 0.03f;
+        break;
+
+    case EHeadbobState::Walking:
+    {
+        float WalkBase = SprintComponent ? SprintComponent->WalkSpeed : 300.0f;
+        float t = FMath::Clamp(Speed / FMath::Max(1.0f, WalkBase), 0.0f, 1.5f);
+        Frequency = FMath::Lerp(5.5f, 8.0f, t);
+        Amplitude = WalkIntensity * BaseHeadbobIntensity * FMath::Lerp(0.015f, 0.025f, t);
+    }
+    break;
+
+    case EHeadbobState::Crouching:
+        Frequency = 3.5f;
+        Amplitude = CrouchIntensity * BaseHeadbobIntensity * 0.01f;
+        break;
+
+    case EHeadbobState::Idle:
+        Frequency = 0.8f;
+        Amplitude = IdleIntensity * BaseHeadbobIntensity * 0.004f;
+        break;
+
+    case EHeadbobState::Custom:
+        Frequency = 6.0f;
+        Amplitude = CustomIntensity * BaseHeadbobIntensity * 0.02f;
+        break;
+
+    default:
+        return FVector::ZeroVector;
+    }
+
+    float ForwardOffset = FMath::Sin(TimeSeconds * Frequency) * Amplitude;
+    float RightOffset = FMath::Sin(TimeSeconds * Frequency * 0.5f + PI * 0.5f) * (Amplitude * 0.5f);
+    float UpOffset = FMath::Abs(FMath::Sin(TimeSeconds * Frequency)) * (Amplitude * 1.5f);
+
+    if (CurrentHeadbobState == EHeadbobState::Walking || CurrentHeadbobState == EHeadbobState::Sprinting)
+    {
+        float SpeedFactor = FMath::Clamp(Speed / (SprintComponent ? SprintComponent->SprintSpeed : 600.0f), 0.0f, 1.0f);
+        ForwardOffset *= SpeedFactor;
+        RightOffset *= SpeedFactor;
+        UpOffset *= SpeedFactor;
+    }
+
+    ForwardOffset = FMath::Clamp(ForwardOffset, -MaxHeadbobOffset, MaxHeadbobOffset);
+    RightOffset = FMath::Clamp(RightOffset, -MaxHeadbobOffset, MaxHeadbobOffset);
+    UpOffset = FMath::Clamp(UpOffset, -MaxHeadbobOffset, MaxHeadbobOffset);
+
+    return FVector(ForwardOffset, RightOffset, UpOffset);
+}

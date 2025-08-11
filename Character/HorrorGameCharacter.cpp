@@ -11,7 +11,6 @@
 #include "HorrorGame/Item/ItemBase.h"
 #include "HorrorGame/Actor/MonsterJump.h"
 #include "HorrorGame/Widget/Settings/DeathScreenWidget.h"
-#include "HorrorGame/Widget/Progress/SanityWidget.h"
 #include "HorrorGame/Widget/Item/NoteWidget.h"
 #include "HorrorGame/Actor/NoteActor.h"
 #include "HorrorGame/Widget/CrossHairWidget.h"
@@ -24,6 +23,8 @@
 #include "HorrorGame/AI/NPC.h"
 #include "HorrorGame/Actor/Component/SprintComponent.h"
 #include "HorrorGame/Actor/Component/HeadbobComponent.h"
+#include "HorrorGame/Actor/Component/SanityComponent.h"
+#include "HorrorGame/Actor/Component/FearComponent.h"
 
 // Engine
 #include "Engine/LocalPlayer.h"
@@ -118,8 +119,6 @@ AHorrorGameCharacter::AHorrorGameCharacter()
 
     GrabbingMonster = nullptr;
 
-    SanityTimeline = CreateDefaultSubobject<UTimelineComponent>(TEXT("SanityTimeline"));
-
     PPComponent = CreateDefaultSubobject<UPostProcessComponent>(TEXT("SanityPostProcess"));
     PPComponent->SetupAttachment(GetRootComponent());
     // Đặt weight ban đầu = 0 (không ảnh hưởng)
@@ -130,24 +129,27 @@ AHorrorGameCharacter::AHorrorGameCharacter()
 	//Components
 	SprintComponent = CreateDefaultSubobject<USprintComponent>(TEXT("SprintComponent"));
     HeadbobComponent = CreateDefaultSubobject<UHeadbobComponent>(TEXT("HeadbobComponent"));
+	SanityComponent = CreateDefaultSubobject<USanityComponent>(TEXT("SanityComponent"));
+    FearComponent = CreateDefaultSubobject<UFearComponent>(TEXT("FearComponent"));
+
+    bIsBeingChased = false;
+    DarknessVolumeCount = 0;
 }
 
 void AHorrorGameCharacter::BeginPlay()
 {
 	Super::BeginPlay();
 
-    if (HeadbobComponent)
+    if (HeadbobComponent && SanityComponent)
     {
         HeadbobComponent->OnHeadbobStateChanged.AddDynamic(this, &AHorrorGameCharacter::HandleHeadbobStateChanged);
         HeadbobComponent->ForceUpdateHeadbob();
+        SanityComponent->OnSanityThresholdReached.AddDynamic(this, &AHorrorGameCharacter::OnSanityThresholdReached);
     }
 
     SetupWidgets();
 
     HandleInventoryWidget();
-
-    SetupSanityWidget();
-    SetupSanityTimeline();
 
     Inventory.SetNum(MainInventoryCapacity);
 }
@@ -157,9 +159,6 @@ void AHorrorGameCharacter::Tick(float DeltaTime)
 	Super::Tick(DeltaTime);
 	Ticks(DeltaTime);
 }
-
-//////////////////////////////////////////////////////////////////////////
-// Input
 
 void AHorrorGameCharacter::NotifyControllerChanged()
 {
@@ -442,103 +441,6 @@ void AHorrorGameCharacter::OnEscape(const FInputActionValue& Value, FKey Pressed
 
     EQTEPhase Phase = GrabbingMonster->GetCurrentPhase();
     GrabbingMonster->ReceiveEscapeInput(PressedKey);
-}
-
-void AHorrorGameCharacter::RecoverSanity(float Delta)
-{
-    Sanity = FMath::Clamp(Sanity + Delta, 0.f, MaxSanity);
-    if (SanityWidget)
-        SanityWidget->SetSanityPercent(Sanity / MaxSanity);
-
-    const float P = Sanity / MaxSanity;
-
-    if (P > 0.6f)
-    {
-        // Khởi động camera shake nếu muốn
-        if (APlayerController* PC = Cast<APlayerController>(GetController()))
-        {
-            PC->PlayerCameraManager->StartCameraShake(LowSanityShake);
-        }
-
-        // Tính alpha từ 0 → 1 khi P từ 0.6 → 1.0
-        const float Alpha = (P - 0.6f) / 0.4f;
-
-        // BlendWeight = alpha để bật dần post‑process
-        PPComponent->BlendWeight = Alpha;
-
-        // Motion Blur
-        PPComponent->Settings.bOverride_MotionBlurAmount = true;
-        PPComponent->Settings.MotionBlurAmount = FMath::Lerp(0.f, 1.f, Alpha);
-
-        // Chromatic Aberration
-        PPComponent->Settings.bOverride_SceneFringeIntensity = true;
-        PPComponent->Settings.SceneFringeIntensity = FMath::Lerp(0.f, 5.f, Alpha);
-
-        // Bloom
-        PPComponent->Settings.bOverride_BloomIntensity = true;
-        PPComponent->Settings.BloomIntensity = FMath::Lerp(0.f, 2.f, Alpha);
-
-        // Vignette
-        PPComponent->Settings.bOverride_VignetteIntensity = true;
-        PPComponent->Settings.VignetteIntensity = FMath::Lerp(0.f, 0.8f, Alpha);
-
-        // Depth of Field (F‑stop nhỏ → DOF mạnh)
-        PPComponent->Settings.bOverride_DepthOfFieldFstop = true;
-        PPComponent->Settings.DepthOfFieldFstop = FMath::Lerp(22.f, 1.2f, Alpha);
-    }
-    else
-    {
-        // Nếu P ≤ 0.6, tắt hoàn toàn post‑process
-        PPComponent->BlendWeight = 0.f;
-    }
-}
-
-void AHorrorGameCharacter::HandleDrainProgress(float Value)
-{
-    if (bIsGrabbed) return;
-
-    const float DrainRate = 5.f;
-    float DeltaSanity = -Value * DrainRate * GetWorld()->GetDeltaSeconds();
-    RecoverSanity(DeltaSanity);
-}
-
-void AHorrorGameCharacter::SetupSanityWidget()
-{
-    if (SanityWidgetClass == nullptr) return;
-
-    SanityWidget = CreateWidget<USanityWidget>(GetWorld(), SanityWidgetClass);
-    if (SanityWidget)
-    {
-        SanityWidget->AddToViewport();
-        SanityWidget->SetSanityPercent(Sanity / MaxSanity);
-    }
-}
-
-void AHorrorGameCharacter::SetupSanityTimeline()
-{
-    if (SanityDrainCurve == nullptr || SanityTimeline == nullptr) return;
-
-    FOnTimelineFloat ProgressDel;
-    ProgressDel.BindUFunction(this, TEXT("HandleDrainProgress"));
-    SanityTimeline->AddInterpFloat(SanityDrainCurve, ProgressDel);
-    SanityTimeline->SetLooping(true);
-    SanityTimeline->PlayFromStart();
-}
-
-void AHorrorGameCharacter::PauseSanityDrain()
-{
-    if (SanityTimeline && SanityTimeline->IsPlaying())
-    {
-        SanityTimeline->Stop();
-    }
-}
-
-void AHorrorGameCharacter::ResumeSanityDrain()
-{
-    if (SanityTimeline && !SanityTimeline->IsPlaying())
-    {
-        SanityTimeline->Play();
-    }
 }
 
 void AHorrorGameCharacter::GrabObject()
@@ -995,10 +897,6 @@ void AHorrorGameCharacter::SetInventoryVisible(bool bVisible)
     {
         InventoryWidget->SetVisibility(Visibility);
     }
-    if (SanityWidget)
-    {
-        SanityWidget->SetVisibility(Visibility);
-    }
 }
 
 void AHorrorGameCharacter::HandleZoom(const FInputActionValue& Value)
@@ -1114,6 +1012,11 @@ void AHorrorGameCharacter::ClientStartJumpScare_Implementation(ANPC* JumpscareNP
     }
 
     this->DisableInput(PC);
+
+    if (SanityComponent)
+    {
+        SanityComponent->OnJumpScare(0.15f);
+    }
 
     // Lưu view target hiện tại
     OriginalViewTarget = PC->GetViewTarget();
@@ -1442,4 +1345,371 @@ void AHorrorGameCharacter::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>&
 	DOREPLIFETIME(AHorrorGameCharacter, EquippedItem);
 	DOREPLIFETIME(AHorrorGameCharacter, bIsFlashlightEnabled);
 	DOREPLIFETIME(AHorrorGameCharacter, bIsKnockedDown);
+}
+
+float AHorrorGameCharacter::GetSanityLevel() const
+{
+    return SanityComponent ? SanityComponent->GetSanityPercent() : 1.0f;
+}
+
+float AHorrorGameCharacter::GetFearLevel() const
+{
+    if (FearComponent)
+    {
+        return FearComponent->GetFearLevel();
+    }
+
+    // Fallback: tính toán fear level phức tạp hơn
+    float BaseFear = 1.0f - GetSanityLevel(); // Sanity thấp = fear cao
+
+    // Multipliers dựa trên các yếu tố môi trường
+    float EnvironmentalFear = 0.0f;
+
+    // Darkness fear (tăng dần theo thời gian trong bóng tối)
+    if (IsInDarkness())
+    {
+        EnvironmentalFear += FMath::Min(0.3f, DarknessExposureTime * 0.05f);
+    }
+
+    // Chase fear (rất cao và giảm dần)
+    if (IsBeingChased())
+    {
+        float ChaseTime = GetWorld()->GetTimeSeconds() - LastChaseTime;
+        float ChaseFear = FMath::Lerp(0.4f, 0.1f, ChaseTime / ChaseMemoryTime);
+        EnvironmentalFear += ChaseFear;
+    }
+
+    // Threat proximity fear
+    if (IsInThreatProximity())
+    {
+        EnvironmentalFear += ThreatProximityAmount * 0.2f;
+    }
+
+    // Monster proximity fear (khoảng cách càng gần càng sợ)
+    if (NearestMonsterDistance > 0.0f && NearestMonsterDistance < MaxFearDistance)
+    {
+        float ProximityFear = 1.0f - (NearestMonsterDistance / MaxFearDistance);
+        EnvironmentalFear += ProximityFear * 0.25f;
+    }
+
+    // Combine base fear với environmental fear
+    float TotalFear = BaseFear + EnvironmentalFear;
+
+    // Sanity state multiplier
+    if (SanityComponent)
+    {
+        ESanityState SanityState = SanityComponent->GetSanityState();
+        switch (SanityState)
+        {
+        case ESanityState::Critical:
+            TotalFear *= 1.5f;
+            break;
+        case ESanityState::Unstable:
+            TotalFear *= 1.3f;
+            break;
+        case ESanityState::Anxious:
+            TotalFear *= 1.1f;
+            break;
+        default:
+            break;
+        }
+    }
+
+    return FMath::Clamp(TotalFear, 0.0f, 1.0f);
+}
+
+void AHorrorGameCharacter::OnSanityThresholdReached(float ThresholdPercent)
+{
+    // Cập nhật headbob component
+    if (UHeadbobComponent* HB = FindComponentByClass<UHeadbobComponent>())
+    {
+        HB->ForceUpdateHeadbob();
+    }
+
+    // Trigger different effects based on threshold
+    if (ThresholdPercent <= 0.8f && ThresholdPercent > 0.6f)
+    {
+        // Nervousness threshold
+        UGameplayStatics::PlaySound2D(this, NervousBreathingSound, 0.3f);
+    }
+    else if (ThresholdPercent <= 0.6f && ThresholdPercent > 0.4f)
+    {
+        // Anxiety threshold
+        UGameplayStatics::PlaySound2D(this, AnxiousWhisperSound, 0.5f);
+
+        // Slight movement speed reduction
+        GetCharacterMovement()->MaxWalkSpeed = DefaultWalkSpeed * 0.9f;
+    }
+    else if (ThresholdPercent <= 0.4f && ThresholdPercent > 0.2f)
+    {
+        // Unstable threshold
+        UGameplayStatics::PlaySound2D(this, UnstableSound, 0.7f);
+
+        // More significant movement impairment
+        GetCharacterMovement()->MaxWalkSpeed = DefaultWalkSpeed * 0.8f;
+
+        // Chance for screen distortion
+        if (FMath::RandRange(0.0f, 1.0f) < 0.3f)
+        {
+            /*TriggerScreenDistortion(2.0f);*/
+        }
+    }
+    else if (ThresholdPercent <= 0.2f)
+    {
+        // Critical threshold
+        UGameplayStatics::PlaySound2D(this, CriticalPanicSound, 1.0f);
+
+        // Severe movement impairment
+        GetCharacterMovement()->MaxWalkSpeed = DefaultWalkSpeed * 0.6f;
+
+        // Trigger post-process effects
+        if (SanityComponent)
+        {
+            SanityComponent->TriggerLowSanityPostProcess();
+        }
+
+        // High chance of hallucination
+        if (FMath::RandRange(0.0f, 1.0f) < 0.6f)
+        {
+            TriggerRandomHallucination();
+        }
+    }
+
+    // Blueprint event
+    BP_OnSanityThresholdReached(ThresholdPercent);
+
+    if (bDebugSanity)
+    {
+        UE_LOG(LogTemp, Warning, TEXT("Sanity threshold reached: %.1f%% - Effects applied"),
+            ThresholdPercent * 100.0f);
+    }
+}
+
+void AHorrorGameCharacter::OnPanicAttack()
+{
+    // Temporary severe movement impairment
+    GetCharacterMovement()->MaxWalkSpeed = DefaultWalkSpeed * 0.3f;
+
+    // Intense screen shake
+    if (APlayerController* PC = Cast<APlayerController>(GetController()))
+    {
+        if (PanicCameraShake)
+        {
+            PC->PlayerCameraManager->StartCameraShake(PanicCameraShake, 2.0f);
+        }
+    }
+
+    // Play panic audio
+    UGameplayStatics::PlaySound2D(this, PanicAttackSound, 1.0f);
+
+    // Restore movement after panic duration
+    FTimerHandle RestoreMovementTimer;
+    GetWorld()->GetTimerManager().SetTimer(
+        RestoreMovementTimer,
+        [this]()
+        {
+            GetCharacterMovement()->MaxWalkSpeed = DefaultWalkSpeed *
+                (SanityComponent ? FMath::Lerp(0.6f, 1.0f, SanityComponent->GetSanityPercent()) : 1.0f);
+        },
+        PanicDuration,
+        false
+    );
+
+    BP_OnPanicAttack();
+}
+
+void AHorrorGameCharacter::OnHallucination()
+{
+    TriggerRandomHallucination();
+    BP_OnHallucination();
+}
+
+void AHorrorGameCharacter::TriggerRandomHallucination()
+{
+    if (HallucinationTypes.Num() == 0) return;
+
+    int32 RandomIndex = FMath::RandRange(0, HallucinationTypes.Num() - 1);
+    EHallucinationType HType = HallucinationTypes[RandomIndex];
+
+    switch (HType)
+    {
+    case EHallucinationType::FakeMonster:
+        break;
+
+    case EHallucinationType::FalseSound:
+        PlayFalseSound();
+        break;
+
+    case EHallucinationType::WallMovement:
+        TriggerWallMovementHallucination();
+        break;
+
+    case EHallucinationType::ShadowPeople:
+        break;
+
+    case EHallucinationType::FakeExit:
+        break;
+    }
+
+    if (bDebugSanity)
+    {
+        UE_LOG(LogTemp, Warning, TEXT("Hallucination triggered: %d"), (int32)HType);
+    }
+}
+
+bool AHorrorGameCharacter::IsBeingChased() const
+{
+    return bIsBeingChased;
+}
+
+bool AHorrorGameCharacter::IsInDarkness() const
+{
+    return DarknessVolumeCount > 0 || CurrentLightLevel < DarknessThreshold;
+}
+
+bool AHorrorGameCharacter::IsInThreatProximity() const
+{
+    return ThreatProximityAmount > 0.0f || NearestMonsterDistance < ThreatProximityDistance;
+}
+
+void AHorrorGameCharacter::NotifyChasedByMonster(float ChaseIntensity)
+{
+    bIsBeingChased = true;
+    LastChaseTime = GetWorld()->GetTimeSeconds();
+    CurrentChaseIntensity = ChaseIntensity;
+
+    // Immediate sanity loss when chase begins
+    if (SanityComponent)
+    {
+        float ChaseSanityLoss = ChaseIntensity * 5.0f; // Scaled by intensity
+        SanityComponent->DrainSanity(ChaseSanityLoss, true);
+    }
+
+    // Clear and reset chase memory timer
+    GetWorldTimerManager().ClearTimer(TimerHandle_ResetChase);
+    GetWorldTimerManager().SetTimer(
+        TimerHandle_ResetChase,
+        [this]() {
+            bIsBeingChased = false;
+            CurrentChaseIntensity = 0.0f;
+        },
+        ChaseMemoryTime,
+        false
+    );
+
+    BP_OnChasedByMonster(ChaseIntensity);
+}
+
+void AHorrorGameCharacter::EnterDarknessZone(float DarknessIntensity)
+{
+    DarknessVolumeCount = FMath::Max(0, DarknessVolumeCount + 1);
+    CurrentDarknessIntensity = FMath::Max(CurrentDarknessIntensity, DarknessIntensity);
+
+    // Start darkness exposure timer
+    if (DarknessVolumeCount == 1) // First darkness zone entered
+    {
+        DarknessExposureTime = 0.0f;
+        StartDarknessExposure();
+    }
+}
+
+void AHorrorGameCharacter::ExitDarknessZone(float DarknessIntensity)
+{
+    DarknessVolumeCount = FMath::Max(0, DarknessVolumeCount - 1);
+
+    if (DarknessVolumeCount == 0)
+    {
+        CurrentDarknessIntensity = 0.0f;
+        StopDarknessExposure();
+    }
+    else
+    {
+        // Recalculate darkness intensity if still in other darkness zones
+        RecalculateDarknessIntensity();
+    }
+}
+
+void AHorrorGameCharacter::StartDarknessExposure()
+{
+    GetWorld()->GetTimerManager().SetTimer(
+        TimerHandle_DarknessExposure,
+        [this]()
+        {
+            DarknessExposureTime += 1.0f;
+
+            // Progressive sanity drain in darkness
+            if (SanityComponent && CurrentDarknessIntensity > 0.0f)
+            {
+                float DarknessDrain = CurrentDarknessIntensity * DarknessSanityDrainRate;
+                SanityComponent->OnDarknessExposure(DarknessDrain);
+            }
+        },
+        1.0f,  // Every second
+        true   // Loop
+    );
+}
+
+void AHorrorGameCharacter::StopDarknessExposure()
+{
+    GetWorld()->GetTimerManager().ClearTimer(TimerHandle_DarknessExposure);
+    DarknessExposureTime = 0.0f;
+}
+
+void AHorrorGameCharacter::PlayFalseSound()
+{
+    USoundBase* SoundToPlay = FalseHallucinationSound ? FalseHallucinationSound : AnxiousWhisperSound;
+    if (SoundToPlay)
+    {
+        UGameplayStatics::PlaySoundAtLocation(this, SoundToPlay, GetActorLocation());
+        if (bDebugSanity)
+        {
+            UE_LOG(LogTemp, Warning, TEXT("PlayFalseSound: played hallucination sound"));
+        }
+    }
+    else if (bDebugSanity)
+    {
+        UE_LOG(LogTemp, Warning, TEXT("PlayFalseSound: no sound assigned (FalseHallucinationSound / AnxiousWhisperSound)"));
+    }
+}
+
+void AHorrorGameCharacter::TriggerWallMovementHallucination()
+{
+    // Minimal, general-purpose implementation: play a short camera shake and an unstable sound.
+    if (bDebugSanity)
+    {
+        UE_LOG(LogTemp, Warning, TEXT("TriggerWallMovementHallucination: triggered"));
+    }
+
+    if (UnstableSound)
+    {
+        UGameplayStatics::PlaySoundAtLocation(this, UnstableSound, GetActorLocation());
+    }
+
+    if (APlayerController* PC = Cast<APlayerController>(GetController()))
+    {
+        if (PanicCameraShake)
+        {
+            PC->PlayerCameraManager->StartCameraShake(PanicCameraShake, 0.6f);
+        }
+    }
+}
+
+void AHorrorGameCharacter::RecalculateDarknessIntensity()
+{
+    // If the character is inside explicit darkness volumes, those should have already set
+    // CurrentDarknessIntensity via EnterDarknessZone/ExitDarknessZone. If not in a volume,
+    // derive intensity from the CurrentLightLevel.
+    if (DarknessVolumeCount > 0)
+    {
+        CurrentDarknessIntensity = FMath::Clamp(CurrentDarknessIntensity, 0.0f, 1.0f);
+    }
+    else
+    {
+        CurrentDarknessIntensity = FMath::Clamp(1.0f - CurrentLightLevel, 0.0f, 1.0f);
+    }
+
+    if (bDebugSanity)
+    {
+        UE_LOG(LogTemp, Verbose, TEXT("RecalculateDarknessIntensity -> %f (LightLevel=%f, Volumes=%d)"), CurrentDarknessIntensity, CurrentLightLevel, DarknessVolumeCount);
+    }
 }

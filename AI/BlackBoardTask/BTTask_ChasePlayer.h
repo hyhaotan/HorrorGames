@@ -17,4 +17,5 @@ class HORRORGAME_API UBTTask_ChasePlayer : public UBTTask_BlackboardBase
 public:
 	explicit UBTTask_ChasePlayer(FObjectInitializer const& ObjectInitializer);
 	virtual EBTNodeResult::Type ExecuteTask(UBehaviorTreeComponent& OwnerComp, uint8* NodeMemory) override;
+	virtual EBTNodeResult::Type AbortTask(UBehaviorTreeComponent& OwnerComp,uint8* NodeMemory) override;
 };
