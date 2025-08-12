@@ -1,5 +1,6 @@
 ﻿#include "LightSwitchActor.h"
 #include "HorrorGame/Character/HorrorGameCharacter.h"
+#include "HorrorGame/Actor/Component/SanityComponent.h"
 #include "Components/StaticMeshComponent.h"
 #include "Components/SpotLightComponent.h"
 #include "Kismet/GameplayStatics.h"
@@ -40,6 +41,17 @@ void ALightSwitchActor::OnRep_IsOn()
     SwitchMesh->SetRelativeRotation(bIsOn
         ? FRotator(-10.f, 0, 0)
         : FRotator::ZeroRotator);
+
+    ACharacter* Player = Cast<ACharacter>(GetOwner());
+    if (Player)
+    {
+        USanityComponent* Sanity = Player->FindComponentByClass<USanityComponent>();
+
+        if (!bIsOn && Sanity)
+        {
+            Sanity->OnLightSource(20.0f);
+        }
+    }
 }
 
 void ALightSwitchActor::DoToggle()

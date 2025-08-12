@@ -42,8 +42,8 @@ AEyeMonster::AEyeMonster()
 	TraceDepth = 2000.f;
 
 	// Sanity damage settings
-	BaseSanityDamage = 15.0f;
-	MaxSanityDamage = 35.0f;
+	BaseSanityDamage = 5.0f;
+	MaxSanityDamage = 15.0f;
 	SanityDamageInterval = 0.8f; // Faster damage tick
 
 	// Staring mechanics

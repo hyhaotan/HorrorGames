@@ -1,17 +1,14 @@
 #include "LobbyGameMode.h"
 #include "LobbyWidget.h"
-#include "OnlineSubsystem.h"
-#include "OnlineSessionSettings.h"
-#include "GameFramework/PlayerState.h"
-#include "GameFramework/GameState.h"
 #include "HorrorGame/Core/HorrorGameState.h"
+#include "GameFramework/PlayerController.h"
+#include "GameFramework/PlayerState.h"
+#include "Kismet/GameplayStatics.h"
+#include "OnlineSubsystem.h"
 
 ALobbyGameMode::ALobbyGameMode()
 {
-    // Set default values
     bUseSeamlessTravel = true;
-
-    // Set the game state class to our custom game state
     GameStateClass = AHorrorGameState::StaticClass();
 }
 
@@ -19,90 +16,131 @@ void ALobbyGameMode::BeginPlay()
 {
     Super::BeginPlay();
 
-    // Create and show the lobby widget
+    InitializeSessionInterface();
+
+    // Create lobby widget
     if (LobbyWidgetClass)
     {
-        LobbyWidget = CreateWidget<ULobbyWidget>(GetWorld()->GetFirstPlayerController(), LobbyWidgetClass);
-        if (LobbyWidget)
+        APlayerController* FirstPC = GetWorld()->GetFirstPlayerController();
+        if (FirstPC)
         {
-            LobbyWidget->AddToViewport();
+            LobbyWidget = CreateWidget<ULobbyWidget>(FirstPC, LobbyWidgetClass);
+            if (LobbyWidget)
+            {
+                LobbyWidget->AddToViewport();
+                UE_LOG(LogTemp, Log, TEXT("Lobby widget created and added to viewport"));
+            }
         }
     }
 
-    UpdateMaxPlayers();
+    UpdateLobbyUI();
+}
+
+void ALobbyGameMode::InitializeSessionInterface()
+{
+    IOnlineSubsystem* OnlineSubsystem = IOnlineSubsystem::Get();
+    if (OnlineSubsystem)
+    {
+        SessionInterface = OnlineSubsystem->GetSessionInterface();
+        UE_LOG(LogTemp, Log, TEXT("LobbyGameMode using OSS: %s"),
+            *OnlineSubsystem->GetSubsystemName().ToString());
+    }
+    else
+    {
+        UE_LOG(LogTemp, Warning, TEXT("LobbyGameMode: No OSS available"));
+    }
 }
 
 void ALobbyGameMode::PostLogin(APlayerController* NewPlayer)
 {
     Super::PostLogin(NewPlayer);
 
-    // Update player count
-    AHorrorGameState* HorrorState = GetGameState<AHorrorGameState>();
-    if (HorrorState)
-    {
-        HorrorState->CurrentPlayers++;
-    }
+    FString PlayerName = NewPlayer->PlayerState ?
+        NewPlayer->PlayerState->GetPlayerName() : TEXT("Unknown Player");
 
-    // Update lobby UI when a new player joins
-    if (LobbyWidget)
+    UE_LOG(LogTemp, Log, TEXT("Player joined lobby: %s"), *PlayerName);
+
+    // Update UI
+    UpdateLobbyUI();
+
+    if (LobbyWidget && NewPlayer->PlayerState)
     {
-        TArray<FUniqueNetIdRepl> PlayerIds;
-        for (APlayerState* PlayerState : GameState->PlayerArray)
-        {
-            if (PlayerState && PlayerState->GetUniqueId().IsValid())
-            {
-                PlayerIds.Add(PlayerState->GetUniqueId());
-            }
-        }
-        LobbyWidget->UpdatePlayerSlots(PlayerIds);
+        bool bIsHost = (GameState->PlayerArray.Num() == 1);
+        LobbyWidget->OnPlayerJoined(PlayerName, bIsHost);
     }
 }
 
 void ALobbyGameMode::Logout(AController* Exiting)
 {
-    // Update player count before calling parent
-    AHorrorGameState* HorrorState = GetGameState<AHorrorGameState>();
-    if (HorrorState)
+    FString PlayerName = Exiting->PlayerState ?
+        Exiting->PlayerState->GetPlayerName() : TEXT("Unknown Player");
+
+    UE_LOG(LogTemp, Log, TEXT("Player left lobby: %s"), *PlayerName);
+
+    if (LobbyWidget && Exiting->PlayerState)
     {
-        HorrorState->CurrentPlayers--;
+        LobbyWidget->OnPlayerLeft(PlayerName);
     }
 
     Super::Logout(Exiting);
-
-    // Update lobby UI when a player leaves
-    if (LobbyWidget)
-    {
-        TArray<FUniqueNetIdRepl> PlayerIds;
-        for (APlayerState* PlayerState : GameState->PlayerArray)
-        {
-            if (PlayerState && PlayerState->GetUniqueId().IsValid() && PlayerState != Exiting->PlayerState)
-            {
-                PlayerIds.Add(PlayerState->GetUniqueId());
-            }
-        }
-        LobbyWidget->UpdatePlayerSlots(PlayerIds);
-    }
+    UpdateLobbyUI();
 }
 
-void ALobbyGameMode::UpdateMaxPlayers()
+void ALobbyGameMode::StartGame()
 {
-    // Get the session interface to access session settings
-    IOnlineSubsystem* OnlineSubsystem = IOnlineSubsystem::Get(TEXT("Steam"));
-    if (OnlineSubsystem)
+    UE_LOG(LogTemp, Log, TEXT("Starting game from lobby"));
+
+    // Transition all players to the main game level
+    GetWorld()->ServerTravel(GameMapName + TEXT("?listen"));
+}
+
+bool ALobbyGameMode::AreAllPlayersReady() const
+{
+    // If you implement a ready system, check here
+    // For now, just check if we have at least one player
+    return GameState && GameState->PlayerArray.Num() > 0;
+}
+
+void ALobbyGameMode::UpdateLobbyUI()
+{
+    if (!LobbyWidget) return;
+
+    TArray<FString> PlayerNames = GetConnectedPlayerNames();
+    TArray<bool> HostStatus = GetPlayerHostStatus();
+
+    LobbyWidget->UpdatePlayerSlots(PlayerNames, HostStatus);
+}
+
+TArray<FString> ALobbyGameMode::GetConnectedPlayerNames() const
+{
+    TArray<FString> Names;
+
+    if (GameState)
     {
-        IOnlineSessionPtr SessionInterface = OnlineSubsystem->GetSessionInterface();
-        if (SessionInterface.IsValid())
+        for (APlayerState* PlayerState : GameState->PlayerArray)
         {
-            FNamedOnlineSession* Session = SessionInterface->GetNamedSession(NAME_GameSession);
-            if (Session)
+            if (PlayerState)
             {
-                // Update max players in game state
-                AHorrorGameState* HorrorState = GetGameState<AHorrorGameState>();
-                if (HorrorState)
-                {
-                    HorrorState->SetMaxPlayers(Session->SessionSettings.NumPublicConnections);
-                }
+                Names.Add(PlayerState->GetPlayerName());
             }
         }
     }
+
+    return Names;
+}
+
+TArray<bool> ALobbyGameMode::GetPlayerHostStatus() const
+{
+    TArray<bool> HostStatus;
+
+    if (GameState)
+    {
+        for (int32 i = 0; i < GameState->PlayerArray.Num(); i++)
+        {
+            // First player (index 0) is typically the host
+            HostStatus.Add(i == 0);
+        }
+    }
+
+    return HostStatus;
 }

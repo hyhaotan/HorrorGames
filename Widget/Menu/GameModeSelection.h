@@ -1,24 +1,26 @@
-﻿#pragma once
+﻿// GameModeSelection.h - Updated version
+#pragma once
 
 #include "CoreMinimal.h"
 #include "Blueprint/UserWidget.h"
+#include "Components/Button.h"
+#include "Animation/WidgetAnimation.h"
+#include "OnlineSubsystem.h"
 #include "Interfaces/OnlineSessionInterface.h"
 #include "GameModeSelection.generated.h"
 
-// Forward declarations
-class UButton;
-class UWidgetAnimation;
 class UMainMenu;
-class UServerBrowserWidget;
 class ULobbyWidget;
+class ULobbySessionManager;
 
-UENUM()
+// Enum for tracking transition states
+UENUM(BlueprintType)
 enum class ETransitionState : uint8
 {
-    None,
-    Single,
-    Multiplayer,
-    Back
+    None        UMETA(DisplayName = "None"),
+    Single      UMETA(DisplayName = "Single Player"),
+    Multiplayer UMETA(DisplayName = "Multiplayer"),
+    Back        UMETA(DisplayName = "Back to Main Menu")
 };
 
 UCLASS()
@@ -29,31 +31,62 @@ class HORRORGAME_API UGameModeSelection : public UUserWidget
 public:
     virtual void NativeConstruct() override;
 
-    UFUNCTION() void OnShownimationFinished();
-    UFUNCTION() void OnHideAnimationFinished();
-    UFUNCTION() void OnCreateSessionComplete(FName SessionName, bool bWasSuccessful);
-
 protected:
-    /** UI Elements */
-    UPROPERTY(meta = (BindWidget)) UButton* SinglePlayerButton;
-    UPROPERTY(meta = (BindWidget)) UButton* MultiplayerButton;
-    UPROPERTY(meta = (BindWidget)) UButton* BackButton;
-    UPROPERTY(meta = (BindWidgetAnim), Transient) UWidgetAnimation* ShowAnim;
-    UPROPERTY(meta = (BindWidgetAnim), Transient) UWidgetAnimation* HideAnim;
+    // UI Components
+    UPROPERTY(meta = (BindWidget))
+    UButton* SinglePlayerButton;
 
-    /** Widget classes for navigation */
-    UPROPERTY(EditDefaultsOnly, Category = "UI") TSubclassOf<UMainMenu> MainMenuClass;
-    UPROPERTY(EditDefaultsOnly, Category = "UI") TSubclassOf<ULobbyWidget> LobbyWidgetClass;
+    UPROPERTY(meta = (BindWidget))
+    UButton* MultiplayerButton;
+
+    UPROPERTY(meta = (BindWidget))
+    UButton* BackButton;
+
+    // Animations
+    UPROPERTY(meta = (BindWidgetAnim), Transient)
+    UWidgetAnimation* ShowAnim;
+
+    UPROPERTY(meta = (BindWidgetAnim), Transient)
+    UWidgetAnimation* HideAnim;
+
+    // Widget Classes
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "UI")
+    TSubclassOf<UMainMenu> MainMenuClass;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "UI")
+    TSubclassOf<ULobbyWidget> LobbyWidgetClass;
 
 private:
-    /** Button callbacks */
-    UFUNCTION() void OnSinglePlayerClicked();
-    UFUNCTION() void OnMultiplayerClicked();
-    UFUNCTION() void OnBackClicked();
+    // Button event handlers
+    UFUNCTION()
+    void OnSinglePlayerClicked();
 
-    /** State enumeration for animation flow */
-    ETransitionState PendingState;
-    IOnlineSessionPtr SessionInterface;
+    UFUNCTION()
+    void OnMultiplayerClicked();
 
-    void CreateLobbySession();
+    UFUNCTION()
+    void OnBackClicked();
+
+    // Animation event handlers
+    UFUNCTION()
+    void OnHideAnimationFinished();
+
+    UFUNCTION()
+    void OnShowAnimationFinished();
+
+    // Session event handlers
+    UFUNCTION()
+    void OnSessionCreated(bool bWasSuccessful);
+
+    // Utility functions
+    void CreateMultiplayerLobby();
+    void ReturnToMainMenu();
+    void ShowConnectionError();
+
+    // Session Manager
+    UPROPERTY()
+    ULobbySessionManager* SessionManager;
+
+    // Current transition state
+    ETransitionState PendingState = ETransitionState::None;
 };
