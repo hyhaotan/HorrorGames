@@ -1,60 +1,65 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "GameFramework/GameMode.h"
+#include "GameFramework/GameModeBase.h"
 #include "OnlineSubsystem.h"
 #include "Interfaces/OnlineSessionInterface.h"
 #include "LobbyGameMode.generated.h"
 
 class ULobbyWidget;
-class AHorrorGameState;
 
 UCLASS()
-class HORRORGAME_API ALobbyGameMode : public AGameMode
+class HORRORGAME_API ALobbyGameMode : public AGameModeBase
 {
-    GENERATED_BODY()
+	GENERATED_BODY()
 
 public:
-    ALobbyGameMode();
-
-    virtual void BeginPlay() override;
-    virtual void PostLogin(APlayerController* NewPlayer) override;
-    virtual void Logout(AController* Exiting) override;
-
-    // Start the main game
-    UFUNCTION(BlueprintCallable)
-    void StartGame();
-
-    // Check if all players are ready (if you want ready system)
-    UFUNCTION(BlueprintCallable)
-    bool AreAllPlayersReady() const;
+	ALobbyGameMode();
 
 protected:
-    // Lobby Widget Class
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Lobby")
-    TSubclassOf<ULobbyWidget> LobbyWidgetClass;
+	virtual void BeginPlay() override;
+	virtual void PostLogin(APlayerController* NewPlayer) override;
+	virtual void Logout(AController* Exiting) override;
 
-    // Current lobby widget instance
-    UPROPERTY()
-    ULobbyWidget* LobbyWidget;
+public:
+	// Game Control Functions
+	UFUNCTION(BlueprintCallable, Category = "Lobby")
+	void StartGame();
 
-    // Game map to load when starting
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Lobby")
-    FString GameMapName = TEXT("L_horrorGame");
+	UFUNCTION(BlueprintCallable, Category = "Lobby")
+	bool AreAllPlayersReady() const;
 
-private:
-    // Session interface
-    IOnlineSessionPtr SessionInterface;
+	UFUNCTION(BlueprintCallable, Category = "Lobby")
+	void PrintLobbyDebugInfo();
 
-    // Initialize session interface
-    void InitializeSessionInterface();
+	// UI Update Functions
+	UFUNCTION(BlueprintCallable, Category = "Lobby")
+	void UpdateLobbyUI();
 
-    // Update lobby UI with current players
-    void UpdateLobbyUI();
+	UFUNCTION(BlueprintCallable, Category = "Lobby")
+	TArray<FString> GetConnectedPlayerNames() const;
 
-    // Get all connected player names
-    TArray<FString> GetConnectedPlayerNames() const;
+	UFUNCTION(BlueprintCallable, Category = "Lobby")
+	TArray<bool> GetPlayerHostStatus() const;
 
-    // Get host status for each player
-    TArray<bool> GetPlayerHostStatus() const;
+protected:
+	// Setup Functions
+	void InitializeSessionInterface();
+	void CreateLobbyWidget();
+
+public:
+	// Configuration Properties
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Lobby Settings")
+	TSubclassOf<ULobbyWidget> LobbyWidgetClass;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Lobby Settings")
+	FString GameMapName = TEXT("GameLevel");
+
+protected:
+	// Widget Reference
+	UPROPERTY()
+	ULobbyWidget* LobbyWidget;
+
+	// Online Session Interface
+	IOnlineSessionPtr SessionInterface;
 };

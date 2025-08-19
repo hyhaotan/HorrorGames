@@ -1,26 +1,25 @@
-﻿// GameModeSelection.h - Updated version
-#pragma once
+﻿#pragma once
 
 #include "CoreMinimal.h"
 #include "Blueprint/UserWidget.h"
-#include "Components/Button.h"
-#include "Animation/WidgetAnimation.h"
-#include "OnlineSubsystem.h"
-#include "Interfaces/OnlineSessionInterface.h"
 #include "GameModeSelection.generated.h"
 
-class UMainMenu;
-class ULobbyWidget;
+class UButton;
+class UWidgetAnimation;
+class UMenuCameraManager;
 class ULobbySessionManager;
+class ULobbyWidget;
+class UMainMenu;
+class UCurveFloat;
+struct FCameraTransitionSettings;
 
-// Enum for tracking transition states
 UENUM(BlueprintType)
 enum class ETransitionState : uint8
 {
-    None        UMETA(DisplayName = "None"),
-    Single      UMETA(DisplayName = "Single Player"),
-    Multiplayer UMETA(DisplayName = "Multiplayer"),
-    Back        UMETA(DisplayName = "Back to Main Menu")
+    None,
+    Single,
+    Multiplayer,
+    Back
 };
 
 UCLASS()
@@ -32,32 +31,67 @@ public:
     virtual void NativeConstruct() override;
 
 protected:
-    // UI Components
-    UPROPERTY(meta = (BindWidget))
+    // --- Widgets & Animations (bind these in UMG or set in BP) ---
+    UPROPERTY(meta = (BindWidgetOptional))
     UButton* SinglePlayerButton;
 
-    UPROPERTY(meta = (BindWidget))
+    UPROPERTY(meta = (BindWidgetOptional))
     UButton* MultiplayerButton;
 
-    UPROPERTY(meta = (BindWidget))
+    UPROPERTY(meta = (BindWidgetOptional))
     UButton* BackButton;
 
-    // Animations
-    UPROPERTY(meta = (BindWidgetAnim), Transient)
+    UPROPERTY(Transient, meta = (BindWidgetAnimOptional))
     UWidgetAnimation* ShowAnim;
 
-    UPROPERTY(meta = (BindWidgetAnim), Transient)
+    UPROPERTY(Transient, meta = (BindWidgetAnimOptional))
     UWidgetAnimation* HideAnim;
 
-    // Widget Classes
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "UI")
-    TSubclassOf<UMainMenu> MainMenuClass;
-
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "UI")
+    // --- Classes to create ---
+    UPROPERTY(EditAnywhere, Category = "UI")
     TSubclassOf<ULobbyWidget> LobbyWidgetClass;
 
-private:
-    // Button event handlers
+    UPROPERTY(EditAnywhere, Category = "UI")
+    TSubclassOf<UMainMenu> MainMenuClass;
+
+    // --- Camera transition settings ---
+    UPROPERTY(EditAnywhere, Category = "Camera")
+    float CameraTransitionDuration = 1.0f;
+
+    UPROPERTY(EditAnywhere, Category = "Camera")
+    bool bUseCameraFade = true;
+
+    UPROPERTY(EditAnywhere, Category = "Camera")
+    float CameraFadeDuration = 0.4f;
+
+    UPROPERTY(EditAnywhere, Category = "Camera")
+    FLinearColor CameraFadeColor = FLinearColor::Black;
+
+    UPROPERTY(EditAnywhere, Category = "Camera")
+    bool bFadeAudioDuringTransition = true;
+
+    UPROPERTY(EditAnywhere, Category = "Camera")
+    UCurveFloat* CameraTransitionCurve = nullptr;
+
+    UPROPERTY(EditAnywhere, Category = "Lobby")
+    bool bReturnToMenuOnError = true;
+
+    // --- Runtime objects ---
+    UPROPERTY()
+    UMenuCameraManager* CameraManager;
+
+    UPROPERTY()
+    ULobbySessionManager* SessionManager;
+
+    // internal state
+    ETransitionState PendingState = ETransitionState::None;
+
+    // --- Helpers ---
+    void BindButtonEvents();
+    void InitializeCameraManager();
+    void SetButtonsEnabled(bool bEnabled);
+
+    // --- Button callbacks ---
     UFUNCTION()
     void OnSinglePlayerClicked();
 
@@ -67,26 +101,28 @@ private:
     UFUNCTION()
     void OnBackClicked();
 
-    // Animation event handlers
+    // --- Camera callbacks ---
+    UFUNCTION()
+    void OnCameraTransitionStarted(const FString TransitionName);
+
+    UFUNCTION()
+    void OnCameraTransitionComplete(bool bWasSuccessful);
+
+    // --- Session callbacks ---
+    UFUNCTION()
+    void OnSessionCreated(bool bWasSuccessful);
+
+    // --- Anim callback ---
     UFUNCTION()
     void OnHideAnimationFinished();
 
     UFUNCTION()
     void OnShowAnimationFinished();
 
-    // Session event handlers
-    UFUNCTION()
-    void OnSessionCreated(bool bWasSuccessful);
-
-    // Utility functions
+    // --- Flow helpers ---
+    void StartCameraTransitionToLobby();
     void CreateMultiplayerLobby();
-    void ReturnToMainMenu();
+    void ShowLobbyUIDirectly();
     void ShowConnectionError();
-
-    // Session Manager
-    UPROPERTY()
-    ULobbySessionManager* SessionManager;
-
-    // Current transition state
-    ETransitionState PendingState = ETransitionState::None;
+    void ReturnToMainMenu();
 };

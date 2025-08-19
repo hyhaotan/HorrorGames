@@ -1,59 +1,157 @@
-﻿// Fill out your copyright notice in the Description page of Project Settings.
-
-#pragma once
+﻿#pragma once
 
 #include "CoreMinimal.h"
 #include "Blueprint/UserWidget.h"
+#include "Components/Button.h"
+#include "Components/TextBlock.h"
+#include "Components/Image.h"
+#include "Components/CanvasPanel.h"
+#include "Animation/WidgetAnimation.h"
+#include "Sound/SoundCue.h"
+#include "Engine/Texture2D.h"
 #include "MainMenu.generated.h"
 
-class UButton;
-class UGameModeSelection;
-class UGraphicsWidget;
-class UConfirmExitWidget;
+DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnMenuTransition);
 
 UCLASS()
 class HORRORGAME_API UMainMenu : public UUserWidget
 {
-	GENERATED_BODY()
+    GENERATED_BODY()
 
 public:
-	UPROPERTY()
-	UGameModeSelection* GameModeSelection;
+    virtual void NativeConstruct() override;
+    virtual void NativeTick(const FGeometry& MyGeometry, float InDeltaTime) override;
 
-	UPROPERTY()
-	UGraphicsWidget* GraphicsWidget;
+protected:
+    // === ORIGINAL BUTTONS ===
+    UPROPERTY(meta = (BindWidget))
+    class UButton* PlayButton;
 
-	UPROPERTY(EditAnywhere, Category = "Menu")
-	TSubclassOf<UGameModeSelection> GameModeSelectionClass;
+    UPROPERTY(meta = (BindWidget))
+    class UButton* OptionsButton;
 
-	UPROPERTY(EditAnywhere, Category = "Menu")
-	TSubclassOf<class UGraphicsWidget> GraphicsWidgetClass;
+    UPROPERTY(meta = (BindWidget))
+    class UButton* ExitButton;
 
-	UPROPERTY()
-	UConfirmExitWidget* ConfirmExitWidgetInstance;
+    UPROPERTY(meta = (BindWidget))
+    class UButton* CreditsButton;
 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Widgets")
-	TSubclassOf<UConfirmExitWidget> ConfirmExitWidgetClass;
+    // === UI ELEMENTS ===
+
+    UPROPERTY(meta = (BindWidget))
+    class UTextBlock* VersionText;
+
+    UPROPERTY(meta = (BindWidget))
+    class UCanvasPanel* ParticleContainer;
+
+    // === ANIMATIONS ===
+    UPROPERTY(Transient, meta = (BindWidgetAnim))
+    class UWidgetAnimation* ButtonEntranceAnim;
+
+    // Hover animations - each should only animate the corresponding button in UMG
+    UPROPERTY(Transient, meta = (BindWidgetAnim))
+    class UWidgetAnimation* PlayButtonHoverAnim;
+
+    UPROPERTY(Transient, meta = (BindWidgetAnim))
+    class UWidgetAnimation* OptionsButtonHoverAnim;
+
+    UPROPERTY(Transient, meta = (BindWidgetAnim))
+    class UWidgetAnimation* ExitButtonHoverAnim;
+
+    UPROPERTY(Transient, meta = (BindWidgetAnim))
+    class UWidgetAnimation* CreditsButtonHoverAnim;
+
+    // === SOUNDS ===
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Audio")
+    class USoundCue* AmbienceSound;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Audio")
+    class USoundCue* ButtonHoverSound;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Audio")
+    class USoundCue* ButtonClickSound;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Audio")
+    class USoundCue* ThunderSound;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Audio")
+    class USoundCue* CreepyWhisperSound;
+
+    // === WIDGET CLASSES ===
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "UI")
+    TSubclassOf<class UGameModeSelection> GameModeSelectionClass;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "UI")
+    TSubclassOf<class UGraphicsWidget> GraphicsWidgetClass;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "UI")
+    TSubclassOf<class UConfirmExitWidget> ConfirmExitWidgetClass;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "UI")
+    TSubclassOf<class UUserWidget> CreditsWidgetClass;
 
 private:
-	//=================VARIABLES=========================
-	UPROPERTY(meta = (BindWidget))
-	UButton* PlayButton;
-	UPROPERTY(meta = (BindWidget))
-	UButton* OptionsButton;
-	UPROPERTY(meta = (BindWidget))
-	UButton* ExitButton;
+    // === WIDGET INSTANCES ===
+    UPROPERTY()
+    class UGameModeSelection* GameModeSelection;
 
-	//=================FUNCTIONS=========================
-	
-	UFUNCTION()
-	void OnPlayButtonClicked();
+    UPROPERTY()
+    class UGraphicsWidget* GraphicsWidget;
 
-	UFUNCTION()
-	void OnOptionsButtonClicked();
+    UPROPERTY()
+    class UConfirmExitWidget* ConfirmExitWidgetInstance;
 
-	UFUNCTION()
-	void OnExitButtonClicked();
+    // === PRIVATE VARIABLES ===
+    int32 HoveredButtonIndex;
 
-	virtual void NativeConstruct() override;
+    // === BUTTON EVENT HANDLERS ===
+    UFUNCTION()
+    void OnPlayButtonClicked();
+
+    UFUNCTION()
+    void OnOptionsButtonClicked();
+
+    UFUNCTION()
+    void OnExitButtonClicked();
+
+    UFUNCTION()
+    void OnCreditsButtonClicked();
+
+    // === BUTTON HOVER HANDLERS ===
+    UFUNCTION()
+    void OnPlayButtonHovered();
+
+    UFUNCTION()
+    void OnPlayButtonUnhovered();
+
+    UFUNCTION()
+    void OnOptionsButtonHovered();
+
+    UFUNCTION()
+    void OnOptionsButtonUnhovered();
+
+    UFUNCTION()
+    void OnExitButtonHovered();
+
+    UFUNCTION()
+    void OnExitButtonUnhovered();
+
+    UFUNCTION()
+    void OnCreditsButtonHovered();
+
+    UFUNCTION()
+    void OnCreditsButtonUnhovered();
+
+    // === UTILITY FUNCTIONS ===
+    void PlayButtonAnimation(int32 ButtonIndex, float Delay);
+    void PlayUISound(USoundCue* Sound);
+    void StartAmbienceLoop();
+
+    void PlayHoverAnimationForButton(int32 ButtonIndex);
+    void StopHoverAnimationForButton(int32 ButtonIndex);
+
+public:
+    // === DELEGATES ===
+    UPROPERTY(BlueprintAssignable)
+    FOnMenuTransition OnMenuTransition;
 };
