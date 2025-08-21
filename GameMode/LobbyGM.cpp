@@ -1,29 +1,108 @@
-﻿// LobbyGM.cpp
-#include "LobbyGM.h"
+﻿#include "LobbyGM.h"
 #include "HorrorGame/Pawn/LobbyPlayerPlatform.h"
+#include "HorrorGame/Widget/Lobby/LobbyGameState.h"
+#include "HorrorGame/Widget/Lobby/LobbyPlayerController.h"
+#include "HorrorGame/Object/PlayerIDManager.h"
 #include "Kismet/GameplayStatics.h"
-#include "GameFramework/GameStateBase.h"
-#include "Components/ActorComponent.h"
+#include "Engine/World.h"
 
-static bool ParseSlotIndexFromName(const FName& Tag, int32& OutIndex)
+ALobbyGM::ALobbyGM()
 {
-    const FString S = Tag.ToString();
-    if (S.StartsWith(TEXT("Slot")))
-    {
-        const FString Num = S.Mid(4);
-        if (!Num.IsEmpty() && Num.IsNumeric())
-        {
-            OutIndex = FCString::Atoi(*Num);
-            return true;
-        }
-    }
-    return false;
+    GameStateClass = ALobbyGameState::StaticClass();
+    PlayerControllerClass = ALobbyPlayerController::StaticClass();
+
+    PlayerIDManager = CreateDefaultSubobject<UPlayerIDManager>(TEXT("PlayerIDManager"));
+    bIsGameStarting = false;
+
+    DefaultLobbySettings.MaxPlayers = 4;
+    DefaultLobbySettings.LobbyName = TEXT("Horror Game Lobby");
+    DefaultLobbySettings.GameMode = TEXT("Classic");
+    DefaultLobbySettings.MapName = TEXT("GameLevel");
+    GameLevelToLoad = TEXT("/Game/Maps/GameLevel");
 }
 
 void ALobbyGM::BeginPlay()
 {
     Super::BeginPlay();
+
+    LobbyGameState = GetGameState<ALobbyGameState>();
+    if (LobbyGameState)
+    {
+        LobbyGameState->LobbySettings = DefaultLobbySettings;
+    }
+
     SetupPlatforms();
+}
+
+void ALobbyGM::PostLogin(APlayerController* NewPlayer)
+{
+    if (!CanPlayerJoin(NewPlayer))
+    {
+        UE_LOG(LogTemp, Warning, TEXT("Player cannot join - lobby full or game starting"));
+        return;
+    }
+
+    Super::PostLogin(NewPlayer);
+
+    ALobbyPlayerController* LobbyPC = Cast<ALobbyPlayerController>(NewPlayer);
+    if (!IsValid(LobbyPC))
+    {
+        UE_LOG(LogTemp, Error, TEXT("Invalid player controller type"));
+        return;
+    }
+
+    // Assign to platform
+    ALobbyPlayerPlatform* Platform = FindFreePlatform();
+    if (IsValid(Platform))
+    {
+        AssignPlayerToPlatform(LobbyPC, Platform);
+    }
+
+    // Store reference
+    UE_LOG(LogTemp, Log, TEXT("Player logged in: %s"), *GetNameSafe(NewPlayer));
+}
+
+void ALobbyGM::Logout(AController* Exiting)
+{
+    ALobbyPlayerController* PC = Cast<ALobbyPlayerController>(Exiting);
+    if (IsValid(PC))
+    {
+        // Remove from platform
+        RemovePlayerFromPlatform(PC);
+
+        // Remove from steam mapping
+        if (!PC->MyPlayerData.SteamID.IsEmpty())
+        {
+            SteamIDToPlayerController.Remove(PC->MyPlayerData.SteamID);
+        }
+    }
+
+    Super::Logout(Exiting);
+}
+
+void ALobbyGM::HandleStartingNewPlayer_Implementation(APlayerController* NewPlayer)
+{
+    // Don't call parent - we handle spawning in PostLogin
+    UE_LOG(LogTemp, Log, TEXT("HandleStartingNewPlayer: %s"), *GetNameSafe(NewPlayer));
+}
+
+bool ALobbyGM::CanPlayerJoin(APlayerController* NewPlayer)
+{
+    if (!LobbyGameState) return false;
+
+    // Check if lobby is full
+    if (LobbyGameState->ConnectedPlayers.Num() >= LobbyGameState->LobbySettings.MaxPlayers)
+    {
+        return false;
+    }
+
+    // Check if game is starting
+    if (bIsGameStarting || LobbyGameState->CurrentLobbyState == ELobbyState::Starting)
+    {
+        return false;
+    }
+
+    return true;
 }
 
 void ALobbyGM::SetupPlatforms()
@@ -37,6 +116,21 @@ void ALobbyGM::SetupPlatforms()
     TArray<FEntry> Indexed;
     TArray<FEntry> Unindexed;
 
+    auto ParseSlotIndexFromName = [](const FName& Tag, int32& OutIndex) -> bool
+        {
+            const FString S = Tag.ToString();
+            if (S.StartsWith(TEXT("Slot")))
+            {
+                const FString Num = S.Mid(4);
+                if (!Num.IsEmpty() && Num.IsNumeric())
+                {
+                    OutIndex = FCString::Atoi(*Num);
+                    return true;
+                }
+            }
+            return false;
+        };
+
     for (AActor* A : Found)
     {
         if (ALobbyPlayerPlatform* P = Cast<ALobbyPlayerPlatform>(A))
@@ -44,7 +138,7 @@ void ALobbyGM::SetupPlatforms()
             int32 BestIdx = TNumericLimits<int32>::Max();
             bool bFoundIdx = false;
 
-            // 1) Actor tags
+            // Check actor tags
             for (const FName& Tag : P->Tags)
             {
                 int32 TagIdx;
@@ -55,7 +149,7 @@ void ALobbyGM::SetupPlatforms()
                 }
             }
 
-            // 2) Component tags (phòng trường hợp tag đặt ở Mesh/Component)
+            // Check component tags
             if (!bFoundIdx)
             {
                 TArray<UActorComponent*> Comps = P->GetComponents().Array();
@@ -76,12 +170,10 @@ void ALobbyGM::SetupPlatforms()
             if (bFoundIdx)
             {
                 Indexed.Add({ BestIdx, P, true });
-                UE_LOG(LogTemp, Log, TEXT("LobbyGM: Found platform %s -> Slot%d"), *GetNameSafe(P), BestIdx);
             }
             else
             {
                 Unindexed.Add({ TNumericLimits<int32>::Max(), P, false });
-                UE_LOG(LogTemp, Warning, TEXT("LobbyGM: Platform %s has NO Slot tag. Appending to end."), *GetNameSafe(P));
             }
         }
     }
@@ -91,7 +183,7 @@ void ALobbyGM::SetupPlatforms()
     for (const FEntry& E : Indexed) { Platforms.Add(E.P); }
     for (const FEntry& E : Unindexed) { Platforms.Add(E.P); }
 
-    UE_LOG(LogTemp, Log, TEXT("LobbyGM: Total platforms ready: %d"), Platforms.Num());
+    UE_LOG(LogTemp, Log, TEXT("LobbyGM: Setup %d platforms"), Platforms.Num());
 }
 
 ALobbyPlayerPlatform* ALobbyGM::FindFreePlatform() const
@@ -104,56 +196,77 @@ ALobbyPlayerPlatform* ALobbyGM::FindFreePlatform() const
     return nullptr;
 }
 
-void ALobbyGM::PostLogin(APlayerController* NewPlayer)
+void ALobbyGM::AssignPlayerToPlatform(ALobbyPlayerController* Player, ALobbyPlayerPlatform* Platform)
 {
-    Super::PostLogin(NewPlayer);
-    if (!NewPlayer) return;
+    if (!IsValid(Player) || !IsValid(Platform)) return;
 
-    if (Platforms.Num() == 0)
-    {
-        UE_LOG(LogTemp, Warning, TEXT("Platforms empty in PostLogin. Rescanning..."));
-        SetupPlatforms();
-    }
+    Platform->CharacterClass = LobbyCharacterClass;
+    Platform->SpawnCharacter(Player);
+    PlayerToPlatform.Add(Player, Platform);
 
-    UE_LOG(LogTemp, Log, TEXT("PostLogin: %s, CurrentPlayers=%d"),
-        *GetNameSafe(NewPlayer),
-        GetGameState<AGameStateBase>() ? GetGameState<AGameStateBase>()->PlayerArray.Num() : -1);
-
-    ALobbyPlayerPlatform* Slot = FindFreePlatform();
-    if (!Slot)
-    {
-        UE_LOG(LogTemp, Warning, TEXT("No free slot for %s"), *GetNameSafe(NewPlayer));
-        return;
-    }
-
-    if (!LobbyCharacterClass)
-    {
-        UE_LOG(LogTemp, Error, TEXT("LobbyCharacterClass is NOT set in GameMode."));
-        return;
-    }
-
-    Slot->CharacterClass = LobbyCharacterClass;
-    Slot->SpawnCharacter(NewPlayer);
-
-    PlayerToPlatform.Add(NewPlayer, Slot);
-
-    UE_LOG(LogTemp, Log, TEXT("Assigned %s -> %s"), *GetNameSafe(NewPlayer), *GetNameSafe(Slot));
+    UE_LOG(LogTemp, Log, TEXT("Assigned %s to platform"), *GetNameSafe(Player));
 }
 
-void ALobbyGM::Logout(AController* Exiting)
+void ALobbyGM::RemovePlayerFromPlatform(APlayerController* Player)
 {
-    Super::Logout(Exiting);
-
-    if (APlayerController* PC = Cast<APlayerController>(Exiting))
+    if (ALobbyPlayerPlatform** Found = PlayerToPlatform.Find(Player))
     {
-        if (ALobbyPlayerPlatform** Found = PlayerToPlatform.Find(PC))
+        if (IsValid(*Found))
         {
-            if (IsValid(*Found))
+            (*Found)->Clear();
+        }
+        PlayerToPlatform.Remove(Player);
+    }
+}
+
+bool ALobbyGM::StartLobbyGame()
+{
+    if (!HasAuthority() || bIsGameStarting) return false;
+
+    if (!LobbyGameState || !LobbyGameState->CanStartGame())
+    {
+        UE_LOG(LogTemp, Warning, TEXT("Cannot start game - not all players ready"));
+        return false;
+    }
+
+    bIsGameStarting = true;
+    LobbyGameState->UpdateLobbyState(ELobbyState::Starting);
+
+    // Notify all players
+    for (const FLobbyPlayerData& Player : LobbyGameState->ConnectedPlayers)
+    {
+        if (ALobbyPlayerController** PC = SteamIDToPlayerController.Find(Player.SteamID))
+        {
+            if (IsValid(*PC))
             {
-                (*Found)->Clear();
-                UE_LOG(LogTemp, Log, TEXT("Cleared slot of %s"), *GetNameSafe(PC));
+                (*PC)->ClientGameStarting();
             }
-            PlayerToPlatform.Remove(PC);
+        }
+    }
+
+    // Travel to game level
+    FString TravelURL = GameLevelToLoad + TEXT("?listen");
+    GetWorld()->ServerTravel(TravelURL);
+
+    return true;
+}
+
+void ALobbyGM::UpdateLobbySettings(const FLobbySettings& NewSettings)
+{
+    if (!HasAuthority() || !LobbyGameState) return;
+
+    LobbyGameState->ServerUpdateLobbySettings(NewSettings);
+}
+
+void ALobbyGM::KickPlayer(const FString& SteamID)
+{
+    if (!HasAuthority()) return;
+
+    if (ALobbyPlayerController** PC = SteamIDToPlayerController.Find(SteamID))
+    {
+        if (IsValid(*PC))
+        {
+            (*PC)->ClientTravel(TEXT("/Game/Maps/MainMenu"), ETravelType::TRAVEL_Absolute);
         }
     }
 }

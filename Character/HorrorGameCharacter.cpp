@@ -25,6 +25,7 @@
 #include "HorrorGame/Actor/Component/HeadbobComponent.h"
 #include "HorrorGame/Actor/Component/SanityComponent.h"
 #include "HorrorGame/Actor/Component/FearComponent.h"
+#include "HorrorGame/Widget/Lobby/LobbyPlayerSlot.h"
 
 // Engine
 #include "Engine/LocalPlayer.h"
@@ -46,6 +47,8 @@
 #include "Engine/PostProcessVolume.h"
 #include "Blueprint/WidgetBlueprintLibrary.h" 
 #include "Net/UnrealNetwork.h"
+#include "Components/WidgetComponent.h"
+#include "GameFramework/PlayerState.h"
 
 DEFINE_LOG_CATEGORY(LogTemplateCharacter);
 
@@ -134,6 +137,13 @@ AHorrorGameCharacter::AHorrorGameCharacter()
 
     bIsBeingChased = false;
     DarknessVolumeCount = 0;
+
+    LobbySlotWidgetComp = CreateDefaultSubobject<UWidgetComponent>(TEXT("LobbySlotWidget"));
+    LobbySlotWidgetComp->SetupAttachment(GetMesh(), TEXT("head")); 
+    LobbySlotWidgetComp->SetDrawSize(FVector2D(200, 50));
+    LobbySlotWidgetComp->SetRelativeLocation(FVector(0, 0, 30));
+    LobbySlotWidgetComp->SetWidgetClass(LobbySlotWidgetClass);
+
 }
 
 void AHorrorGameCharacter::BeginPlay()
@@ -146,6 +156,19 @@ void AHorrorGameCharacter::BeginPlay()
         HeadbobComponent->ForceUpdateHeadbob();
         SanityComponent->OnSanityThresholdReached.AddDynamic(this, &AHorrorGameCharacter::OnSanityThresholdReached);
     }
+
+    if (UUserWidget* BaseWidget = LobbySlotWidgetComp->GetUserWidgetObject())
+    {
+        if (ULobbyPlayerSlot* SlotWidget = Cast<ULobbyPlayerSlot>(BaseWidget))
+        {
+            // Lấy PlayerState hoặc Controller để đặt tên, trạng thái
+            FString PlayerName = GetPlayerState() ? GetPlayerState()->GetPlayerName() : TEXT("Guest");
+            bool bIsReady = false;
+
+            SlotWidget->SetPlayerInfo(PlayerName, bIsReady);
+        }
+    }
+
 
     SetupWidgets();
 

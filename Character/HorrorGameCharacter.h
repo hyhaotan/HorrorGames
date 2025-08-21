@@ -27,6 +27,7 @@ class UCrossHairWidget;
 class UKnockOutWidget;
 class UNoteWidget;
 class UKeyNotificationWidget;
+class UWidgetComponent;
 
 DECLARE_LOG_CATEGORY_EXTERN(LogTemplateCharacter, Log, All);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnInventoryUpdated, const TArray<AActor*>&, NewInventory);
@@ -321,6 +322,12 @@ public:
 
 	UPROPERTY(EditDefaultsOnly, Category = "UI")
 	TSubclassOf<UUserWidget> NoteWidgetClass;
+
+	UPROPERTY(EditDefaultsOnly, Category = "UI")
+	TSubclassOf<UUserWidget> LobbySlotWidgetClass;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "UI")
+	UWidgetComponent* LobbySlotWidgetComp;
 
 	//Component
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")

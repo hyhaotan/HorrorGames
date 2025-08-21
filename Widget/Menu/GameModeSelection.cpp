@@ -1,6 +1,6 @@
 ﻿#include "GameModeSelection.h"
 #include "HorrorGame/Widget/Menu/MainMenu.h"
-#include "HorrorGame/Widget/Lobby/LobbyWidget.h"
+#include "HorrorGame/Widget/Lobby/LobbyMainWidget.h"
 #include "HorrorGame/Object/LobbySessionManager.h"
 #include "HorrorGame/Object/MenuCameraManager.h"
 #include "Kismet/GameplayStatics.h"
@@ -221,7 +221,7 @@ void UGameModeSelection::ShowLobbyUIDirectly()
         return;
     }
 
-    ULobbyWidget* LobbyWidget = CreateWidget<ULobbyWidget>(PC, LobbyWidgetClass);
+    ULobbyMainWidget* LobbyWidget = CreateWidget<ULobbyMainWidget>(PC, LobbyWidgetClass);
     if (LobbyWidget)
     {
         RemoveFromParent();

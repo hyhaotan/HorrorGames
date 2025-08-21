@@ -1,272 +1,357 @@
-﻿#include "HorrorGame/Widget/Menu/MainMenu.h"
-#include "HorrorGame/Widget/Menu/GameModeSelection.h"
-#include "HorrorGame/Widget/Settings/GraphicsWidget.h"
-#include "HorrorGame/Widget/Menu/ConfirmExitWidget.h"
+﻿#include "MainMenu.h"
+#include "HorrorGame/GameInstance/SteamLobbySubsystem.h"
+#include "HorrorGame/Object/PlayerIDManager.h"
+#include "HorrorGame/Widget/Lobby/LobbyEntry.h"
 #include "Components/Button.h"
 #include "Components/TextBlock.h"
-#include "Components/Image.h"
-#include "Animation/WidgetAnimation.h"
+#include "Components/EditableText.h"
+#include "Components/ScrollBox.h"
+#include "Components/Border.h"
+#include "Components/HorizontalBox.h"
 #include "Kismet/GameplayStatics.h"
-#include "Engine/World.h"
-#include "TimerManager.h"
-#include "Math/UnrealMathUtility.h"
+#include "Kismet/KismetSystemLibrary.h"
+#include "Engine/Engine.h"
 
 void UMainMenu::NativeConstruct()
 {
     Super::NativeConstruct();
 
-    // Initialize time tracking
-    HoveredButtonIndex = -1;
+    // Initialize state variables
+    bIsSearchingLobbies = false;
+    bIsCreatingLobby = false;
+    bIsJoiningLobby = false;
 
-    // === BIND ORIGINAL BUTTONS ===
-    if (PlayButton)
+    // Get Steam Lobby Subsystem
+    SteamLobbySubsystem = GetGameInstance()->GetSubsystem<USteamLobbySubsystem>();
+
+    if (SteamLobbySubsystem)
     {
-        PlayButton->OnClicked.AddDynamic(this, &UMainMenu::OnPlayButtonClicked);
-        PlayButton->OnHovered.AddDynamic(this, &UMainMenu::OnPlayButtonHovered);
-        PlayButton->OnUnhovered.AddDynamic(this, &UMainMenu::OnPlayButtonUnhovered);
+        // Bind Steam Lobby events
+        SteamLobbySubsystem->OnLobbyCreated.AddDynamic(this, &UMainMenu::OnLobbyCreated);
+        SteamLobbySubsystem->OnLobbyJoined.AddDynamic(this, &UMainMenu::OnLobbyJoined);
+        SteamLobbySubsystem->OnLobbySearchComplete.AddDynamic(this, &UMainMenu::OnLobbySearchComplete);
+    }
+    else
+    {
+        UpdateStatusMessage(TEXT("Failed to initialize Steam Lobby System"), true);
+        return;
     }
 
-    if (OptionsButton)
+    // Bind button events
+    if (CreateLobbyButton)
     {
-        OptionsButton->OnClicked.AddDynamic(this, &UMainMenu::OnOptionsButtonClicked);
-        OptionsButton->OnHovered.AddDynamic(this, &UMainMenu::OnOptionsButtonHovered);
-        OptionsButton->OnUnhovered.AddDynamic(this, &UMainMenu::OnOptionsButtonUnhovered);
+        CreateLobbyButton->OnClicked.AddDynamic(this, &UMainMenu::OnCreateLobbyClicked);
     }
 
-    if (ExitButton)
+    if (JoinLobbyButton)
     {
-        ExitButton->OnClicked.AddDynamic(this, &UMainMenu::OnExitButtonClicked);
-        ExitButton->OnHovered.AddDynamic(this, &UMainMenu::OnExitButtonHovered);
-        ExitButton->OnUnhovered.AddDynamic(this, &UMainMenu::OnExitButtonUnhovered);
+        JoinLobbyButton->OnClicked.AddDynamic(this, &UMainMenu::OnJoinLobbyClicked);
     }
 
-    if (CreditsButton)
+    if (RefreshLobbiesButton)
     {
-        CreditsButton->OnClicked.AddDynamic(this, &UMainMenu::OnCreditsButtonClicked);
-        CreditsButton->OnHovered.AddDynamic(this, &UMainMenu::OnCreditsButtonHovered);
-        CreditsButton->OnUnhovered.AddDynamic(this, &UMainMenu::OnCreditsButtonUnhovered);
+        RefreshLobbiesButton->OnClicked.AddDynamic(this, &UMainMenu::OnRefreshLobbiesClicked);
     }
 
-    // === PLAY ENTRANCE ANIMATIONS ===
-    if (ButtonEntranceAnim)
+    if (ExitGameButton)
     {
-        // Stagger entrance. Note: ButtonEntranceAnim should be set up in UMG to animate each button
-        PlayButtonAnimation(0, 0.2f); // Play
-        PlayButtonAnimation(1, 0.4f); // Options
-        PlayButtonAnimation(2, 0.6f); // Exit
-        PlayButtonAnimation(3, 1.0f); // Credits
+        ExitGameButton->OnClicked.AddDynamic(this, &UMainMenu::OnExitGameClicked);
     }
 
-    // === START BACKGROUND SYSTEMS ===
-    StartAmbienceLoop();
-
-    // Set version text if available
-    if (VersionText)
+    // Initialize UI state
+    if (BorderListBox)
     {
-        VersionText->SetText(FText::FromString(TEXT("v1.0.0 - Alpha Build")));
+        BorderListBox->SetVisibility(ESlateVisibility::Hidden);
     }
+
+    InitializePlayerName();
+    UpdateStatusMessage(TEXT("Ready to play!"));
+
+    // Auto-refresh lobbies on start
+    OnRefreshLobbiesClicked();
 }
 
-void UMainMenu::NativeTick(const FGeometry& MyGeometry, float InDeltaTime)
+void UMainMenu::NativeDestruct()
 {
-    Super::NativeTick(MyGeometry, InDeltaTime);
-}
-
-void UMainMenu::StartAmbienceLoop()
-{
-    if (AmbienceSound)
+    // Clean up delegates
+    if (SteamLobbySubsystem)
     {
-        UGameplayStatics::PlaySound2D(this, AmbienceSound, 0.6f, 1.0f, 0.0f);
-
-        // Loop ambience every 3 minutes
-        FTimerHandle AmbienceTimer;
-        GetWorld()->GetTimerManager().SetTimer(AmbienceTimer, [this]()
-            {
-                if (AmbienceSound)
-                {
-                    UGameplayStatics::PlaySound2D(this, AmbienceSound, 0.6f, 1.0f, 0.0f);
-                }
-            }, 180.0f, true);
+        SteamLobbySubsystem->OnLobbyCreated.RemoveDynamic(this, &UMainMenu::OnLobbyCreated);
+        SteamLobbySubsystem->OnLobbyJoined.RemoveDynamic(this, &UMainMenu::OnLobbyJoined);
+        SteamLobbySubsystem->OnLobbySearchComplete.RemoveDynamic(this, &UMainMenu::OnLobbySearchComplete);
     }
+
+    Super::NativeDestruct();
 }
 
-// === ORIGINAL BUTTON IMPLEMENTATIONS ===
-void UMainMenu::OnPlayButtonClicked()
+void UMainMenu::InitializePlayerName()
 {
-    PlayUISound(ButtonClickSound);
+    if (!PlayerNameText) return;
 
-    if (GameModeSelectionClass)
+    // Create temporary PlayerIDManager to get Steam name
+    UPlayerIDManager* TempManager = NewObject<UPlayerIDManager>(this);
+    if (IsValid(TempManager))
     {
-        GameModeSelection = CreateWidget<UGameModeSelection>(GetWorld(), GameModeSelectionClass);
-        if (GameModeSelection)
+        FString SteamName = TempManager->GetCurrentSteamName();
+        if (!SteamName.IsEmpty())
         {
-            GameModeSelection->AddToViewport();
-            this->RemoveFromViewport();
+            PlayerNameText->SetText(FText::FromString(FString::Printf(TEXT("Welcome, %s"), *SteamName)));
         }
-    }
-}
-
-void UMainMenu::OnOptionsButtonClicked()
-{
-    PlayUISound(ButtonClickSound);
-
-    if (GraphicsWidgetClass)
-    {
-        GraphicsWidget = CreateWidget<UGraphicsWidget>(GetWorld(), GraphicsWidgetClass);
-        if (GraphicsWidget)
+        else
         {
-            GraphicsWidget->AddToViewport();
-        }
-    }
-}
-
-void UMainMenu::OnExitButtonClicked()
-{
-    PlayUISound(ButtonClickSound);
-
-    if (!ConfirmExitWidgetClass) return;
-    if (!ConfirmExitWidgetInstance)
-    {
-        ConfirmExitWidgetInstance = CreateWidget<UConfirmExitWidget>(GetWorld(), ConfirmExitWidgetClass);
-        if (ConfirmExitWidgetInstance)
-        {
-            ConfirmExitWidgetInstance->ShowAnimExit();
-            ConfirmExitWidgetInstance->AddToViewport(100);
+            PlayerNameText->SetText(FText::FromString(TEXT("Welcome, Player")));
         }
     }
     else
     {
-        ConfirmExitWidgetInstance->ShowAnimExit();
-        ConfirmExitWidgetInstance->SetVisibility(ESlateVisibility::Visible);
+        PlayerNameText->SetText(FText::FromString(TEXT("Welcome, Player")));
     }
 }
 
-void UMainMenu::OnCreditsButtonClicked()
+void UMainMenu::OnCreateLobbyClicked()
 {
-    PlayUISound(ButtonClickSound);
-    UE_LOG(LogTemp, Log, TEXT("Credits button clicked"));
+    if (!SteamLobbySubsystem || bIsCreatingLobby) return;
 
-    if (CreditsWidgetClass)
+    // Validate lobby name input
+    FString LobbyName;
+    if (LobbyNameInput && !LobbyNameInput->GetText().IsEmpty())
     {
-        auto CreditsWidget = CreateWidget<UUserWidget>(GetWorld(), CreditsWidgetClass);
-        if (CreditsWidget)
+        LobbyName = LobbyNameInput->GetText().ToString().TrimStartAndEnd();
+        if (LobbyName.Len() > 50) // Limit lobby name length
         {
-            CreditsWidget->AddToViewport(50);
+            UpdateStatusMessage(TEXT("Lobby name too long (max 50 characters)"), true);
+            return;
+        }
+    }
+    else
+    {
+        LobbyName = TEXT("Horror Game Lobby");
+    }
+
+    FLobbySettings Settings;
+    Settings.LobbyName = LobbyName;
+    Settings.MaxPlayers = 4;
+    Settings.bIsPrivate = false;
+    Settings.GameMode = TEXT("Classic");
+    Settings.MapName = TEXT("Abandoned Hospital");
+
+    bIsCreatingLobby = true;
+    SteamLobbySubsystem->CreateLobby(Settings);
+
+    UpdateStatusMessage(TEXT("Creating lobby..."));
+    SetButtonsEnabled(false);
+}
+
+void UMainMenu::OnJoinLobbyClicked()
+{
+    if (!SteamLobbySubsystem) return;
+
+    // Toggle lobby list visibility
+    if (BorderListBox)
+    {
+        if (BorderListBox->GetVisibility() == ESlateVisibility::Hidden)
+        {
+            BorderListBox->SetVisibility(ESlateVisibility::Visible);
+
+            // Refresh lobbies when showing the list
+            if (!bIsSearchingLobbies)
+            {
+                OnRefreshLobbiesClicked();
+            }
+        }
+        else
+        {
+            BorderListBox->SetVisibility(ESlateVisibility::Hidden);
         }
     }
 }
 
-// === HOVER EFFECTS ===
-void UMainMenu::OnPlayButtonHovered()
+void UMainMenu::JoinSpecificLobby(const FString& LobbyID)
 {
-    PlayUISound(ButtonHoverSound);
-    HoveredButtonIndex = 0;
-    PlayHoverAnimationForButton(0);
+    if (!SteamLobbySubsystem || bIsJoiningLobby) return;
+
+    if (LobbyID.IsEmpty())
+    {
+        UpdateStatusMessage(TEXT("Invalid Lobby ID"), true);
+        return;
+    }
+
+    bIsJoiningLobby = true;
+    SteamLobbySubsystem->JoinLobby(LobbyID);
+
+    UpdateStatusMessage(TEXT("Joining lobby..."));
+    SetButtonsEnabled(false);
+
+    // Hide lobby list
+    if (BorderListBox)
+    {
+        BorderListBox->SetVisibility(ESlateVisibility::Hidden);
+    }
 }
 
-void UMainMenu::OnPlayButtonUnhovered()
+void UMainMenu::OnRefreshLobbiesClicked()
 {
-    StopHoverAnimationForButton(0);
-    HoveredButtonIndex = -1;
+    if (!SteamLobbySubsystem || bIsSearchingLobbies) return;
+
+    bIsSearchingLobbies = true;
+    SteamLobbySubsystem->SearchLobbies();
+
+    UpdateStatusMessage(TEXT("Searching for lobbies..."));
+
+    if (RefreshLobbiesButton)
+    {
+        RefreshLobbiesButton->SetIsEnabled(false);
+    }
+
+    // Clear existing lobbies list
+    ClearLobbiesList();
 }
 
-void UMainMenu::OnOptionsButtonHovered()
+void UMainMenu::OnExitGameClicked()
 {
-    PlayUISound(ButtonHoverSound);
-    HoveredButtonIndex = 1;
-    PlayHoverAnimationForButton(1);
+    UKismetSystemLibrary::QuitGame(GetWorld(), nullptr, EQuitPreference::Quit, false);
 }
 
-void UMainMenu::OnOptionsButtonUnhovered()
+void UMainMenu::OnLobbyCreated(bool bSuccess)
 {
-    StopHoverAnimationForButton(1);
-    HoveredButtonIndex = -1;
+    bIsCreatingLobby = false;
+    SetButtonsEnabled(true);
+
+    if (bSuccess)
+    {
+        UpdateStatusMessage(TEXT("Lobby created successfully! Loading lobby..."));
+        UE_LOG(LogTemp, Log, TEXT("Lobby created successfully"));
+
+        UGameplayStatics::OpenLevel(GetWorld(), TEXT("LobbyMap"));
+    }
+    else
+    {
+        UpdateStatusMessage(TEXT("Failed to create lobby. Please try again."), true);
+        UE_LOG(LogTemp, Warning, TEXT("Failed to create lobby"));
+    }
 }
 
-void UMainMenu::OnExitButtonHovered()
+void UMainMenu::OnLobbyJoined(bool bSuccess)
 {
-    PlayUISound(ButtonHoverSound);
-    HoveredButtonIndex = 2;
-    PlayHoverAnimationForButton(2);
+    bIsJoiningLobby = false;
+    SetButtonsEnabled(true);
+
+    if (bSuccess)
+    {
+        UpdateStatusMessage(TEXT("Successfully joined lobby! Loading lobby..."));
+        UE_LOG(LogTemp, Log, TEXT("Joined lobby successfully"));
+
+        UGameplayStatics::OpenLevel(GetWorld(), TEXT("LobbyMap"));
+    }
+    else
+    {
+        UpdateStatusMessage(TEXT("Failed to join lobby. It may be full or no longer available."), true);
+        UE_LOG(LogTemp, Warning, TEXT("Failed to join lobby"));
+    }
 }
 
-void UMainMenu::OnExitButtonUnhovered()
+void UMainMenu::OnLobbySearchComplete(bool bSuccess, const TArray<FString>& LobbyList)
 {
-    StopHoverAnimationForButton(2);
-    HoveredButtonIndex = -1;
-}
+    bIsSearchingLobbies = false;
 
-void UMainMenu::OnCreditsButtonHovered()
-{
-    PlayUISound(ButtonHoverSound);
-    HoveredButtonIndex = 3;
-    PlayHoverAnimationForButton(3);
-}
+    if (RefreshLobbiesButton)
+    {
+        RefreshLobbiesButton->SetIsEnabled(true);
+    }
 
-void UMainMenu::OnCreditsButtonUnhovered()
-{
-    StopHoverAnimationForButton(3);
-    HoveredButtonIndex = -1;
-}
-
-void UMainMenu::PlayButtonAnimation(int32 ButtonIndex, float Delay)
-{
-    FTimerHandle AnimTimer;
-    GetWorld()->GetTimerManager().SetTimer(AnimTimer, [this, ButtonIndex]()
+    if (bSuccess)
+    {
+        if (LobbyList.Num() > 0)
         {
-            if (ButtonEntranceAnim)
-            {
-                PlayAnimation(ButtonEntranceAnim);
-            }
-        }, Delay, false);
-}
-
-void UMainMenu::PlayUISound(USoundCue* Sound)
-{
-    if (Sound)
+            PopulateLobbiesList(LobbyList);
+            UpdateStatusMessage(FString::Printf(TEXT("Found %d lobbies"), LobbyList.Num()));
+        }
+        else
+        {
+            UpdateStatusMessage(TEXT("No lobbies found. Create one to get started!"));
+        }
+    }
+    else
     {
-        UGameplayStatics::PlaySound2D(this, Sound, 0.8f);
+        UpdateStatusMessage(TEXT("Failed to search for lobbies. Check your connection."), true);
+        UE_LOG(LogTemp, Warning, TEXT("Lobby search failed"));
     }
 }
 
-void UMainMenu::PlayHoverAnimationForButton(int32 ButtonIndex)
+void UMainMenu::OnSpecificLobbyJoinClicked(const FString& LobbyID)
 {
-    switch (ButtonIndex)
+    JoinSpecificLobby(LobbyID);
+}
+
+void UMainMenu::PopulateLobbiesList(const TArray<FString>& Lobbies)
+{
+    if (!LobbiesListBox || !LobbyEntryWidgetClass) return;
+
+    ClearLobbiesList();
+
+    for (const FString& LobbyData : Lobbies)
     {
-    case 0:
-        if (PlayButtonHoverAnim) PlayAnimation(PlayButtonHoverAnim);
-        break;
-    case 1:
-        if (OptionsButtonHoverAnim) PlayAnimation(OptionsButtonHoverAnim);
-        break;
-    case 2:
-        if (ExitButtonHoverAnim) PlayAnimation(ExitButtonHoverAnim);
-        break;
-    case 3:
-        if (CreditsButtonHoverAnim) PlayAnimation(CreditsButtonHoverAnim);
-        break;
-    default:
-        break;
+        if (LobbyData.IsEmpty()) continue;
+
+        // Create lobby entry widget
+        ULobbyEntry* LobbyEntry = CreateWidget<ULobbyEntry>(this, LobbyEntryWidgetClass);
+        if (LobbyEntry)
+        {
+            LobbyEntry->SetLobbyData(LobbyData);
+            LobbyEntry->OnLobbyJoinRequested.AddDynamic(this, &UMainMenu::OnLobbyEntryJoinRequested);
+            LobbiesListBox->AddChild(LobbyEntry);
+        }
+    }
+
+    // Show lobby list if we have lobbies
+    if (Lobbies.Num() > 0 && BorderListBox)
+    {
+        BorderListBox->SetVisibility(ESlateVisibility::Visible);
     }
 }
 
-void UMainMenu::StopHoverAnimationForButton(int32 ButtonIndex)
+void UMainMenu::OnLobbyEntryJoinRequested(const FString& LobbyID)
 {
-    switch (ButtonIndex)
+    JoinSpecificLobby(LobbyID);
+}
+
+void UMainMenu::UpdateStatusMessage(const FString& Message, bool bIsError)
+{
+    if (StatusText)
     {
-    case 0:
-        if (PlayButtonHoverAnim) StopAnimation(PlayButtonHoverAnim);
-        break;
-    case 1:
-        if (OptionsButtonHoverAnim) StopAnimation(OptionsButtonHoverAnim);
-        break;
-    case 2:
-        if (ExitButtonHoverAnim) StopAnimation(ExitButtonHoverAnim);
-        break;
-    case 3:
-        if (CreditsButtonHoverAnim) StopAnimation(CreditsButtonHoverAnim);
-        break;
-    default:
-        break;
+        StatusText->SetText(FText::FromString(Message));
+        // You could set different colors for error vs normal messages here
+    }
+
+    // Also show debug message if it's an error
+    if (bIsError && GEngine)
+    {
+        GEngine->AddOnScreenDebugMessage(-1, 5.0f, FColor::Red, Message);
+    }
+}
+
+void UMainMenu::SetButtonsEnabled(bool bEnabled)
+{
+    if (CreateLobbyButton)
+    {
+        CreateLobbyButton->SetIsEnabled(bEnabled);
+    }
+
+    if (JoinLobbyButton)
+    {
+        JoinLobbyButton->SetIsEnabled(bEnabled);
+    }
+
+    if (RefreshLobbiesButton && !bIsSearchingLobbies)
+    {
+        RefreshLobbiesButton->SetIsEnabled(bEnabled);
+    }
+}
+
+void UMainMenu::ClearLobbiesList()
+{
+    if (LobbiesListBox)
+    {
+        LobbiesListBox->ClearChildren();
     }
 }

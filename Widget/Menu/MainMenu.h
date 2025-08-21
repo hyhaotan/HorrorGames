@@ -2,16 +2,17 @@
 
 #include "CoreMinimal.h"
 #include "Blueprint/UserWidget.h"
-#include "Components/Button.h"
-#include "Components/TextBlock.h"
-#include "Components/Image.h"
-#include "Components/CanvasPanel.h"
-#include "Animation/WidgetAnimation.h"
-#include "Sound/SoundCue.h"
-#include "Engine/Texture2D.h"
+#include "HorrorGame/Data/LobbyType.h"
 #include "MainMenu.generated.h"
 
-DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnMenuTransition);
+class UButton;
+class UTextBlock;
+class UEditableText;
+class UScrollBox;
+class UBorder;
+class UHorizontalBox;
+class USteamLobbySubsystem;
+class ULobbyEntry;
 
 UCLASS()
 class HORRORGAME_API UMainMenu : public UUserWidget
@@ -20,138 +21,92 @@ class HORRORGAME_API UMainMenu : public UUserWidget
 
 public:
     virtual void NativeConstruct() override;
-    virtual void NativeTick(const FGeometry& MyGeometry, float InDeltaTime) override;
+    virtual void NativeDestruct() override;
+
+    // UI Components
+    UPROPERTY(meta = (BindWidget))
+    UButton* CreateLobbyButton;
+
+    UPROPERTY(meta = (BindWidget))
+    UButton* JoinLobbyButton;
+
+    UPROPERTY(meta = (BindWidget))
+    UButton* RefreshLobbiesButton;
+
+    UPROPERTY(meta = (BindWidget))
+    UButton* ExitGameButton;
+
+    UPROPERTY(meta = (BindWidget))
+    UBorder* BorderListBox;
+
+    UPROPERTY(meta = (BindWidget))
+    UScrollBox* LobbiesListBox;
+
+    UPROPERTY(meta = (BindWidget))
+    UEditableText* LobbyNameInput;
+
+    UPROPERTY(meta = (BindWidget))
+    UEditableText* JoinLobbyIDInput;
+
+    UPROPERTY(meta = (BindWidget))
+    UTextBlock* PlayerNameText;
+
+    UPROPERTY(meta = (BindWidget))
+    UTextBlock* StatusText;
 
 protected:
-    // === ORIGINAL BUTTONS ===
-    UPROPERTY(meta = (BindWidget))
-    class UButton* PlayButton;
-
-    UPROPERTY(meta = (BindWidget))
-    class UButton* OptionsButton;
-
-    UPROPERTY(meta = (BindWidget))
-    class UButton* ExitButton;
-
-    UPROPERTY(meta = (BindWidget))
-    class UButton* CreditsButton;
-
-    // === UI ELEMENTS ===
-
-    UPROPERTY(meta = (BindWidget))
-    class UTextBlock* VersionText;
-
-    UPROPERTY(meta = (BindWidget))
-    class UCanvasPanel* ParticleContainer;
-
-    // === ANIMATIONS ===
-    UPROPERTY(Transient, meta = (BindWidgetAnim))
-    class UWidgetAnimation* ButtonEntranceAnim;
-
-    // Hover animations - each should only animate the corresponding button in UMG
-    UPROPERTY(Transient, meta = (BindWidgetAnim))
-    class UWidgetAnimation* PlayButtonHoverAnim;
-
-    UPROPERTY(Transient, meta = (BindWidgetAnim))
-    class UWidgetAnimation* OptionsButtonHoverAnim;
-
-    UPROPERTY(Transient, meta = (BindWidgetAnim))
-    class UWidgetAnimation* ExitButtonHoverAnim;
-
-    UPROPERTY(Transient, meta = (BindWidgetAnim))
-    class UWidgetAnimation* CreditsButtonHoverAnim;
-
-    // === SOUNDS ===
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Audio")
-    class USoundCue* AmbienceSound;
-
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Audio")
-    class USoundCue* ButtonHoverSound;
-
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Audio")
-    class USoundCue* ButtonClickSound;
-
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Audio")
-    class USoundCue* ThunderSound;
-
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Audio")
-    class USoundCue* CreepyWhisperSound;
-
-    // === WIDGET CLASSES ===
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "UI")
-    TSubclassOf<class UGameModeSelection> GameModeSelectionClass;
-
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "UI")
-    TSubclassOf<class UGraphicsWidget> GraphicsWidgetClass;
-
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "UI")
-    TSubclassOf<class UConfirmExitWidget> ConfirmExitWidgetClass;
-
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "UI")
-    TSubclassOf<class UUserWidget> CreditsWidgetClass;
-
-private:
-    // === WIDGET INSTANCES ===
-    UPROPERTY()
-    class UGameModeSelection* GameModeSelection;
-
-    UPROPERTY()
-    class UGraphicsWidget* GraphicsWidget;
-
-    UPROPERTY()
-    class UConfirmExitWidget* ConfirmExitWidgetInstance;
-
-    // === PRIVATE VARIABLES ===
-    int32 HoveredButtonIndex;
-
-    // === BUTTON EVENT HANDLERS ===
+    // Button handlers
     UFUNCTION()
-    void OnPlayButtonClicked();
+    void OnCreateLobbyClicked();
 
     UFUNCTION()
-    void OnOptionsButtonClicked();
+    void OnJoinLobbyClicked();
 
     UFUNCTION()
-    void OnExitButtonClicked();
+    void OnRefreshLobbiesClicked();
 
     UFUNCTION()
-    void OnCreditsButtonClicked();
+    void OnExitGameClicked();
 
-    // === BUTTON HOVER HANDLERS ===
+    // Lobby management
     UFUNCTION()
-    void OnPlayButtonHovered();
-
-    UFUNCTION()
-    void OnPlayButtonUnhovered();
+    void JoinSpecificLobby(const FString& LobbyID);
 
     UFUNCTION()
-    void OnOptionsButtonHovered();
+    void OnSpecificLobbyJoinClicked(const FString& LobbyID);
+
+    // Event handlers for Steam Lobby Subsystem
+    UFUNCTION()
+    void OnLobbyCreated(bool bSuccess);
 
     UFUNCTION()
-    void OnOptionsButtonUnhovered();
+    void OnLobbyJoined(bool bSuccess);
 
     UFUNCTION()
-    void OnExitButtonHovered();
+    void OnLobbySearchComplete(bool bSuccess, const TArray<FString>& LobbyList);
 
+    // Helper functions
+    void InitializePlayerName();
+    void PopulateLobbiesList(const TArray<FString>& Lobbies);
+    void UpdateStatusMessage(const FString& Message, bool bIsError = false);
+    void SetButtonsEnabled(bool bEnabled);
+    void ClearLobbiesList();
+
+    // Event handler for lobby entry
     UFUNCTION()
-    void OnExitButtonUnhovered();
-
-    UFUNCTION()
-    void OnCreditsButtonHovered();
-
-    UFUNCTION()
-    void OnCreditsButtonUnhovered();
-
-    // === UTILITY FUNCTIONS ===
-    void PlayButtonAnimation(int32 ButtonIndex, float Delay);
-    void PlayUISound(USoundCue* Sound);
-    void StartAmbienceLoop();
-
-    void PlayHoverAnimationForButton(int32 ButtonIndex);
-    void StopHoverAnimationForButton(int32 ButtonIndex);
+    void OnLobbyEntryJoinRequested(const FString& LobbyID);
 
 public:
-    // === DELEGATES ===
-    UPROPERTY(BlueprintAssignable)
-    FOnMenuTransition OnMenuTransition;
+    // Class reference for lobby entry widget
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "UI")
+    TSubclassOf<ULobbyEntry> LobbyEntryWidgetClass;
+
+private:
+    UPROPERTY()
+    USteamLobbySubsystem* SteamLobbySubsystem;
+
+    // State tracking
+    bool bIsSearchingLobbies;
+    bool bIsCreatingLobby;
+    bool bIsJoiningLobby;
 };

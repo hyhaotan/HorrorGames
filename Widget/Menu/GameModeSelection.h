@@ -8,7 +8,7 @@ class UButton;
 class UWidgetAnimation;
 class UMenuCameraManager;
 class ULobbySessionManager;
-class ULobbyWidget;
+class ULobbyMainWidget;
 class UMainMenu;
 class UCurveFloat;
 struct FCameraTransitionSettings;
@@ -49,7 +49,7 @@ protected:
 
     // --- Classes to create ---
     UPROPERTY(EditAnywhere, Category = "UI")
-    TSubclassOf<ULobbyWidget> LobbyWidgetClass;
+    TSubclassOf<ULobbyMainWidget> LobbyWidgetClass;
 
     UPROPERTY(EditAnywhere, Category = "UI")
     TSubclassOf<UMainMenu> MainMenuClass;

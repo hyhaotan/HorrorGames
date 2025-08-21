@@ -1,18 +1,14 @@
-#pragma once
+﻿#pragma once
 
 #include "CoreMinimal.h"
 #include "Blueprint/UserWidget.h"
-#include "Components/Button.h"
 #include "Components/TextBlock.h"
 #include "Components/Image.h"
 #include "Components/Border.h"
-#include "Materials/MaterialInstanceDynamic.h"
-#include "Animation/WidgetAnimation.h"
+#include "Components/ProgressBar.h"
 #include "LobbyPlayerSlot.generated.h"
 
-class UTexture2D;
-
-DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnSlotInteraction, int32, SlotIndex);
+class UInviteFriendWidget;
 
 UCLASS()
 class HORRORGAME_API ULobbyPlayerSlot : public UUserWidget
@@ -20,60 +16,43 @@ class HORRORGAME_API ULobbyPlayerSlot : public UUserWidget
     GENERATED_BODY()
 
 public:
+    // Ghi đè
     virtual void NativeConstruct() override;
 
-    // Slot management
+    // Thiết lập thông tin người chơi cho slot
     UFUNCTION(BlueprintCallable)
-    void SetPlayerInfo(const FString& PlayerName, bool bInIsHost);
+    void SetPlayerInfo(const FString& PlayerName, bool bInIsReady);
 
-    UFUNCTION(BlueprintCallable)
-    void SetPlayerInfoWithAnimation(const FString& PlayerName, bool bInIsHost);
-
+    // Đặt slot về trạng thái rỗng
     UFUNCTION(BlueprintCallable)
     void SetEmpty();
 
-    UFUNCTION(BlueprintCallable)
-    void SetSlotIndex(int32 Index) { SlotIndex = Index; }
-
-    // State getters
+    // Trả về trạng thái có người hay không
     UFUNCTION(BlueprintCallable)
     bool IsOccupied() const { return bIsOccupied; }
 
-    UFUNCTION(BlueprintCallable)
-    bool IsHost() const { return bIsHost; }
-
+    // Lấy tên người chơi hiện tại (có thể rỗng)
     UFUNCTION(BlueprintCallable)
     FString GetPlayerName() const { return CurrentPlayerName; }
 
-    // Material setup
+    // Đánh dấu host cho slot
     UFUNCTION(BlueprintCallable)
-    void SetDynamicMaterials(UMaterialInstanceDynamic* HostMat, UMaterialInstanceDynamic* NormalMat, UMaterialInstanceDynamic* EmptyMat);
+    void SetIsHost(bool bInIsHost);
 
-    // Animation functions
-    UFUNCTION(BlueprintImplementableEvent)
-    void PlaySlotJoinAnimation();
+    // Cập nhật ping (ms)
+    UFUNCTION(BlueprintCallable)
+    void SetPing(float InPing);
 
-    UFUNCTION(BlueprintImplementableEvent)
-    void PlaySlotLeaveAnimation();
+public:
+    // Index của slot (0..N-1), có thể được set từ widget quản lý
+    UPROPERTY(BlueprintReadWrite, VisibleAnywhere, Category = "Slot")
+    int32 SlotIndex = -1;
 
-    UFUNCTION(BlueprintImplementableEvent)
-    void PlaySlotAppearAnimation();
-
-    UFUNCTION(BlueprintImplementableEvent)
-    void PlayHostGlowAnimation();
-
-    UFUNCTION(BlueprintImplementableEvent)
-    void PlayInviteClickAnimation();
-
-    // Interaction delegates
-    UPROPERTY(BlueprintAssignable)
-    FOnSlotInteraction OnInviteClicked;
-
-    UPROPERTY(BlueprintAssignable)
-    FOnSlotInteraction OnKickClicked;
-
+    UPROPERTY()
+    class UInviteFriendsWidget* InviteWidget;
 protected:
-    // UI Components
+    // --- UI components (bind từ UMG) ---
+    // Tên người chơi / trạng thái / avatar
     UPROPERTY(meta = (BindWidget))
     UTextBlock* PlayerNameText;
 
@@ -81,60 +60,37 @@ protected:
     UTextBlock* StatusText;
 
     UPROPERTY(meta = (BindWidget))
-    UButton* InviteButton;
-
-    UPROPERTY(meta = (BindWidget))
-    UButton* KickButton;
-
-    UPROPERTY(meta = (BindWidget))
     UImage* PlayerAvatar;
 
-    UPROPERTY(meta = (BindWidget))
-    UImage* HostIcon;
-
+    // Border xung quanh slot (đổi màu theo ready/host/empty)
     UPROPERTY(meta = (BindWidget))
     UBorder* SlotBorder;
 
-    // Animations
-    UPROPERTY(meta = (BindWidgetAnim), Transient)
-    UWidgetAnimation* JoinAnim;
+    // Hiển thị ping (text). Nếu muốn dùng progress bar thì đã khai báo sẵn
+    UPROPERTY(meta = (BindWidget))
+    UTextBlock* PingText;
 
-    UPROPERTY(meta = (BindWidgetAnim), Transient)
-    UWidgetAnimation* LeaveAnim;
-
-    UPROPERTY(meta = (BindWidgetAnim), Transient)
-    UWidgetAnimation* HostGlowAnim;
+    // Tùy chọn: progress bar hiển thị chất lượng kết nối (không bắt buộc)
+    UPROPERTY(meta = (BindWidget))
+    UProgressBar* PingBar;
 
 private:
-    // Slot state
+    // Trạng thái runtime
+    UPROPERTY()
     bool bIsOccupied = false;
+
+    UPROPERTY()
+    bool bIsReady = false;
+
+    UPROPERTY()
     bool bIsHost = false;
+
+    UPROPERTY()
     FString CurrentPlayerName;
-    int32 SlotIndex = 0;
-
-    // Dynamic materials
-    UPROPERTY()
-    UMaterialInstanceDynamic* HostBorderMaterialDynamic;
 
     UPROPERTY()
-    UMaterialInstanceDynamic* NormalBorderMaterialDynamic;
+    float Ping = 0.0f;
 
-    UPROPERTY()
-    UMaterialInstanceDynamic* EmptyBorderMaterialDynamic;
-
-    UPROPERTY()
-    FTimerHandle CrownTimer;
-
-    // Button event handlers
-    UFUNCTION()
-    void OnInviteButtonClicked();
-
-    UFUNCTION()
-    void OnKickButtonClicked();
-
-    // Update functions
+    // Cập nhật UI nội bộ
     void UpdateSlotContent();
-    void UpdateButtonVisibility();
-    void ApplyMaterialStyling();
-    void SetHostStyling(bool bIsHost);
 };

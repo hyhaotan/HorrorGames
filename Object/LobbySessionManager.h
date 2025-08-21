@@ -9,8 +9,8 @@
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnSessionCreated, bool, bWasSuccessful);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnSessionDestroyed, bool, bWasSuccessful);
-DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnPlayerJoined, FString, PlayerName, bool, bIsHost);
-DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnPlayerLeft, FString, PlayerName);
+//DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnPlayerJoined, FString, PlayerName, bool, bIsHost);
+//DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnPlayerLeft, FString, PlayerName);
 
 UCLASS(BlueprintType)
 class HORRORGAME_API ULobbySessionManager : public UObject
@@ -58,11 +58,11 @@ public:
     UPROPERTY(BlueprintAssignable)
     FOnSessionDestroyed OnSessionDestroyed;
 
-    UPROPERTY(BlueprintAssignable)
-    FOnPlayerJoined OnPlayerJoined;
+    //UPROPERTY(BlueprintAssignable)
+    //FOnPlayerJoined OnPlayerJoined;
 
-    UPROPERTY(BlueprintAssignable)
-    FOnPlayerLeft OnPlayerLeft;
+    //UPROPERTY(BlueprintAssignable)
+    //FOnPlayerLeft OnPlayerLeft;
 
 private:
     // Session interface

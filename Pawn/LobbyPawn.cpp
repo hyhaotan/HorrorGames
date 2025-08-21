@@ -1,4 +1,4 @@
-// Fill out your copyright notice in the Description page of Project Settings.
+﻿// Fill out your copyright notice in the Description page of Project Settings.
 
 
 #include "LobbyPawn.h"
@@ -13,8 +13,14 @@ ALobbyPawn::ALobbyPawn()
 
 	Camera = CreateDefaultSubobject<UCameraComponent>(TEXT("Camera"));
 	RootComponent = Camera;
-
+	Camera->bUsePawnControlRotation = false;
 	Camera->SetFieldOfView(60.0f);
+
+	// Tắt mọi xoay từ Controller
+	bUseControllerRotationPitch = false;
+	bUseControllerRotationYaw = false;
+	bUseControllerRotationRoll = false;
+
 }
 
 // Called when the game starts or when spawned
