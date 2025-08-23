@@ -10,6 +10,8 @@
 #include "Components/HorizontalBox.h"
 #include "Kismet/GameplayStatics.h"
 #include "Kismet/KismetSystemLibrary.h"
+#include "HorrorGame/Widget/Menu/ConfirmExitWidget.h"
+#include "HorrorGame/Widget/Menu/CreditsWidget.h"
 #include "Engine/Engine.h"
 
 void UMainMenu::NativeConstruct()
@@ -51,6 +53,11 @@ void UMainMenu::NativeConstruct()
     if (RefreshLobbiesButton)
     {
         RefreshLobbiesButton->OnClicked.AddDynamic(this, &UMainMenu::OnRefreshLobbiesClicked);
+    }
+
+    if (CreditsLobbyButton)
+    {
+        CreditsLobbyButton->OnClicked.AddDynamic(this, &UMainMenu::OnCreditsLobbyClicked);
     }
 
     if (ExitGameButton)
@@ -117,9 +124,9 @@ void UMainMenu::OnCreateLobbyClicked()
     if (LobbyNameInput && !LobbyNameInput->GetText().IsEmpty())
     {
         LobbyName = LobbyNameInput->GetText().ToString().TrimStartAndEnd();
-        if (LobbyName.Len() > 50) // Limit lobby name length
+        if (LobbyName.Len() > 20) 
         {
-            UpdateStatusMessage(TEXT("Lobby name too long (max 50 characters)"), true);
+            UpdateStatusMessage(TEXT("Lobby name too long (max 20 characters)"), true);
             return;
         }
     }
@@ -166,6 +173,15 @@ void UMainMenu::OnJoinLobbyClicked()
     }
 }
 
+void UMainMenu::OnCreditsLobbyClicked()
+{
+    UCreditsWidget* CreditsWidget = CreateWidget<UCreditsWidget>(this, CreditsWidgetClass);
+    if (CreditsWidget)
+    {
+        CreditsWidget->AddToViewport(999);
+    }
+}
+
 void UMainMenu::JoinSpecificLobby(const FString& LobbyID)
 {
     if (!SteamLobbySubsystem || bIsJoiningLobby) return;
@@ -209,7 +225,12 @@ void UMainMenu::OnRefreshLobbiesClicked()
 
 void UMainMenu::OnExitGameClicked()
 {
-    UKismetSystemLibrary::QuitGame(GetWorld(), nullptr, EQuitPreference::Quit, false);
+    UConfirmExitWidget* ConfirmExitWidget = CreateWidget<UConfirmExitWidget>(this, ConfirmExitWidgetClass);
+    if (ConfirmExitWidget)
+    {
+        ConfirmExitWidget->AddToViewport(999);
+        ConfirmExitWidget->SetVisibility(ESlateVisibility::Visible);
+    }
 }
 
 void UMainMenu::OnLobbyCreated(bool bSuccess)
@@ -320,7 +341,6 @@ void UMainMenu::UpdateStatusMessage(const FString& Message, bool bIsError)
     if (StatusText)
     {
         StatusText->SetText(FText::FromString(Message));
-        // You could set different colors for error vs normal messages here
     }
 
     // Also show debug message if it's an error

@@ -1,5 +1,4 @@
-﻿// Copyright Epic Games, Inc. All Rights Reserved.
-
+﻿
 #include "HorrorGameCharacter.h"
 #include "HorrorGame/Actor/Door/Door.h"
 #include "HorrorGame/Interface/Interact.h"
@@ -10,7 +9,7 @@
 #include "HorrorGame/Widget/Inventory/InventoryItem.h"
 #include "HorrorGame/Item/ItemBase.h"
 #include "HorrorGame/Actor/MonsterJump.h"
-#include "HorrorGame/Widget/Settings/DeathScreenWidget.h"
+#include "HorrorGame/Widget/DeathScreenWidget.h"
 #include "HorrorGame/Widget/Item/NoteWidget.h"
 #include "HorrorGame/Actor/NoteActor.h"
 #include "HorrorGame/Widget/CrossHairWidget.h"

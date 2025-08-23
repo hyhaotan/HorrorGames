@@ -29,7 +29,6 @@ protected:
        Widget bindings
        ---------------------- */
 
-       // Header / info
     UPROPERTY(meta = (BindWidget))
     class UTextBlock* LobbyNameText;
 

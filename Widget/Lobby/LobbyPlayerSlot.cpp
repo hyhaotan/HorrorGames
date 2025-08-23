@@ -54,10 +54,10 @@ void ULobbyPlayerSlot::UpdateSlotContent()
             FString DisplayName = CurrentPlayerName;
             if (bIsHost)
             {
-                DisplayName += TEXT(" (Host)");
+                DisplayName += TEXT("(Host)");
             }
             PlayerNameText->SetText(FText::FromString(DisplayName));
-            PlayerNameText->SetColorAndOpacity(bIsHost ? FLinearColor::Yellow : FLinearColor::White);
+            PlayerNameText->SetColorAndOpacity(bIsHost ? FLinearColor::Black : FLinearColor::White);
         }
         else
         {
@@ -110,7 +110,6 @@ void ULobbyPlayerSlot::UpdateSlotContent()
             FString PingString = FString::Printf(TEXT("%.0fms"), Ping);
             PingText->SetText(FText::FromString(PingString));
 
-            // Color code ping
             FLinearColor PingColor;
             if (Ping < 50) PingColor = FLinearColor::Green;
             else if (Ping < 100) PingColor = FLinearColor::Yellow;

@@ -1,4 +1,3 @@
-// Fill out your copyright notice in the Description page of Project Settings.
 
 #pragma once
 
@@ -10,6 +9,9 @@ class UComboBoxString;
 class UCheckBox;
 class UGameUserSettings;
 class USelectionWidget;
+class UButton;
+class USlider;
+class UTextBlock;
 
 UCLASS()
 class HORRORGAME_API UGraphicsWidget : public UCommonActivatableWidget
@@ -22,6 +24,42 @@ protected:
 	void InitializeResolutionComboBox();
 	void InitializeVSync();
 	void InitializeFramerate();
+
+    UPROPERTY(meta = (BindWidget))
+    USelectionWidget* TextureQualitySelection;
+
+    UPROPERTY(meta = (BindWidget))
+    USelectionWidget* ViewDistanceQualitySelection;
+
+    UPROPERTY(meta = (BindWidget))
+    USelectionWidget* AntiAliasingQualitySelection;
+
+    UPROPERTY(meta = (BindWidget))
+    USelectionWidget* ReflectionQualitySelection;
+
+    UPROPERTY(meta = (BindWidget))
+    USelectionWidget* FoliageQualitySelection;
+
+    UPROPERTY(meta = (BindWidget))
+    UCheckBox* MotionBlurCheckBox;
+
+    UPROPERTY(meta = (BindWidget))
+    UCheckBox* BloomCheckBox;
+
+    UPROPERTY(meta = (BindWidget))
+    UCheckBox* LensFlareCheckBox;
+
+    UPROPERTY(meta = (BindWidget))
+    USlider* FieldOfViewSlider;
+
+    UPROPERTY(meta = (BindWidget))
+    UTextBlock* FieldOfViewText;
+
+    UPROPERTY(meta = (BindWidget))
+    USelectionWidget* FullscreenModeSelection;
+
+    UPROPERTY(meta = (BindWidget))
+    UButton* BenchmarkButton;
 
 	UFUNCTION()
 	void OnVSyncChanged(bool InIsChecked);
@@ -58,4 +96,23 @@ protected:
 
 	UPROPERTY()
 	TArray<FIntPoint> Resolutions;
+
+private:
+    void InitializeAdvancedGraphicsOptions();
+    void InitializeDisplayOptions();
+
+    UFUNCTION()
+    void OnMotionBlurChanged(bool bIsChecked);
+
+    UFUNCTION()
+    void OnBloomChanged(bool bIsChecked);
+
+    UFUNCTION()
+    void OnLensFlareChanged(bool bIsChecked);
+
+    UFUNCTION()
+    void OnFieldOfViewChanged(float Value);
+
+    UFUNCTION()
+    void OnBenchmarkClicked();
 };

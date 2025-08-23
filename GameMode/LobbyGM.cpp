@@ -17,8 +17,8 @@ ALobbyGM::ALobbyGM()
     DefaultLobbySettings.MaxPlayers = 4;
     DefaultLobbySettings.LobbyName = TEXT("Horror Game Lobby");
     DefaultLobbySettings.GameMode = TEXT("Classic");
-    DefaultLobbySettings.MapName = TEXT("GameLevel");
-    GameLevelToLoad = TEXT("/Game/Maps/GameLevel");
+    DefaultLobbySettings.MapName = TEXT("LoobyMap");
+    GameLevelToLoad = TEXT("/Game/Maps/L_horrorGame");
 }
 
 void ALobbyGM::BeginPlay()

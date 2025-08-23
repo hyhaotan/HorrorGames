@@ -207,6 +207,8 @@ void ALobbyPlayerController::ServerLeaveLobby_Implementation()
         UE_LOG(LogTemp, Log, TEXT("Host transferred to %s"), *LobbyGameState->ConnectedPlayers[0].DisplayName);
     }
 
+    UGameplayStatics::OpenLevel(this, "MainMenu", true);
+
     UE_LOG(LogTemp, Log, TEXT("Player left lobby: %s"), *MyPlayerData.DisplayName);
 }
 

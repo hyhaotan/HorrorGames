@@ -1,103 +1,123 @@
-// Fill out your copyright notice in the Description page of Project Settings.
-
-
 #include "HorrorGame/Widget/Settings/AudioWidget.h"
 #include "Components/Slider.h"
 #include "Components/Button.h"
+#include "Components/TextBlock.h"
+#include "HorrorGame/Settings/HorrorGameSettings.h"
+#include "AudioMixerBlueprintLibrary.h"
 #include "Sound/SoundMix.h"
-#include "Sound/SoundClass.h"
-#include "Kismet/GameplayStatics.h"
 
 void UAudioWidget::NativeConstruct()
 {
-	Super::NativeConstruct();
+    Super::NativeConstruct();
 
-	// Bind slider changes to functions
-	if (MasterVolumeSlider)
-	{
-		MasterVolumeSlider->OnValueChanged.AddDynamic(this, &UAudioWidget::OnMasterVolumeChanged);
-	}
+    // Get settings reference
+    if (UHorrorGameSettings* GameSettings = UHorrorGameSettings::Get())
+    {
+        // Initialize all volume sliders
+        if (MasterVolumeSlider)
+        {
+            MasterVolumeSlider->SetValue(GameSettings->MasterVolume);
+            MasterVolumeSlider->OnValueChanged.Clear();
+            MasterVolumeSlider->OnValueChanged.AddDynamic(this, &UAudioWidget::OnMasterVolumeChanged);
+        }
 
-	if (MusicVolumeSlider)
-	{
-		MusicVolumeSlider->OnValueChanged.AddDynamic(this, &UAudioWidget::OnMusicVolumeChanged);
-	}
+        if (MusicVolumeSlider)
+        {
+            MusicVolumeSlider->SetValue(GameSettings->MusicVolume);
+            MusicVolumeSlider->OnValueChanged.Clear();
+            MusicVolumeSlider->OnValueChanged.AddDynamic(this, &UAudioWidget::OnMusicVolumeChanged);
+        }
 
-	if (SFXVolumeSlider)
-	{
-		SFXVolumeSlider->OnValueChanged.AddDynamic(this, &UAudioWidget::OnSFXVolumeChanged);
-	}
+        if (SFXVolumeSlider)
+        {
+            SFXVolumeSlider->SetValue(GameSettings->SFXVolume);
+            SFXVolumeSlider->OnValueChanged.Clear();
+            SFXVolumeSlider->OnValueChanged.AddDynamic(this, &UAudioWidget::OnSFXVolumeChanged);
+        }
 
-	// Bind mute button
-	if (MuteButton)
-	{
-		MuteButton->OnClicked.AddDynamic(this, &UAudioWidget::OnMuteButtonClicked);
-	}
+        // Add Voice and Ambient volume sliders if they exist
+        // Initialize mute button
+        if (MuteButton)
+        {
+            MuteButton->OnClicked.Clear();
+            MuteButton->OnClicked.AddDynamic(this, &UAudioWidget::OnMuteButtonClicked);
+        }
+
+        // Set initial values
+        MasterVolume = GameSettings->MasterVolume;
+        MusicVolume = GameSettings->MusicVolume;
+        SFXVolume = GameSettings->SFXVolume;
+        bIsMuted = GameSettings->bMuted;
+    }
 }
 
 void UAudioWidget::OnMasterVolumeChanged(float Value)
 {
-	MasterVolume = Value;
-	UGameplayStatics::SetSoundMixClassOverride(
-		this,
-		nullptr,
-		nullptr,
-		MasterVolume,
-		1.0f,
-		0.1f
-	);
+    MasterVolume = Value;
+
+    if (UHorrorGameSettings* GameSettings = UHorrorGameSettings::Get())
+    {
+        GameSettings->MasterVolume = Value;
+        GameSettings->SaveConfig();
+
+        // Apply to audio system
+        UAudioMixerBlueprintLibrary::SetBypassSourceEffectChainEntry(this, nullptr, 0, !bIsMuted);
+    }
 }
 
 void UAudioWidget::OnMusicVolumeChanged(float Value)
 {
-	MusicVolume = Value;
-	// Assuming you have a Music SoundClass
-	USoundClass* MusicSoundClass = LoadObject<USoundClass>(nullptr, TEXT("/Game/Audio/MusicSoundClass.MusicSoundClass"));
-	if (MusicSoundClass)
-	{
-		UGameplayStatics::SetSoundMixClassOverride(
-			this,
-			nullptr,
-			MusicSoundClass,
-			MusicVolume,
-			1.0f,
-			0.1f
-		);
-	}
+    MusicVolume = Value;
+
+    if (UHorrorGameSettings* GameSettings = UHorrorGameSettings::Get())
+    {
+        GameSettings->MusicVolume = Value;
+        GameSettings->SaveConfig();
+
+        // Apply music volume to sound mix
+        // TODO: Apply to music sound class
+    }
 }
 
 void UAudioWidget::OnSFXVolumeChanged(float Value)
 {
-	SFXVolume = Value;
-	// Assuming you have a SFX SoundClass
-	USoundClass* SFXSoundClass = LoadObject<USoundClass>(nullptr, TEXT("/Game/Audio/SFXSoundClass.SFXSoundClass"));
-	if (SFXSoundClass)
-	{
-		UGameplayStatics::SetSoundMixClassOverride(
-			this,
-			nullptr,
-			SFXSoundClass,
-			SFXVolume,
-			1.0f,
-			0.1f
-		);
-	}
+    SFXVolume = Value;
+
+    if (UHorrorGameSettings* GameSettings = UHorrorGameSettings::Get())
+    {
+        GameSettings->SFXVolume = Value;
+        GameSettings->SaveConfig();
+
+        // Apply SFX volume to sound mix
+        // TODO: Apply to SFX sound class
+    }
 }
 
 void UAudioWidget::OnMuteButtonClicked()
 {
-	bIsMuted = !bIsMuted;
+    bIsMuted = !bIsMuted;
 
-	float NewVolume = bIsMuted ? 0.0f : 1.0f;
-	UGameplayStatics::SetSoundMixClassOverride(
-		this,
-		nullptr,
-		nullptr,
-		NewVolume,
-		1.0f,
-		0.1f
-	);
+    if (UHorrorGameSettings* GameSettings = UHorrorGameSettings::Get())
+    {
+        GameSettings->bMuted = bIsMuted;
+        GameSettings->SaveConfig();
 
-	// Update the UI or show a message
-	// For example, change button text/icon to indicate mute state
+        // Mute/unmute all audio
+        if (bIsMuted)
+        {
+            // Mute all audio
+            UAudioMixerBlueprintLibrary::SetBypassSourceEffectChainEntry(this, nullptr, 0, false);
+        }
+        else
+        {
+            // Restore audio
+            UAudioMixerBlueprintLibrary::SetBypassSourceEffectChainEntry(this, nullptr, 0, true);
+        }
+    }
+
+    // Update button text
+    if (MuteButton)
+    {
+        // TODO: Update button appearance based on mute state
+    }
 }
