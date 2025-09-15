@@ -15,6 +15,7 @@ class USteamLobbySubsystem;
 class ULobbyEntry;
 class UConfirmExitWidget;
 class UCreditsWidget;
+class UMenuSettingSystemWidget;
 
 UCLASS()
 class HORRORGAME_API UMainMenu : public UUserWidget
@@ -34,6 +35,9 @@ public:
 
     UPROPERTY(meta = (BindWidget))
     UButton* JoinLobbyButton;
+
+    UPROPERTY(meta = (BindWidget))
+    UButton* SettingsButton;
 
     UPROPERTY(meta = (BindWidget))
     UButton* RefreshLobbiesButton;
@@ -76,6 +80,9 @@ protected:
     UFUNCTION()
     void OnExitGameClicked();
 
+    UFUNCTION()
+    void OnSettingsClicked();
+
     // Lobby management
     UFUNCTION()
     void JoinSpecificLobby(const FString& LobbyID);
@@ -114,6 +121,9 @@ public:
 
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "UI")
     TSubclassOf<UCreditsWidget> CreditsWidgetClass;
+
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "UI")
+	TSubclassOf<UMenuSettingSystemWidget> MenuSettingSystemWidgetClass;
 
 private:
     UPROPERTY()

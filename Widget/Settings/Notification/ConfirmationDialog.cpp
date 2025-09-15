@@ -15,6 +15,11 @@ void UConfirmationDialog::NativeConstruct()
 
 void UConfirmationDialog::ShowDialog(const FText& Title, const FText& Message, const FText& ConfirmText, const FText& CancelText)
 {
+	const FText DefaultConfirmText = FText::FromString(TEXT("Confirm"));
+	const FText DefaultCancelText = FText::FromString(TEXT("Cancel"));
+	const FText ConfirmTextToUse = ConfirmText.IsEmpty() ? DefaultConfirmText : ConfirmText;
+	const FText CancelTextToUse = CancelText.IsEmpty() ? DefaultCancelText : CancelText;
+
     if (TitleText)
         TitleText->SetText(Title);
 
@@ -22,10 +27,10 @@ void UConfirmationDialog::ShowDialog(const FText& Title, const FText& Message, c
         MessageText->SetText(Message);
 
     if (ConfirmButtonText)
-        ConfirmButtonText->SetText(ConfirmText);
+        ConfirmButtonText->SetText(ConfirmTextToUse);
 
     if (CancelButtonText)
-        CancelButtonText->SetText(CancelText);
+        CancelButtonText->SetText(CancelTextToUse);
 
     AddToViewport();
     SetKeyboardFocus();

@@ -1,7 +1,7 @@
 ﻿// Fill out your copyright notice in the Description page of Project Settings.
 
 
-#include "HorrorGame/Widget/Settings/MenuSettingWidget.h"
+#include "MenuSettingWidget.h"
 #include "HorrorGame/GameMode/MainMenuMode.h"
 #include "kismet/GameplayStatics.h"
 #include "Components/Button.h"

@@ -1,4 +1,4 @@
-﻿#include "MainMenu.h"
+﻿#include "HorrorGame/Widget/Menu/MainMenu.h"
 #include "HorrorGame/GameInstance/SteamLobbySubsystem.h"
 #include "HorrorGame/Object/PlayerIDManager.h"
 #include "HorrorGame/Widget/Lobby/LobbyEntry.h"
@@ -13,6 +13,7 @@
 #include "HorrorGame/Widget/Menu/ConfirmExitWidget.h"
 #include "HorrorGame/Widget/Menu/CreditsWidget.h"
 #include "Engine/Engine.h"
+#include "HorrorGame//Widget/Settings/MainSettings/MenuSettingSystemWidget.h"
 
 void UMainMenu::NativeConstruct()
 {
@@ -63,6 +64,11 @@ void UMainMenu::NativeConstruct()
     if (ExitGameButton)
     {
         ExitGameButton->OnClicked.AddDynamic(this, &UMainMenu::OnExitGameClicked);
+    }
+
+    if (SettingsButton)
+    {
+        SettingsButton->OnClicked.AddDynamic(this, &UMainMenu::OnSettingsClicked);
     }
 
     // Initialize UI state
@@ -230,6 +236,16 @@ void UMainMenu::OnExitGameClicked()
     {
         ConfirmExitWidget->AddToViewport(999);
         ConfirmExitWidget->SetVisibility(ESlateVisibility::Visible);
+    }
+}
+
+void UMainMenu::OnSettingsClicked()
+{
+    UMenuSettingSystemWidget* SettingsWidget = CreateWidget<UMenuSettingSystemWidget>(this, MenuSettingSystemWidgetClass);
+    if (SettingsWidget)
+    {
+        SettingsWidget->AddToViewport(999);
+        SettingsWidget->SetVisibility(ESlateVisibility::Visible);
     }
 }
 

@@ -2,10 +2,10 @@
 #include "CoreMinimal.h"
 #include "Blueprint/UserWidget.h"
 #include "InputCoreTypes.h"
-#include "ControlsWidget.h"
+#include "HorrorGame/Widget/Settings/SettingsTab/ControlsWidget.h"
 #include "KeyBindingWidget.generated.h"
 
-DECLARE_DELEGATE_TwoParams(FOnKeyBindingChanged, FName, FKey);
+DECLARE_DELEGATE_ThreeParams(FOnKeyBindingChanged, FName, FKey, bool);
 
 UCLASS()
 class HORRORGAME_API UKeyBindingWidget : public UUserWidget
@@ -35,7 +35,7 @@ private:
     void OnKeyButtonClicked();
 
     UFUNCTION()
-    void OnKeySelected(FKey SelectedKey);
+    void OnKeySelected(FKey SelectedKey, bool bIsGamepadKey);
 
     FKeyBinding CurrentKeyBinding;
     bool bIsWaitingForKey = false;

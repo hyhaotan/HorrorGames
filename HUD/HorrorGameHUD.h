@@ -10,7 +10,7 @@ class HORRORGAME_API AHorrorGameHUD : public AHUD
 
 public:
     UFUNCTION(BlueprintCallable, Category = "UI")
-    void ShowNotification(const FText& Message, float Duration = 3.0f);
+    void ShowNotifications(const FText& Message, float Duration = 3.0f);
 
 protected:
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "UI")

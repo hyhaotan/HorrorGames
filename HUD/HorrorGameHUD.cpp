@@ -3,3 +3,6 @@
 
 #include "HorrorGameHUD.h"
 
+void AHorrorGameHUD::ShowNotifications(const FText& Message, float Duration)
+{
+}

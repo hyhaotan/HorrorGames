@@ -2,7 +2,7 @@
 #include "HorrorGameCharacter.h"
 #include "HorrorGame/Actor/Door/Door.h"
 #include "HorrorGame/Interface/Interact.h"
-#include "HorrorGame/Widget/Settings/MenuSettingWidget.h"
+#include "HorrorGame/Widget/Settings/MainSettings/MenuSettingWidget.h"
 #include "HorrorGame/Actor/Item.h"
 #include "HorrorGame/Widget/Inventory/Inventory.h"
 #include "HorrorGame/Widget/Inventory/InventorySlot.h"

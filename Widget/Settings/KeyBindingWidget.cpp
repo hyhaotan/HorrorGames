@@ -1,4 +1,4 @@
-#include "KeyBindingWidget.h"
+﻿#include "KeyBindingWidget.h"
 #include "Components/TextBlock.h"
 #include "Components/Button.h"
 #include "Blueprint/WidgetBlueprintLibrary.h"
@@ -6,7 +6,6 @@
 void UKeyBindingWidget::NativeConstruct()
 {
     Super::NativeConstruct();
-
     if (KeyButton)
     {
         KeyButton->OnClicked.AddDynamic(this, &UKeyBindingWidget::OnKeyButtonClicked);
@@ -16,12 +15,10 @@ void UKeyBindingWidget::NativeConstruct()
 void UKeyBindingWidget::SetKeyBinding(const FKeyBinding& InKeyBinding)
 {
     CurrentKeyBinding = InKeyBinding;
-
     if (ActionNameText)
     {
         ActionNameText->SetText(CurrentKeyBinding.ActionName);
     }
-
     if (KeyText)
     {
         KeyText->SetText(FText::FromString(CurrentKeyBinding.CurrentKey.GetDisplayName().ToString()));
@@ -44,7 +41,7 @@ void UKeyBindingWidget::OnKeyButtonClicked()
     SetKeyboardFocus();
 }
 
-void UKeyBindingWidget::OnKeySelected(FKey SelectedKey)
+void UKeyBindingWidget::OnKeySelected(FKey SelectedKey, bool bIsGamepadKey)
 {
     if (!bIsWaitingForKey)
         return;
@@ -61,24 +58,35 @@ void UKeyBindingWidget::OnKeySelected(FKey SelectedKey)
         return;
     }
 
-    CurrentKeyBinding.CurrentKey = SelectedKey;
+    // Cập nhật key binding tương ứng
+    if (bIsGamepadKey)
+    {
+        CurrentKeyBinding.CurrentGamepadKey = SelectedKey;
+    }
+    else
+    {
+        CurrentKeyBinding.CurrentKey = SelectedKey;
+    }
 
+    // Cập nhật UI text
     if (KeyText)
     {
         KeyText->SetText(FText::FromString(SelectedKey.GetDisplayName().ToString()));
     }
 
-    OnKeyBindingChanged.ExecuteIfBound(CurrentKeyBinding.ActionTag, SelectedKey);
+    // Gọi delegate với 3 tham số (ActionTag, Key, bIsGamepadKey)
+    OnKeyBindingChanged.ExecuteIfBound(CurrentKeyBinding.ActionTag, SelectedKey, bIsGamepadKey);
 }
 
 FReply UKeyBindingWidget::NativeOnKeyDown(const FGeometry& InGeometry, const FKeyEvent& InKeyEvent)
 {
     if (bIsWaitingForKey)
     {
-        OnKeySelected(InKeyEvent.GetKey());
+        FKey PressedKey = InKeyEvent.GetKey();
+        bool bIsGamepadKey = PressedKey.IsGamepadKey();
+        OnKeySelected(PressedKey, bIsGamepadKey);
         return FReply::Handled();
     }
-
     return Super::NativeOnKeyDown(InGeometry, InKeyEvent);
 }
 
@@ -86,9 +94,8 @@ FReply UKeyBindingWidget::NativeOnMouseButtonDown(const FGeometry& InGeometry, c
 {
     if (bIsWaitingForKey)
     {
-        OnKeySelected(InMouseEvent.GetEffectingButton());
+        OnKeySelected(InMouseEvent.GetEffectingButton(), false);
         return FReply::Handled();
     }
-
     return Super::NativeOnMouseButtonDown(InGeometry, InMouseEvent);
 }

@@ -3,7 +3,7 @@
 #include "CommonActivatableWidget.h"
 #include "ConfirmationDialog.generated.h"
 
-DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnConfirmationResult, bool, bConfirmed);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnConfirmationResults, bool, bConfirmed);
 
 UCLASS()
 class HORRORGAME_API UConfirmationDialog : public UCommonActivatableWidget
@@ -14,10 +14,10 @@ public:
     virtual void NativeConstruct() override;
 
     UFUNCTION(BlueprintCallable, Category = "Dialog")
-    void ShowDialog(const FText& Title, const FText& Message, const FText& ConfirmText = FText::FromString("Confirm"), const FText& CancelText = FText::FromString("Cancel"));
+    void ShowDialog(const FText& Title, const FText& Message, const FText& ConfirmText = FText::GetEmpty(), const FText& CancelText = FText::GetEmpty());
 
-    UPROPERTY(BlueprintAssignable)
-    FOnConfirmationResult OnConfirmationResult;
+    UPROPERTY(BlueprintAssignable, Category = "Confirmation")
+    FOnConfirmationResults OnConfirmationResult;
 
 protected:
     UPROPERTY(meta = (BindWidget))
